@@ -17,7 +17,7 @@ history.json.*
 *.bak
 data/
 output/
-assets/output/
+assets/
 
 # OS
 .DS_Store
