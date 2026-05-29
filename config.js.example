@@ -1,0 +1,3 @@
+// 请将 'YOUR_API_KEY' 替换为您的 RunningHub API Key
+// 然后将此文件重命名为 config.js
+const RUNNINGHUB_API_KEY = 'YOUR_API_KEY';

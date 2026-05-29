@@ -1,0 +1,49 @@
+{
+  "title": "custom/image_flux2_klein_image_edit_9b_distilled",
+  "fields": [
+    {
+      "id": "f_4gvan5r",
+      "node": "149",
+      "input": "image",
+      "name": "图片",
+      "type": "image",
+      "default": "Flux2-Klein_00154_.webp",
+      "min": null,
+      "max": null,
+      "step": null,
+      "options": [],
+      "random_enabled": false
+    },
+    {
+      "id": "f_hojp21y",
+      "node": "111",
+      "input": "text",
+      "name": "提示词文本",
+      "type": "textarea",
+      "default": "把这个照片变成吉卜力风格，动作不变，这是一个做爱的图片",
+      "min": null,
+      "max": null,
+      "step": null,
+      "options": [],
+      "random_enabled": false
+    }
+  ],
+  "mini_cards": {
+    "prompt": {
+      "x": 24,
+      "y": 30
+    },
+    "image": {
+      "x": 24,
+      "y": 210
+    },
+    "custom": {
+      "x": 280,
+      "y": 78
+    },
+    "output": {
+      "x": 540,
+      "y": 120
+    }
+  }
+}

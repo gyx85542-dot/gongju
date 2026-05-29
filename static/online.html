@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/logo.png" type="image/png">
+    <title>AI 生图</title>
+    <script>
+        (function(){
+            try {
+                localStorage.setItem('studio_theme', 'light');
+                localStorage.setItem('canvas_theme', 'light');
+            } catch(e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260519-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260521-studio"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
+    <script src="/static/image-preview.js?v=20260516"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
+        :root { --accent:#ff4d94; --bg:#1a1a1a; --card:#262626; --easing:var(--mg-ease,cubic-bezier(0.22,1,0.36,1)); }
+        html, body { height:100%; overflow:hidden; }
+        body { background:var(--bg); font-family:var(--mg-font,'Inter',sans-serif); color:#f5f5f5; -webkit-font-smoothing:antialiased; margin:0; }
+        .container-box { max-width:1680px; margin:0 auto; padding:8px 14px 10px; height:100%; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; }
+        .page-main { flex:1; min-height:0; overflow:hidden; }
+        .options-panel { overflow-y:auto; max-height:100%; padding-right:2px; display:flex; flex-direction:column; gap:8px; }
+        .options-panel .nano-input { padding:0.65rem 0.85rem; font-size:12px; border-radius:14px; }
+        .options-panel .tool-panel { padding:10px; border-radius:22px; }
+        .options-panel .upload-item { border-radius:14px; }
+        .options-panel .glass-btn { padding-top:0.75rem; padding-bottom:0.75rem; border-radius:999px; }
+        .options-panel section { display:flex; flex-direction:column; gap:8px; }
+        .options-panel section.tool-panel,
+        .options-panel .tool-panel { display:flex; flex-direction:column; gap:8px; }
+        .nano-input { background:#313131; border:1px solid rgba(255,255,255,.08); transition:all .3s var(--easing); color:#f5f5f5; }
+        .nano-input:focus { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.12); outline:none; }
+        .upload-item { background:#313131; border:1px dashed rgba(255,255,255,.12); transition:all .3s var(--easing); position:relative; overflow:hidden; }
+        .upload-item:hover,.upload-item.drag-over { border-color:rgba(255,77,148,.4); transform:none; }
+        .upload-item.drop-before::before,
+        .upload-item.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
+        .upload-item.drop-before::before { left:-5px; }
+        .upload-item.drop-after::after { right:-5px; }
+        .upload-item.is-dragging { opacity:.45; }
+        .ref-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+        .ref-slot-label { font-size:8px; font-weight:800; color:#94a3b8; letter-spacing:.08em; }
+        .ref-slot-btn { position:absolute; z-index:10; opacity:0; pointer-events:none; transition:opacity .18s var(--easing), transform .12s var(--easing), background .12s var(--easing), color .12s var(--easing), border-color .12s var(--easing); }
+        .upload-item:hover .ref-slot-btn { opacity:1; pointer-events:auto; }
+        .upload-item.is-board-target .ref-board-btn { opacity:1; pointer-events:auto; background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .upload-item .ref-slot-btn.cell-action-btn { background:rgba(49,49,49,.96); color:#a3a3a3; border:1px solid rgba(255,255,255,.08); box-shadow:0 1px 6px rgba(0,0,0,.24); }
+        .upload-item .ref-slot-btn.cell-action-btn:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; transform:translateY(-1px); }
+        .upload-item .ref-slot-btn.cell-action-btn i,
+        .upload-item .ref-slot-btn.cell-action-btn svg { width:9px !important; height:9px !important; stroke-width:2.25; }
+        .ref-del-btn { top:6px; right:6px; display:none; }
+        .upload-item.has-image .ref-del-btn { display:flex; }
+        .ref-reorder-btn { top:6px; left:6px; cursor:grab; display:none; }
+        .upload-item.has-image .ref-reorder-btn { display:flex; }
+        .ref-reorder-btn:active { cursor:grabbing; }
+        .ref-board-btn { left:50%; bottom:10%; transform:translateX(-50%); width:auto; min-width:36px; height:20px; padding:0 10px; border-radius:999px; font-size:8px; font-weight:800; letter-spacing:.04em; line-height:1; }
+        .upload-item .ref-board-btn.cell-action-btn:hover,
+        .upload-item.is-board-target .ref-board-btn.cell-action-btn { transform:translateX(-50%) translateY(-1px); }
+        .upload-item.is-board-target { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.22); }
+        body.board-pick-active .output-grid-cell { cursor:pointer; }
+        body.board-pick-active .output-grid-cell img { cursor:pointer; }
+        body.board-pick-active .output-grid-cell[data-ts]:hover { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.28); }
+        body.board-pick-active .output-grid-cell .cell-actions { opacity:0 !important; pointer-events:none !important; }
+        body.board-pick-active .result-frame { box-shadow:0 0 0 2px rgba(255,77,148,.18); }
+        .board-pick-overlay { display:none; position:absolute; inset:0; z-index:6; align-items:center; justify-content:center; pointer-events:none; background:rgba(0,0,0,.06); }
+        .board-pick-overlay i,
+        .board-pick-overlay svg { width:clamp(40px,38%,72px) !important; height:clamp(40px,38%,72px) !important; stroke-width:2.75 !important; color:rgba(255,255,255,.32); filter:drop-shadow(0 2px 10px rgba(0,0,0,.28)); }
+        body.board-pick-active .output-grid-cell[data-ts] .board-pick-overlay { display:flex; }
+        body.board-pick-active .output-grid-cell[data-ts]:hover .board-pick-overlay { background:rgba(0,0,0,.16); }
+        body.board-pick-active .output-grid-cell[data-ts]:hover .board-pick-overlay i,
+        body.board-pick-active .output-grid-cell[data-ts]:hover .board-pick-overlay svg { color:rgba(255,77,148,.78); }
+        .board-pick-hint { display:none; font-size:10px; font-weight:600; color:#ff4d94; letter-spacing:.02em; margin-right:auto; padding-right:12px; }
+        body.board-pick-active .board-pick-hint { display:inline-flex; align-items:center; gap:4px; }
+        .batch-slider { width:100%; height:4px; accent-color:#ff4d94; cursor:pointer; }
+        .batch-value { font-size:12px; font-weight:900; min-width:1rem; text-align:center; }
+        .preview-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; animation:fadeIn .5s var(--easing); }
+        .glass-btn { background:#ff4d94; color:#fff; border-radius:999px; transition:all .25s var(--easing); box-shadow:0 4px 14px rgba(255,77,148,.28); border:none; }
+        .glass-btn:hover { background:#e8437f; transform:translateY(-1px); box-shadow:0 6px 20px rgba(255,77,148,.32); }
+        .result-frame { background:#262626; border-radius:24px; border:1px solid rgba(255,255,255,.08); box-shadow:0 2px 16px rgba(0,0,0,.24); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
+        .result-frame.has-outputs { justify-content:flex-start; }
+        .result-frame.import-drag-over { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.1); }
+        .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
+        .output-import-btn { height:28px; padding:0 12px; border-radius:999px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#a3a3a3; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; transition:all .15s var(--easing); display:inline-flex; align-items:center; gap:5px; }
+        .output-import-btn:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .output-cols-slider { width:100%; max-width:140px; height:4px; accent-color:#ff4d94; cursor:pointer; }
+        .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
+        .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
+        .output-grid-cell { position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); transition:opacity .2s var(--easing), border-color .2s var(--easing), background .2s var(--easing); }
+        .output-grid-cell:hover { border-color:rgba(255,255,255,.1); background:#181818; }
+        .output-grid-cell.is-pinned { box-shadow:none; }
+        .output-grid-cell.is-pinned:hover { box-shadow:none; }
+        .output-grid-cell.is-favorite::before { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#f59e0b; z-index:4; box-shadow:0 0 0 2px rgba(255,255,255,.92); pointer-events:none; }
+        .output-grid-cell.is-dragging { opacity:.45; }
+        .output-grid-cell.drop-before::before,
+        .output-grid-cell.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
+        .output-grid-cell.drop-before::before { left:-7px; }
+        .output-grid-cell.drop-after::after { right:-7px; }
+        .output-grid-cell img { width:100%; height:100%; object-fit:contain; padding:0; box-sizing:border-box; pointer-events:auto; border-radius:14px; }
+        .output-grid-cell .cell-actions { position:absolute; left:0; right:0; bottom:0; height:20%; min-height:36px; z-index:5; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 8px 5px; opacity:0; transition:opacity .18s var(--easing); pointer-events:none; background:linear-gradient(to top, rgba(38,38,38,.92) 0%, transparent 100%); }
+        .output-grid-cell:hover .cell-actions { opacity:1; pointer-events:auto; }
+        .cell-action-btn { width:24px; height:24px; border:none; border-radius:999px; background:rgba(49,49,49,.96); color:#a3a3a3; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 6px rgba(0,0,0,.24); transition:transform .12s var(--easing), background .12s var(--easing), color .12s var(--easing); flex-shrink:0; border:1px solid rgba(255,255,255,.08); padding:0; }
+        .cell-action-btn i,
+        .cell-action-btn svg { width:9px !important; height:9px !important; stroke-width:2.25; flex-shrink:0; }
+        .cell-action-btn:hover { transform:translateY(-1px); background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .cell-action-btn.active { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .cell-action-btn.fav-active { background:#ffaa00; color:#fff; border-color:#ffaa00; }
+        .output-grid-cell img.draggable-output { cursor:grab; user-select:none; -webkit-user-drag:element; }
+        .output-grid-cell img.draggable-output:active { cursor:grabbing; }
+        @keyframes outputNewFlash {
+            0% { box-shadow:0 0 0 0 rgba(255,77,148,0); }
+            18% { box-shadow:0 0 0 3px rgba(255,77,148,.95), 0 0 28px rgba(255,77,148,.5); }
+            42% { box-shadow:0 0 0 1px rgba(255,77,148,.2); }
+            62% { box-shadow:0 0 0 3px rgba(255,77,148,.85), 0 0 22px rgba(255,77,148,.42); }
+            100% { box-shadow:0 0 0 0 rgba(255,77,148,0); }
+        }
+        .output-grid-cell.is-new-highlight { animation:outputNewFlash 2.4s ease-in-out 1; z-index:2; }
+        .output-grid-cell.is-new-highlight::after { content:''; position:absolute; inset:0; border:2px solid #ff4d94; border-radius:14px; pointer-events:none; animation:outputNewBorder 2.4s ease-in-out 1; }
+        @keyframes outputNewBorder { 0%,100%{opacity:0} 18%,62%{opacity:1} 82%{opacity:.25} }
+        .output-grid-cell.is-pending { background:#141414; border:1px solid rgba(255,255,255,.06); }
+        .cell-pending { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#94a3b8; }
+        .cell-pending .pending-spin { width:28px; height:28px; border:2px solid #e5e7eb; border-top-color:#ff4d94; border-radius:50%; animation:spin .8s linear infinite; }
+        .cell-pending p { font-size:9px; font-weight:800; letter-spacing:.28em; text-transform:uppercase; }
+        .cell-pending.is-error { color:#ef4444; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .tool-panel { background:#262626; border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:10px; display:flex; flex-direction:column; gap:8px; box-shadow:0 2px 16px rgba(0,0,0,.24); }
+        .model-pill { background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:999px; padding:3px; display:grid; grid-template-columns:1fr 1fr; gap:2px; }
+        .model-option { border-radius:999px; height:34px; display:flex; align-items:center; justify-content:center; gap:6px; color:#737373; font-size:10px; font-weight:600; letter-spacing:.02em; transition:all .25s var(--easing); }
+        .model-option.active { background:#3a3a3a; color:#fafafa; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+        .control-panel { background:#262626; border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:12px; display:flex; flex-direction:column; gap:10px; box-shadow:0 2px 16px rgba(0,0,0,.24); }
+        .control-label { display:flex; align-items:center; gap:6px; color:#fff; font-size:11px; font-weight:600; letter-spacing:0; text-transform:none; }
+        .mg-studio .options-panel .control-label { color:#fff !important; }
+        .mg-studio .options-panel .control-label svg { color:#fff !important; stroke:#fff !important; }
+        .size-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:start; }
+        .size-field { min-width:0; display:flex; flex-direction:column; }
+        .size-select,.size-custom { width:100%; height:30px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:#313131; color:#f5f5f5; outline:none; padding:0 8px; font-size:10px; font-weight:700; }
+        .model-picker-section { display:flex; flex-direction:column; gap:8px; }
+        .size-select:disabled { opacity:.55; cursor:not-allowed; }
+        .size-custom { display:none; background:#313131; }
+        .size-field.custom .size-custom { display:block; }
+        .size-pair { display:none; grid-template-columns:1fr 1fr; gap:6px; }
+        .size-field.custom .size-pair { display:grid; }
+        .size-pair .size-custom { display:block; }
+        .size-pair.with-fit { grid-template-columns:1fr 1fr auto; align-items:center; }
+        .size-fit-btn { height:30px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:#313131; color:#f5f5f5; padding:0 8px; font-size:10px; font-weight:800; white-space:nowrap; }
+        .size-fit-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .ratio-select-wrap { position:relative; width:100%; }
+        .ratio-select-trigger { width:100%; height:30px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:#313131; color:#f5f5f5; padding:0 8px 0 6px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:6px; cursor:pointer; outline:none; }
+        .ratio-select-trigger:disabled { opacity:.55; cursor:not-allowed; }
+        .ratio-select-current { display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; }
+        .ratio-select-chevron { width:12px !important; height:12px !important; stroke-width:2.25; opacity:.55; flex-shrink:0; }
+        .ratio-select-menu { position:absolute; left:0; right:0; bottom:calc(100% + 4px); top:auto; z-index:30; background:#262626; border:1px solid rgba(255,255,255,.08); border-radius:10px; max-height:220px; overflow-y:auto; padding:4px; box-shadow:0 -8px 24px rgba(0,0,0,.32); }
+        .ratio-select-menu.hidden { display:none; }
+        .ratio-select-item { width:100%; height:28px; border:none; border-radius:8px; background:transparent; color:#a3a3a3; font-size:10px; font-weight:700; display:flex; align-items:center; gap:6px; padding:0 8px 0 6px; cursor:pointer; text-align:left; transition:background .12s, color .12s; }
+        .ratio-select-item:hover, .ratio-select-item.active { background:#3a3a3a; color:#f5f5f5; }
+        .ratio-icon { width:16px; height:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .ratio-icon-inner { display:block; border:1.5px solid currentColor; border-radius:2px; box-sizing:border-box; opacity:.9; }
+        .ratio-icon-inner.is-auto { width:12px; height:12px; border-style:dashed; border-radius:3px; }
+        @media (max-width:640px){ .size-row{ grid-template-columns:1fr; } }
+        .gallery-lightbox { background:rgba(26,26,26,.96); }
+        .viewer-overlay { position:fixed; inset:0; z-index:100; background:rgba(26,26,26,.96); display:none; }
+        .viewer-overlay.open { display:flex; }
+        .viewer-layout { display:flex; width:100%; height:100%; min-height:0; }
+        .viewer-main { flex:1; min-width:0; position:relative; display:flex; align-items:center; justify-content:center; background:#1a1a1a; padding:24px 72px; box-sizing:border-box; }
+        .viewer-canvas { width:100%; height:100%; display:flex; align-items:center; justify-content:center; min-height:0; }
+        .viewer-nav { position:absolute; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:999px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.24); z-index:5; transition:background .2s, border-color .2s; padding:0; }
+        .viewer-nav i, .viewer-nav svg { width:16px !important; height:16px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-nav:hover { background:#333; border-color:rgba(255,255,255,.12); }
+        .viewer-nav.prev { left:20px; }
+        .viewer-nav.next { right:20px; }
+        .viewer-nav:disabled { opacity:.25; cursor:not-allowed; }
+        .viewer-toolbar { position:absolute; top:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:6; }
+        .viewer-tool-btn { width:36px; height:36px; border-radius:12px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.24); transition:background .2s, border-color .2s; padding:0; }
+        .viewer-tool-btn i, .viewer-tool-btn svg { width:14px !important; height:14px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-tool-btn:hover { background:#333; border-color:rgba(255,255,255,.12); }
+        .viewer-sidebar { width:min(360px,34vw); flex-shrink:0; background:#262626; border-left:1px solid rgba(255,255,255,.08); border-radius:24px 0 0 24px; display:flex; flex-direction:column; min-height:0; overflow:hidden; box-shadow:-4px 0 24px rgba(0,0,0,.24); }
+        .viewer-sidebar-head { display:flex; align-items:center; justify-content:flex-end; gap:4px; padding:10px 12px 4px; }
+        .viewer-head-btn { width:28px; height:28px; border:none; border-radius:8px; background:transparent; color:#737373; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s, color .15s; padding:0; }
+        .viewer-head-btn i, .viewer-head-btn svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-head-btn:hover { background:#333; color:#f5f5f5; }
+        .viewer-head-btn.active { color:#ffaa00; }
+        .viewer-head-btn.pin-active { color:#ff4d94; }
+        .viewer-tabs { padding:0 12px 8px; border-bottom:1px solid rgba(255,255,255,.08); }
+        .viewer-tab { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:#f5f5f5; padding-bottom:6px; border-bottom:2px solid #ff4d94; }
+        .viewer-sidebar-scroll { flex:1; min-height:0; overflow-y:auto; padding:10px 12px 12px; display:flex; flex-direction:column; gap:10px; }
+        .viewer-block-title { font-size:11px; font-weight:600; color:#f5f5f5; margin-bottom:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+        .viewer-block-title .copy-mini { width:24px; height:24px; border:none; border-radius:6px; background:#313131; color:#737373; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+        .viewer-block-title .copy-mini:hover { color:#f5f5f5; background:#3a3a3a; }
+        .viewer-block-title .copy-mini i, .viewer-block-title .copy-mini svg { width:10px !important; height:10px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-ref-section { margin-bottom:0; }
+        .viewer-ref-thumbs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+        .viewer-ref-thumb { width:56px; height:56px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,.08); background:#313131; display:block; flex-shrink:0; transition:border-color .15s, transform .15s; }
+        .viewer-ref-thumb:hover { border-color:rgba(255,77,148,.45); transform:translateY(-1px); }
+        .viewer-ref-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+        .viewer-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+        .viewer-meta-cell { background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:6px 8px; min-width:0; }
+        .viewer-meta-label { font-size:9px; color:#737373; text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
+        .viewer-meta-value { font-size:11px; color:#f5f5f5; font-weight:500; word-break:break-all; line-height:1.35; }
+        .viewer-prompt { background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 10px; font-size:11px; line-height:1.45; color:#a3a3a3; max-height:120px; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
+        .viewer-prompt.empty { color:#737373; font-style:italic; }
+        .viewer-edit-tools { display:flex; flex-direction:column; gap:6px; }
+        .viewer-edit-mode-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+        .viewer-edit-tab { height:30px; border:1px solid rgba(255,255,255,.08); border-radius:8px; background:#313131; color:#a3a3a3; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; transition:background .15s, color .15s, border-color .15s; padding:0 8px; }
+        .viewer-edit-tab i, .viewer-edit-tab svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-edit-tab.active { background:#3a3a3a; color:#f5f5f5; border-color:rgba(255,77,148,.35); }
+        .viewer-edit-panel { display:flex; flex-direction:column; gap:6px; background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px; }
+        .viewer-edit-panel.hidden { display:none; }
+        .viewer-edit-row { display:flex; align-items:center; gap:8px; min-width:0; }
+        .viewer-edit-label { font-size:10px; font-weight:600; color:#737373; min-width:2rem; flex-shrink:0; }
+        .viewer-edit-row input[type="range"] { flex:1; accent-color:#ff4d94; height:4px; }
+        .viewer-hue-row { align-items:center; }
+        .viewer-hue-bar-wrap { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+        .viewer-hue-bar { flex:1; height:16px; border-radius:999px; position:relative; cursor:pointer; border:1px solid rgba(255,255,255,.12); box-shadow:inset 0 1px 3px rgba(0,0,0,.28); touch-action:none; background:linear-gradient(to right,#ff0000 0%,#ff8000 8%,#ffff00 17%,#80ff00 25%,#00ff00 33%,#00ff80 42%,#00ffff 50%,#0080ff 58%,#0000ff 67%,#8000ff 75%,#ff00ff 83%,#ff0080 92%,#ff0000 100%); }
+        .viewer-hue-thumb { position:absolute; top:50%; width:18px; height:18px; border-radius:999px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.4); transform:translate(-50%,-50%); pointer-events:none; }
+        .viewer-hue-swatch { width:24px; height:24px; border-radius:8px; border:1px solid rgba(255,255,255,.12); flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.24); }
+        .viewer-edit-val { font-size:10px; font-weight:700; color:#f5f5f5; min-width:1.25rem; text-align:right; }
+        .viewer-edit-hint { font-size:10px; line-height:1.4; color:#737373; margin:0; }
+        .viewer-edit-actions { display:flex; gap:6px; }
+        .viewer-edit-action { height:30px; border:1px solid rgba(255,255,255,.08); border-radius:999px; background:#262626; color:#f5f5f5; font-size:10px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; padding:0 12px; transition:background .15s, border-color .15s; }
+        .viewer-edit-action i, .viewer-edit-action svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
+        .viewer-edit-action:hover { background:#333; }
+        .viewer-edit-action.primary { background:#ff4d94; border-color:#ff4d94; }
+        .viewer-edit-action.primary:hover { background:#e8437f; border-color:#e8437f; }
+        .viewer-stage { position:relative; display:inline-flex; max-width:100%; max-height:100%; line-height:0; }
+        .viewer-stage img { max-width:100%; max-height:100%; object-fit:contain; border-radius:16px; user-select:none; box-shadow:0 8px 32px rgba(0,0,0,.08); display:block; }
+        .viewer-draw-canvas { position:absolute; left:0; top:0; border-radius:16px; pointer-events:none; touch-action:none; box-sizing:border-box; }
+        .viewer-draw-canvas.viewer-draw-active { pointer-events:auto; cursor:none; }
+        .viewer-brush-cursor { position:absolute; border:2px solid rgba(255,255,255,.9); border-radius:999px; pointer-events:none; transform:translate(-50%,-50%); box-shadow:0 0 0 1px rgba(0,0,0,.35); z-index:8; opacity:0; transition:opacity .12s; }
+        .viewer-brush-cursor.visible { opacity:1; }
+        .viewer-crop-ratios { display:flex; flex-wrap:wrap; gap:6px; }
+        .viewer-crop-ratio { height:28px; padding:0 10px; border:1px solid rgba(255,255,255,.08); border-radius:999px; background:#262626; color:#a3a3a3; font-size:10px; font-weight:700; cursor:pointer; transition:background .15s, color .15s, border-color .15s; }
+        .viewer-crop-ratio.active { background:#3a3a3a; color:#f5f5f5; border-color:rgba(255,77,148,.35); }
+        .viewer-edit-confirm { width:100%; margin-top:4px; }
+        .viewer-crop-layer { position:absolute; inset:0; border-radius:16px; overflow:hidden; pointer-events:none; }
+        .viewer-crop-layer:not(.hidden) { pointer-events:auto; }
+        .viewer-crop-box { position:absolute; left:10%; top:10%; width:80%; height:80%; border:2px solid #fff; border-radius:10px; box-shadow:0 0 0 9999px rgba(0,0,0,.45); cursor:move; }
+        .viewer-crop-handle { position:absolute; width:14px; height:14px; border-radius:999px; background:#fff; border:2px solid #262626; z-index:2; touch-action:none; }
+        .viewer-crop-handle.nw { left:-6px; top:-6px; cursor:nwse-resize; }
+        .viewer-crop-handle.ne { right:-6px; top:-6px; cursor:nesw-resize; }
+        .viewer-crop-handle.sw { left:-6px; bottom:-6px; cursor:nesw-resize; }
+        .viewer-crop-handle.se { right:-6px; bottom:-6px; cursor:nwse-resize; }
+        .viewer-reedit { width:100%; height:44px; border:none; border-radius:999px; background:#ff4d94; color:#fff; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s; box-shadow:0 4px 14px rgba(255,77,148,.25); }
+        .viewer-reedit:hover { background:#e8437f; }
+        .viewer-reedit i, .viewer-reedit svg { width:14px !important; height:14px !important; stroke-width:2.25; flex-shrink:0; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        html.embed-panel { --bg:#1e1e1e; }
+        html.embed-panel body { background:#1e1e1e !important; }
+        html.embed-panel .container-box { padding:8px 8px 8px; max-width:none; }
+        html.embed-panel .studio-output-col { display:none !important; }
+        html.embed-panel .studio-panel-col { grid-column:1 / -1 !important; max-width:none !important; }
+        html.embed-panel .page-main { grid-template-columns:minmax(0,1fr) !important; }
+    </style>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
+    <style>
+        html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
+            color:#fff !important;
+        }
+        html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label svg {
+            color:#fff !important;
+            stroke:#fff !important;
+        }
+    </style>
+</head>
+<body class="mg-studio">
+    <div class="container-box">
+        <main class="page-main grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 h-full">
+            <div class="lg:col-span-3 options-panel h-full min-h-0 studio-panel-col">
+                <section class="tool-panel">
+                    <label class="block">
+                        <div class="control-label mb-1">
+                            <i data-lucide="server" class="w-3 h-3"></i>
+                            <span data-i18n="api.provider">平台</span>
+                        </div>
+                        <select id="providerSelect" class="size-select" onchange="setProvider(this.value)"></select>
+                    </label>
+                    <label class="block">
+                        <div class="control-label mb-1">
+                            <i data-lucide="sliders-horizontal" class="w-3 h-3"></i>
+                            <span data-i18n="online.model">Model</span>
+                        </div>
+                        <select id="modelSelect" class="size-select" onchange="setModel(this.value)"></select>
+                    </label>
+                </section>
+
+                <section class="tool-panel">
+                    <div>
+                        <div class="control-label mb-1">
+                            <i data-lucide="terminal" class="w-3 h-3"></i>
+                            <span data-i18n="online.promptLabel">提示词</span>
+                        </div>
+                        <textarea id="promptInput" rows="3" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder"></textarea>
+                    </div>
+                    <div>
+                        <div class="control-label mb-1">
+                            <i data-lucide="images" class="w-3 h-3"></i>
+                            <span data-i18n="online.referenceImages">Reference Images</span>
+                        </div>
+                        <div id="refGrid" class="ref-grid"></div>
+                    </div>
+                </section>
+
+                <section class="tool-panel">
+                    <div>
+                        <div class="control-label mb-1">
+                            <i data-lucide="layers" class="w-3 h-3"></i>
+                            <span data-i18n="online.batchCount">批次</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="batchSlider" class="batch-slider" min="1" max="4" value="1" oninput="setBatchCount(this.value)">
+                            <span id="batchValue" class="batch-value">1</span>
+                        </div>
+                    </div>
+                    <div class="size-row">
+                        <label id="resolutionField" class="size-field">
+                            <div class="control-label mb-1">
+                                <i data-lucide="scan" class="w-3 h-3"></i>
+                                <span data-i18n="online.resolution">Resolution</span>
+                            </div>
+                            <select id="resolutionSelect" class="size-select" onchange="setResolution(this.value)">
+                                <option value="1k" selected>1K</option>
+                                <option value="2k">2K</option>
+                                <option value="4k">4K</option>
+                                <option value="custom" data-i18n="online.customSize">自定义尺寸</option>
+                            </select>
+                            <span class="size-pair with-fit">
+                                <input id="sizeCustomWidth" class="size-custom" type="number" min="64" step="64" placeholder="宽度" data-i18n-placeholder="online.width" oninput="setCustomSize()">
+                                <input id="sizeCustomHeight" class="size-custom" type="number" min="64" step="64" placeholder="高度" data-i18n-placeholder="online.height" oninput="setCustomSize()">
+                                <button id="fitImageSizeBtn" class="size-fit-btn" type="button" onclick="fitCustomSizeToImage(event)">适配图片</button>
+                            </span>
+                        </label>
+                        <label id="ratioField" class="size-field">
+                            <div class="control-label mb-1">
+                                <i data-lucide="crop" class="w-3 h-3"></i>
+                                <span data-i18n="online.aspect">Aspect</span>
+                            </div>
+                            <div id="ratioSelectWrap" class="ratio-select-wrap">
+                                <button type="button" id="ratioSelectTrigger" class="ratio-select-trigger" onclick="toggleRatioDropdown(event)">
+                                    <span id="ratioSelectCurrent" class="ratio-select-current"></span>
+                                    <i data-lucide="chevron-up" class="ratio-select-chevron"></i>
+                                </button>
+                                <div id="ratioSelectMenu" class="ratio-select-menu hidden"></div>
+                            </div>
+                            <span class="size-pair">
+                                <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="宽" data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
+                                <input id="ratioCustomHeight" class="size-custom" type="number" min="1" step="1" placeholder="高" data-i18n-placeholder="online.ratioHeight" oninput="setCustomRatio()">
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <button id="genBtn" onclick="submitImage()" class="glass-btn w-full py-3 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i>
+                    <span class="tracking-[0.3em] text-[11px] uppercase" data-i18n="online.generate">Generate</span>
+                </button>
+            </div>
+
+            <div class="lg:col-span-9 flex flex-col gap-2 min-h-0 h-full studio-output-col">
+                <div class="output-toolbar shrink-0">
+                    <span class="board-pick-hint" data-i18n="online.boardPickHint">点击下方图片添加到参考图</span>
+                    <button type="button" id="outputImportBtn" class="output-import-btn" onclick="document.getElementById('outputImportInput').click()">
+                        <i data-lucide="upload" class="w-3 h-3"></i>
+                        <span data-i18n="online.import">Import</span>
+                    </button>
+                    <input type="file" id="outputImportInput" accept="image/*" multiple class="hidden" onchange="importOutputFiles(this.files); this.value='';">
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest" data-i18n="online.colsPerRow">每行</span>
+                    <input type="range" id="outputColsSlider" class="output-cols-slider" min="1" max="6" value="2" aria-label="columns per row">
+                    <span id="outputColsValue" class="text-[12px] font-black tabular-nums min-w-[1.25rem] text-center">2</span>
+                </div>
+                <div id="resultBox" class="result-frame relative">
+                    <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center space-y-4 opacity-20 pointer-events-none"><i data-lucide="layout" class="w-12 h-12 stroke-[1px]"></i><p class="text-[10px] font-black tracking-[0.5em] uppercase" data-i18n="online.canvasReady">Canvas Ready</p></div>
+                    <div id="outputScroll" class="output-scroll-wrap">
+                        <div id="outputGrid" class="output-grid hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <div id="lightbox" class="viewer-overlay" onclick="handleOutsideClick(event)">
+        <div class="viewer-layout" onclick="event.stopPropagation()">
+            <div class="viewer-main">
+                <button type="button" id="viewerPrev" class="viewer-nav prev" onclick="viewerNav(-1)" aria-label="Previous"><i data-lucide="chevron-left"></i></button>
+                <div id="lightboxFrame" class="viewer-canvas">
+                    <div id="viewerStage" class="viewer-stage">
+                        <img id="lightboxImg" alt="preview">
+                        <canvas id="viewerDrawCanvas" class="viewer-draw-canvas"></canvas>
+                        <div id="viewerBrushCursor" class="viewer-brush-cursor"></div>
+                        <div id="viewerCropLayer" class="viewer-crop-layer hidden">
+                            <div id="viewerCropBox" class="viewer-crop-box">
+                                <div class="viewer-crop-handle nw" data-corner="nw"></div>
+                                <div class="viewer-crop-handle ne" data-corner="ne"></div>
+                                <div class="viewer-crop-handle sw" data-corner="sw"></div>
+                                <div class="viewer-crop-handle se" data-corner="se"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="viewerNext" class="viewer-nav next" onclick="viewerNav(1)" aria-label="Next"><i data-lucide="chevron-right"></i></button>
+                <div class="viewer-toolbar">
+                    <button type="button" class="viewer-tool-btn" onclick="closeLightbox()" title="Close"><i data-lucide="x"></i></button>
+                    <button type="button" class="viewer-tool-btn" onclick="copyLightboxImage(event)" title="Copy"><i data-lucide="copy"></i></button>
+                    <button type="button" id="lightboxDownload" class="viewer-tool-btn" onclick="downloadLightboxImage(event)" title="Download"><i data-lucide="download"></i></button>
+                    <button type="button" class="viewer-tool-btn" onclick="openLightboxFullscreen(event)" title="Fullscreen"><i data-lucide="maximize-2"></i></button>
+                </div>
+            </div>
+            <aside class="viewer-sidebar">
+                <div class="viewer-sidebar-head">
+                    <button type="button" id="viewerFavBtn" class="viewer-head-btn" onclick="toggleViewerFavorite()" title="Favorite"><i data-lucide="star"></i></button>
+                    <button type="button" id="viewerPinBtn" class="viewer-head-btn" onclick="toggleViewerPin()" title="Pin"><i data-lucide="pin"></i></button>
+                </div>
+                <div class="viewer-tabs"><span class="viewer-tab"><i data-lucide="info" class="w-3.5 h-3.5"></i><span data-i18n="online.viewerInfo">Info</span></span></div>
+                <div class="viewer-sidebar-scroll">
+                    <section>
+                        <div id="lightboxRefsWrap" class="viewer-ref-section hidden">
+                            <div class="viewer-block-title"><span data-i18n="online.referenceImages">Reference Images</span></div>
+                            <div id="lightboxRefs" class="viewer-ref-thumbs"></div>
+                        </div>
+                        <div id="lightboxInfo" class="viewer-info-grid"></div>
+                    </section>
+                    <section id="lightboxPromptSection">
+                        <div class="viewer-block-title">
+                            <span>Prompt</span>
+                            <button type="button" class="copy-mini" onclick="copyLightboxPrompt(event)" title="Copy prompt"><i data-lucide="copy"></i></button>
+                        </div>
+                        <div id="lightboxPrompt" class="viewer-prompt"></div>
+                    </section>
+                    <section>
+                        <div class="viewer-block-title"><span data-i18n="online.viewerEdit">Edit</span></div>
+                        <div id="lightboxEdit" class="viewer-edit-tools">
+                            <div class="viewer-edit-mode-row">
+                                <button type="button" id="viewerModeBrush" class="viewer-edit-tab active" onclick="setViewerEditMode('brush')"><i data-lucide="paintbrush"></i><span data-i18n="online.viewerBrush">画笔</span></button>
+                                <button type="button" id="viewerModeCrop" class="viewer-edit-tab" onclick="setViewerEditMode('crop')"><i data-lucide="crop"></i><span data-i18n="online.viewerCrop">裁剪</span></button>
+                            </div>
+                            <div id="viewerBrushPanel" class="viewer-edit-panel">
+                                <div class="viewer-edit-row viewer-hue-row">
+                                    <span class="viewer-edit-label" data-i18n="online.viewerBrushColor">颜色</span>
+                                    <div class="viewer-hue-bar-wrap">
+                                        <div id="viewerHueBar" class="viewer-hue-bar" role="slider" aria-label="Brush hue" aria-valuemin="0" aria-valuemax="360">
+                                            <div id="viewerHueThumb" class="viewer-hue-thumb"></div>
+                                        </div>
+                                        <span id="viewerBrushColorSwatch" class="viewer-hue-swatch" aria-hidden="true"></span>
+                                    </div>
+                                    <input type="hidden" id="viewerBrushColor" value="#ff4d94">
+                                </div>
+                                <div class="viewer-edit-row">
+                                    <span class="viewer-edit-label" data-i18n="canvas.brushSize">笔刷</span>
+                                    <input type="range" id="viewerBrushSize" min="2" max="80" value="16" oninput="document.getElementById('viewerBrushSizeVal').textContent=this.value">
+                                    <span id="viewerBrushSizeVal" class="viewer-edit-val">16</span>
+                                </div>
+                                <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
+                                <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                            </div>
+                            <div id="viewerCropPanel" class="viewer-edit-panel hidden">
+                                <p class="viewer-edit-hint" data-i18n="canvas.cropHint">拖动裁剪框移动，拖右下角调整大小</p>
+                                <div id="viewerCropRatios" class="viewer-crop-ratios"></div>
+                                <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                            </div>
+                        </div>
+                    </section>
+                    <section>
+                        <div class="viewer-block-title"><span data-i18n="online.viewerMore">More</span></div>
+                        <button type="button" class="viewer-reedit" onclick="applySameStyle()"><i data-lucide="rotate-cw"></i><span data-i18n="online.reEdit">重新编辑</span></button>
+                    </section>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        function tr(key){ return window.StudioI18n ? StudioI18n.t(key) : key; }
+        function applyLanguage(lang){
+            if(lang && window.StudioI18n) StudioI18n.set(lang);
+            document.title = tr('online.title');
+        }
+        window.addEventListener('message', event => {
+            if(event.data?.type === 'studio-lang') applyLanguage(event.data.lang);
+        });
+        window.addEventListener('studio-lang-change', () => {
+            document.title = tr('online.title');
+        });
+        const MAX_REF_SLOTS = 13;
+        const REF_REORDER_MIME = 'application/x-online-ref-reorder';
+        let refSlots = [];
+        let refReorderDragId = '';
+        let boardPickSlotId = '';
+        let batchCount = 1;
+        let provider = 'custom-api';
+        let selectedModel = 'gpt-image-2';
+        let apiProviders = [];
+        let ratio = '1:1';
+        let resolution = '1k';
+        let customRatioWidth = '';
+        let customRatioHeight = '';
+        let customWidth = '';
+        let customHeight = '';
+        let models = {gpt:'gpt-image-2', nano:'nano-banana-pro'};
+        let allHistory = [], currentResult = null, currentLightboxData = null, historyLoading = false;
+        let outputCols = 2;
+        let pinnedIds = [];
+        let favoriteIds = [];
+        let displayOrder = [];
+        let pendingJobs = [];
+        let reorderDragKey = '';
+        const META_PIN_KEY = 'online_pinned';
+        const META_FAV_KEY = 'online_favorites';
+        const META_ORDER_KEY = 'online_display_order';
+        const REORDER_MIME = 'application/x-online-reorder';
+        const SIZE_OPTIONS = {
+            square: [
+                ['1024x1024', '1k'],
+                ['2048x2048', '2k'],
+                ['3840x2160', '4k']
+            ],
+            portrait: [
+                ['1024x1536', '1k'],
+                ['1360x2048', '2k'],
+                ['2352x3520', '4k']
+            ],
+            portrait43: [
+                ['1008x1344', '1k'],
+                ['1536x2048', '2k'],
+                ['2448x3264', '4k']
+            ],
+            landscape43: [
+                ['1344x1008', '1k'],
+                ['2048x1536', '2k'],
+                ['3264x2448', '4k']
+            ],
+            landscape: [
+                ['1536x1024', '1k'],
+                ['2048x1360', '2k'],
+                ['3520x2352', '4k']
+            ],
+            story: [
+                ['720x1280', '1k'],
+                ['1152x2048', '2k'],
+                ['2160x3840', '4k']
+            ],
+            wide: [
+                ['1280x720', '1k'],
+                ['2048x1152', '2k'],
+                ['3840x2160', '4k']
+            ]
+        };
+        const RES_LONG_SIDE = { '1k': 1536, '2k': 2048, '4k': 3840 };
+        const RES_PIXEL_LIMIT = { '1k': 1572864, '2k': 4194304, '4k': 8294400 };
+        const LEGACY_RATIO_MAP = {
+            square: '1:1', portrait: '2:3', landscape: '3:2', portrait43: '3:4', landscape43: '4:3', story: '9:16', wide: '16:9'
+        };
+        const GPT_IMAGE2_RATIO_PRESETS = [
+            { id: 'auto' },
+            { id: '1:1', w: 1, h: 1 }, { id: '3:2', w: 3, h: 2 }, { id: '2:3', w: 2, h: 3 },
+            { id: '4:3', w: 4, h: 3 }, { id: '3:4', w: 3, h: 4 }, { id: '5:4', w: 5, h: 4 }, { id: '4:5', w: 4, h: 5 },
+            { id: '16:9', w: 16, h: 9 }, { id: '9:16', w: 9, h: 16 }, { id: '2:1', w: 2, h: 1 }, { id: '1:2', w: 1, h: 2 },
+            { id: '3:1', w: 3, h: 1 }, { id: '1:3', w: 1, h: 3 }, { id: '21:9', w: 21, h: 9 }, { id: '9:21', w: 9, h: 21 }
+        ];
+        const GEMINI_IMAGE_RATIO_PRESETS = [
+            { id: 'auto' },
+            { id: '1:1', w: 1, h: 1 }, { id: '3:2', w: 3, h: 2 }, { id: '2:3', w: 2, h: 3 },
+            { id: '4:3', w: 4, h: 3 }, { id: '3:4', w: 3, h: 4 }, { id: '16:9', w: 16, h: 9 }, { id: '9:16', w: 9, h: 16 },
+            { id: '5:4', w: 5, h: 4 }, { id: '4:5', w: 4, h: 5 }, { id: '21:9', w: 21, h: 9 },
+            { id: '1:4', w: 1, h: 4 }, { id: '4:1', w: 4, h: 1 }, { id: '1:8', w: 1, h: 8 }, { id: '8:1', w: 8, h: 1 }
+        ];
+        const DEFAULT_RATIO_PRESETS = [
+            { id: '1:1', w: 1, h: 1 }, { id: '2:3', w: 2, h: 3 }, { id: '3:2', w: 3, h: 2 },
+            { id: '3:4', w: 3, h: 4 }, { id: '4:3', w: 4, h: 3 }, { id: '9:16', w: 9, h: 16 }, { id: '16:9', w: 16, h: 9 },
+            { id: 'custom', custom: true }
+        ];
+
+        function normalizeModelKey(model){ return String(model || '').trim().toLowerCase(); }
+        function isGptImage2Model(model){ return normalizeModelKey(model) === 'gpt-image-2'; }
+        function isGeminiImageModel(model){
+            const m = normalizeModelKey(model);
+            return m === 'gemini-3-pro-image-preview' || m === 'gemini-3.1-flash-image-preview';
+        }
+        function supportsAutoRatio(model){
+            return isGptImage2Model(model) || isGeminiImageModel(model);
+        }
+        function getRatioPresetsForModel(model){
+            if(isGptImage2Model(model)) return GPT_IMAGE2_RATIO_PRESETS;
+            if(isGeminiImageModel(model)) return GEMINI_IMAGE_RATIO_PRESETS;
+            return DEFAULT_RATIO_PRESETS;
+        }
+        function getRatioPreset(id, model){
+            return getRatioPresetsForModel(model || selectedModel).find(item => item.id === id) || null;
+        }
+        let ratioDropdownOpen = false;
+        function ratioIconStyle(w, h){
+            const box = 14;
+            if(!w || !h) return { width: `${box}px`, height: `${box}px`, className: 'is-auto' };
+            if(w >= h){
+                const width = Math.min(box, Math.max(6, Math.round(box * w / h)));
+                const height = Math.max(4, Math.round(width * h / w));
+                return { width: `${width}px`, height: `${height}px`, className: '' };
+            }
+            const height = Math.min(box, Math.max(6, Math.round(box * h / w)));
+            const width = Math.max(4, Math.round(height * w / h));
+            return { width: `${width}px`, height: `${height}px`, className: '' };
+        }
+        function ratioIconMarkup(item){
+            const icon = ratioIconStyle(item?.w, item?.h);
+            return `<span class="ratio-icon"><span class="ratio-icon-inner ${icon.className}" style="width:${icon.width};height:${icon.height};"></span></span>`;
+        }
+        function closeRatioDropdown(){
+            ratioDropdownOpen = false;
+            document.getElementById('ratioSelectMenu')?.classList.add('hidden');
+        }
+        function toggleRatioDropdown(event){
+            event?.stopPropagation();
+            if(resolution === 'custom') return;
+            ratioDropdownOpen = !ratioDropdownOpen;
+            document.getElementById('ratioSelectMenu')?.classList.toggle('hidden', !ratioDropdownOpen);
+            if(ratioDropdownOpen) lucide.createIcons();
+        }
+        function selectRatioOption(ratioId){
+            setRatio(ratioId);
+            closeRatioDropdown();
+        }
+        function renderRatioSelect(){
+            const menu = document.getElementById('ratioSelectMenu');
+            const current = document.getElementById('ratioSelectCurrent');
+            const trigger = document.getElementById('ratioSelectTrigger');
+            if(!menu || !current || !trigger) return;
+            syncRatioForModel();
+            const presets = getRatioPresetsForModel(selectedModel);
+            const activePreset = getRatioPreset(ratio, selectedModel) || (ratio === 'custom' ? { id: 'custom' } : presets[0]);
+            menu.innerHTML = presets.map(item => {
+                const active = ratio === item.id ? ' active' : '';
+                return `<button type="button" class="ratio-select-item${active}" data-ratio="${escapeHtml(item.id)}" onclick="selectRatioOption('${escapeHtml(item.id)}')">${ratioIconMarkup(item)}<span>${escapeHtml(item.id)}</span></button>`;
+            }).join('');
+            current.innerHTML = `${ratioIconMarkup(activePreset)}<span>${escapeHtml(activePreset?.id || ratio || '1:1')}</span>`;
+            trigger.disabled = resolution === 'custom';
+            lucide.createIcons();
+        }
+        function syncRatioForModel(){
+            if(resolution === 'custom' || ratio === '') return;
+            const presets = getRatioPresetsForModel(selectedModel);
+            const ids = presets.map(item => item.id);
+            const mapped = LEGACY_RATIO_MAP[ratio] || ratio;
+            if(ids.includes(mapped)) ratio = mapped;
+            else if(ids.includes(ratio)) return;
+            else ratio = ids[0] || '1:1';
+        }
+        function sizeFromRatioAndResolution(rw, rh, resKey){
+            const longSide = RES_LONG_SIDE[resKey] || 1536;
+            const pixelLimit = RES_PIXEL_LIMIT[resKey] || (longSide * longSide);
+            const parsed = rw / rh;
+            let rawWidth;
+            let rawHeight;
+            if(parsed >= 1){
+                rawWidth = longSide;
+                rawHeight = Math.min(longSide / parsed, Math.sqrt(pixelLimit / parsed));
+            } else {
+                rawHeight = longSide;
+                rawWidth = Math.min(longSide * parsed, Math.sqrt(pixelLimit * parsed));
+            }
+            const width = Math.floor(rawWidth / 16) * 16;
+            const height = Math.floor(rawHeight / 16) * 16;
+            return `${Math.max(64, width)}x${Math.max(64, height)}`;
+        }
+        function inferRatioFromSize(size, model){
+            const raw = String(size || '').trim();
+            if(!raw) return getRatioPresetsForModel(model)[0]?.id || '1:1';
+            if((raw === 'auto' || /^auto:(1k|2k|4k)$/i.test(raw)) && supportsAutoRatio(model)) return 'auto';
+            if(getRatioPreset(raw, model)) return raw;
+            const parsed = parseSizeValue(raw);
+            if(parsed){
+                const w = Number(parsed.width);
+                const h = Number(parsed.height);
+                if(w > 0 && h > 0){
+                    const target = w / h;
+                    const presets = getRatioPresetsForModel(model).filter(item => item.w && item.h);
+                    const best = presets.sort((a, b) => Math.abs(a.w / a.h - target) - Math.abs(b.w / b.h - target))[0];
+                    if(best) return best.id;
+                }
+            }
+            const legacy = Object.entries(SIZE_OPTIONS).find(([, options]) => options.some(([value]) => value === raw));
+            if(legacy && LEGACY_RATIO_MAP[legacy[0]]){
+                const mapped = LEGACY_RATIO_MAP[legacy[0]];
+                if(getRatioPreset(mapped, model)) return mapped;
+            }
+            return getRatioPresetsForModel(model)[0]?.id || '1:1';
+        }
+        function inferResolutionFromSize(size){
+            const raw = String(size || '').trim();
+            const autoMatch = raw.match(/^auto:(1k|2k|4k)$/i);
+            if(autoMatch) return autoMatch[1].toLowerCase();
+            if(!raw || raw === 'auto') return '1k';
+            const parsed = parseSizeValue(raw);
+            if(!parsed) return '1k';
+            const w = Number(parsed.width);
+            const h = Number(parsed.height);
+            const longEdge = Math.max(w, h);
+            const pixels = w * h;
+            if(longEdge >= 3000 || pixels > 4500000) return '4k';
+            if(longEdge >= 1800 || pixels > 1800000) return '2k';
+            return '1k';
+        }
+
+        function uniqueModels(list){
+            const seen = new Set();
+            return (list || []).map(item => String(item || '').trim()).filter(item => item && !seen.has(item) && seen.add(item));
+        }
+        function resolveDefaultProviderId(list){
+            const providers = list || imageProviders();
+            const primary = providers.find(p => p.primary);
+            if(primary) return primary.id;
+            const apimart = providers.find(p => p.id === 'custom-api' || p.id === 'apimart' || String(p.name || '').toLowerCase() === 'apimart');
+            return apimart?.id || providers.find(p => p.id !== 'modelscope')?.id || providers[0]?.id || 'custom-api';
+        }
+        function imageProviders(){
+            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.image_models || []).length);
+            return list.length ? list : [{id:'custom-api', name:'apimart', image_models:[models.gpt, models.nano]}];
+        }
+        function providerById(id){
+            return imageProviders().find(p => p.id === id) || imageProviders()[0];
+        }
+        function providerModels(id){
+            return uniqueModels(providerById(id)?.image_models || [models.gpt]);
+        }
+        function renderProviderControls(){
+            const providerSelect = document.getElementById('providerSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            if(!providerSelect || !modelSelect) return;
+            const providers = imageProviders();
+            if(!providers.some(p => p.id === provider)) provider = resolveDefaultProviderId(providers);
+            const modelsForProvider = providerModels(provider);
+            if(!modelsForProvider.includes(selectedModel)) selectedModel = modelsForProvider[0] || models.gpt;
+            providerSelect.innerHTML = providers.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === provider ? 'selected' : ''}>${escapeHtml(p.name || p.id)}</option>`).join('');
+            modelSelect.innerHTML = modelsForProvider.map(m => `<option value="${escapeHtml(m)}" ${m === selectedModel ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+            syncRatioForModel();
+            renderRatioSelect();
+        }
+
+        async function initModels(){
+            try {
+                const cfg = await fetch('/api/config').then(r=>r.json());
+                const imageModels = cfg.image_models || [];
+                models.nano = imageModels.find(m => m.toLowerCase().includes('nano')) || 'nano-banana-pro';
+                models.gpt = imageModels.find(m => !m.toLowerCase().includes('nano')) || cfg.image_model || 'gpt-image-2';
+                apiProviders = Array.isArray(cfg.api_providers) ? cfg.api_providers : [];
+                provider = cfg.primary_provider_id || resolveDefaultProviderId(apiProviders.filter(p => p.enabled !== false && (p.image_models || []).length));
+                selectedModel = providerModels(provider)[0] || models.gpt;
+            } catch(e) {}
+            renderProviderControls();
+        }
+
+        function setProvider(next){
+            provider = next;
+            selectedModel = providerModels(provider)[0] || selectedModel;
+            renderProviderControls();
+        }
+        function setModel(next){
+            selectedModel = next;
+            syncRatioForModel();
+            renderRatioSelect();
+            updateSizeUI();
+        }
+        function escapeHtml(str){ return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+        function parseSizeValue(value){
+            const match = String(value || '').trim().match(/^(\d+)\s*[xX*]\s*(\d+)$/);
+            return match ? {width:match[1], height:match[2]} : null;
+        }
+        function customRatioValue(){
+            const w = Number(customRatioWidth);
+            const h = Number(customRatioHeight);
+            return w > 0 && h > 0 ? w / h : null;
+        }
+        function customSizeValue(){
+            const w = Number(customWidth);
+            const h = Number(customHeight);
+            return w > 0 && h > 0 ? `${Math.round(w)}x${Math.round(h)}` : '';
+        }
+        function getImageDimensions(src){
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve({width:img.naturalWidth, height:img.naturalHeight});
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+        function firstReferenceDimension(){
+            return refSlots.map(s => s.dim).find(dim => dim?.width && dim?.height) || null;
+        }
+        function newRefSlot(ref=null, dim=null){
+            return { id:`ref_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, ref, dim };
+        }
+        function getReferenceList(){
+            return refSlots.map(s => s.ref).filter(Boolean);
+        }
+        function filledRefCount(){
+            return refSlots.filter(s => s.ref).length;
+        }
+        function setBatchCount(n){
+            batchCount = Math.min(4, Math.max(1, Number(n) || 1));
+            const label = document.getElementById('batchValue');
+            const slider = document.getElementById('batchSlider');
+            if(label) label.textContent = batchCount;
+            if(slider) slider.value = batchCount;
+            try { localStorage.setItem('online_batch_count', String(batchCount)); } catch(e) {}
+        }
+        function loadBatchCount(){
+            try {
+                const saved = parseInt(localStorage.getItem('online_batch_count') || '1', 10);
+                if(saved >= 1 && saved <= 4) batchCount = saved;
+            } catch(e) {}
+        }
+        function ensureTrailingEmptySlot(){
+            const hasEmpty = refSlots.some(s => !s.ref);
+            if(!hasEmpty && refSlots.length < MAX_REF_SLOTS) refSlots.push(newRefSlot());
+            if(!refSlots.length) refSlots.push(newRefSlot());
+        }
+        function clearRefDropHints(){
+            document.querySelectorAll('#refGrid .upload-item.drop-before,#refGrid .upload-item.drop-after').forEach(el => {
+                el.classList.remove('drop-before', 'drop-after');
+            });
+        }
+        function reorderRefSlots(sourceId, targetId, placeBefore){
+            if(!sourceId || !targetId || sourceId === targetId) return;
+            const list = [...refSlots];
+            const from = list.findIndex(s => s.id === sourceId);
+            const to = list.findIndex(s => s.id === targetId);
+            if(from < 0 || to < 0) return;
+            const [item] = list.splice(from, 1);
+            let insertAt = list.findIndex(s => s.id === targetId);
+            if(insertAt < 0) insertAt = list.length;
+            if(!placeBefore) insertAt += 1;
+            list.splice(insertAt, 0, item);
+            refSlots = list;
+            renderRefGrid();
+        }
+        function updateBoardPickUI(){
+            document.body.classList.toggle('board-pick-active', !!boardPickSlotId);
+            document.querySelectorAll('#refGrid .upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
+            if(boardPickSlotId){
+                document.querySelector(`#refGrid [data-ref-id="${boardPickSlotId}"]`)?.classList.add('is-board-target');
+            }
+        }
+        function startBoardPick(slotId, ev){
+            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+            if(boardPickSlotId === slotId){
+                cancelBoardPick();
+                return;
+            }
+            boardPickSlotId = slotId;
+            window.boardPickSlotId = slotId;
+            updateBoardPickUI();
+            if(window.StudioPanelBridge){
+                StudioPanelBridge.notifyBoardPick(slotId);
+            } else {
+                renderOutputGrid();
+                document.getElementById('resultBox')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+            }
+        }
+        function cancelBoardPick(){
+            if(!boardPickSlotId) return;
+            boardPickSlotId = '';
+            window.boardPickSlotId = '';
+            updateBoardPickUI();
+            if(window.StudioPanelBridge){
+                StudioPanelBridge.notifyBoardPick('');
+            } else {
+                renderOutputGrid();
+            }
+        }
+        function pickOutputForRef(data){
+            const url = data?.images?.[0];
+            if(!url || !boardPickSlotId) return;
+            const slot = refSlots.find(s => s.id === boardPickSlotId);
+            if(!slot) return;
+            const normalized = normalizeImageUrl(url);
+            if(!normalized) return;
+            cancelBoardPick();
+            slot.ref = { url: normalized, name: normalized.split('/').pop() || 'image.png', role: '' };
+            getImageDimensions(normalized).then(dim => {
+                slot.dim = dim;
+                updateSizeUI();
+                renderRefGrid();
+            }).catch(() => renderRefGrid());
+            ensureTrailingEmptySlot();
+            renderRefGrid();
+        }
+        function bindRefSlotEvents(cell, slot){
+            const input = cell.querySelector('input[type="file"]');
+            const delBtn = cell.querySelector('[data-ref-del]');
+            const handle = cell.querySelector('[data-ref-reorder]');
+            const boardBtn = cell.querySelector('[data-ref-board]');
+            cell.onclick = e => {
+                if(e.target.closest('[data-ref-del],[data-ref-reorder],[data-ref-board]')) return;
+                if(!slot.ref) input?.click();
+            };
+            input.onchange = () => handleFile(input.files[0], slot.id);
+            delBtn?.addEventListener('click', e => removeRefSlot(slot.id, e));
+            boardBtn?.addEventListener('click', e => startBoardPick(slot.id, e));
+            cell.ondragover = e => {
+                const types = [...(e.dataTransfer?.types || [])];
+                if(types.includes(REF_REORDER_MIME)){
+                    if(refReorderDragId && refReorderDragId !== slot.id){
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        clearRefDropHints();
+                        const rect = cell.getBoundingClientRect();
+                        cell.classList.add((e.clientX - rect.left) < rect.width / 2 ? 'drop-before' : 'drop-after');
+                    }
+                    return;
+                }
+                if(!hasSlotDropData(e.dataTransfer)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                cell.classList.add('drag-over');
+            };
+            cell.ondragleave = e => {
+                if(e.currentTarget.contains(e.relatedTarget)) return;
+                cell.classList.remove('drag-over', 'drop-before', 'drop-after');
+            };
+            cell.ondrop = e => {
+                e.preventDefault();
+                e.stopPropagation();
+                cell.classList.remove('drag-over');
+                const types = [...(e.dataTransfer?.types || [])];
+                if(types.includes(REF_REORDER_MIME)){
+                    const dragId = refReorderDragId || e.dataTransfer.getData(REF_REORDER_MIME);
+                    if(dragId && dragId !== slot.id){
+                        const rect = cell.getBoundingClientRect();
+                        reorderRefSlots(dragId, slot.id, (e.clientX - rect.left) < rect.width / 2);
+                    }
+                    clearRefDropHints();
+                    return;
+                }
+                const file = e.dataTransfer.files?.[0];
+                if(file && file.type.startsWith('image/')) {
+                    handleFile(file, slot.id);
+                    return;
+                }
+                const url = imageUrlFromSlotDrop(e.dataTransfer);
+                if(url) handleImageUrl(url, slot.id);
+            };
+            if(handle && slot.ref){
+                handle.draggable = true;
+                handle.ondragstart = e => {
+                    e.stopPropagation();
+                    refReorderDragId = slot.id;
+                    cell.classList.add('is-dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData(REF_REORDER_MIME, slot.id);
+                };
+                handle.ondragend = () => {
+                    refReorderDragId = '';
+                    cell.classList.remove('is-dragging');
+                    clearRefDropHints();
+                };
+            }
+        }
+        function renderRefGrid(){
+            const grid = document.getElementById('refGrid');
+            if(!grid) return;
+            ensureTrailingEmptySlot();
+            grid.innerHTML = refSlots.map((slot, idx) => {
+                const filled = !!slot.ref;
+                const preview = filled ? slot.ref.url : '';
+                return `<div class="upload-item group aspect-square rounded-2xl flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
+                    <input type="file" accept="image/*" class="hidden">
+                    ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
+                    <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2,'0')}</span>
+                    <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeHtml(preview)}"` : ''} draggable="false">
+                    <button type="button" data-ref-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${tr('online.boardPickTitle')}">board</button>
+                    <button type="button" data-ref-reorder class="cell-action-btn ref-slot-btn ref-reorder-btn" title="${tr('online.reorder')}"><i data-lucide="grip-vertical"></i></button>
+                    <button type="button" data-ref-del class="cell-action-btn ref-slot-btn ref-del-btn" title="${tr('online.delete')}"><i data-lucide="trash-2"></i></button>
+                </div>`;
+            }).join('');
+            refSlots.forEach(slot => {
+                const cell = grid.querySelector(`[data-ref-id="${slot.id}"]`);
+                if(cell) bindRefSlotEvents(cell, slot);
+            });
+            lucide.createIcons();
+            updateSizeUI();
+        }
+
+        function setRatio(next){
+            ratio = next;
+            if(next !== 'custom'){
+                customRatioWidth = '';
+                customRatioHeight = '';
+            }
+            renderRatioSelect();
+            updateSizeUI();
+        }
+
+        function setCustomRatio(){
+            customRatioWidth = document.getElementById('ratioCustomWidth').value;
+            customRatioHeight = document.getElementById('ratioCustomHeight').value;
+            ratio = 'custom';
+            updateSizeUI();
+        }
+
+        function setCustomSize(){
+            customWidth = document.getElementById('sizeCustomWidth').value;
+            customHeight = document.getElementById('sizeCustomHeight').value;
+            resolution = 'custom';
+            ratio = '';
+            updateSizeUI();
+        }
+
+        function setResolution(next){
+            resolution = next;
+            if(next === 'custom'){
+                ratio = '';
+            } else {
+                customWidth = '';
+                customHeight = '';
+                if(ratio === '') ratio = '1:1';
+            }
+            updateSizeUI();
+        }
+
+        function updateSizeUI(){
+            const ratioField = document.getElementById('ratioField');
+            const ratioSelectWrap = document.getElementById('ratioSelectWrap');
+            const ratioCustomWidthInput = document.getElementById('ratioCustomWidth');
+            const ratioCustomHeightInput = document.getElementById('ratioCustomHeight');
+            const resolutionSelect = document.getElementById('resolutionSelect');
+            const resolutionField = document.getElementById('resolutionField');
+            const sizeCustomWidthInput = document.getElementById('sizeCustomWidth');
+            const sizeCustomHeightInput = document.getElementById('sizeCustomHeight');
+            const fitImageSizeBtn = document.getElementById('fitImageSizeBtn');
+            renderRatioSelect();
+            ratioField?.classList.toggle('custom', ratio === 'custom');
+            if(ratioSelectWrap){
+                ratioSelectWrap.style.opacity = resolution === 'custom' ? '0.45' : '';
+                ratioSelectWrap.style.pointerEvents = resolution === 'custom' ? 'none' : '';
+            }
+            ratioCustomWidthInput.value = customRatioWidth;
+            ratioCustomHeightInput.value = customRatioHeight;
+            resolutionSelect.value = resolution;
+            resolutionField.classList.toggle('custom', resolution === 'custom');
+            sizeCustomWidthInput.value = customWidth;
+            sizeCustomHeightInput.value = customHeight;
+            if(fitImageSizeBtn) fitImageSizeBtn.disabled = !firstReferenceDimension();
+            updateResolutionUI();
+        }
+
+        function updateResolutionUI(){}
+        function fitCustomSizeToImage(event){
+            if(event) event.preventDefault();
+            const dim = firstReferenceDimension();
+            if(!dim) return;
+            resolution = 'custom';
+            ratio = '';
+            customWidth = dim.width;
+            customHeight = dim.height;
+            updateSizeUI();
+        }
+
+        function currentSize(){
+            if(resolution === 'custom') return customSizeValue();
+            if(ratio === 'auto') return `auto:${resolution || '1k'}`;
+            if(ratio === 'custom'){
+                const w = Number(customRatioWidth);
+                const h = Number(customRatioHeight);
+                if(w > 0 && h > 0) return sizeFromRatioAndResolution(w, h, resolution);
+            }
+            const preset = getRatioPreset(ratio, selectedModel);
+            if(preset?.w && preset?.h) return sizeFromRatioAndResolution(preset.w, preset.h, resolution);
+            const legacyKey = Object.keys(LEGACY_RATIO_MAP).find(key => LEGACY_RATIO_MAP[key] === ratio) || ratio;
+            const options = SIZE_OPTIONS[legacyKey] || SIZE_OPTIONS.square;
+            const match = options.find(([, label]) => label === resolution) || options[0];
+            return match?.[0] || '1024x1024';
+        }
+
+        function normalizeImageUrl(url){
+            const raw = String(url || '').trim();
+            if(!raw) return '';
+            try {
+                if(/^https?:\/\//i.test(raw)){
+                    const parsed = new URL(raw);
+                    if(parsed.pathname.startsWith('/assets/') || parsed.pathname.startsWith('/output/')) return parsed.pathname;
+                }
+            } catch(e) {}
+            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
+            return raw;
+        }
+        function imageUrlFromSlotDrop(dataTransfer){
+            if(!dataTransfer) return '';
+            const custom = dataTransfer.getData('application/x-online-output-image');
+            if(custom) return normalizeImageUrl(custom);
+            const values = [
+                dataTransfer.getData('text/uri-list') || '',
+                dataTransfer.getData('text/plain') || ''
+            ].join('\n').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            for(const value of values){
+                const normalized = normalizeImageUrl(value);
+                if(normalized.startsWith('/assets/') || normalized.startsWith('/output/')) return normalized;
+            }
+            return '';
+        }
+        function hasSlotDropData(dataTransfer){
+            if(!dataTransfer) return false;
+            const types = [...(dataTransfer.types || [])];
+            if(types.includes('application/x-online-output-image')) return true;
+            if(types.includes('Files') && [...(dataTransfer.items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/'))) return true;
+            return types.includes('text/uri-list') || types.includes('text/plain');
+        }
+        function setImageDragData(e, url, keepEffect){
+            const normalized = normalizeImageUrl(url);
+            if(!normalized) return;
+            if(!keepEffect) e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('application/x-online-output-image', normalized);
+            e.dataTransfer.setData('text/uri-list', normalized);
+            e.dataTransfer.setData('text/plain', normalized);
+        }
+        function isImageImportFile(file){
+            if(!file) return false;
+            if(file.type && file.type.startsWith('image/')) return true;
+            return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name || '');
+        }
+        function loadOutputCols(){
+            try {
+                const saved = parseInt(localStorage.getItem('online_output_cols') || '2', 10);
+                if(saved >= 1 && saved <= 6) outputCols = saved;
+            } catch(e) {}
+        }
+        function setOutputCols(n){
+            outputCols = Math.min(6, Math.max(1, Number(n) || 2));
+            try { localStorage.setItem('online_output_cols', String(outputCols)); } catch(e) {}
+            const grid = document.getElementById('outputGrid');
+            const label = document.getElementById('outputColsValue');
+            const slider = document.getElementById('outputColsSlider');
+            if(grid) grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0, 1fr))`;
+            if(label) label.textContent = outputCols;
+            if(slider) slider.value = outputCols;
+        }
+        function bindOutputCell(cell, data){
+            const img = cell.querySelector('img');
+            const key = historyKey(data);
+            if(!img || !data?.images?.[0]) return;
+            img.draggable = !boardPickSlotId;
+            img.classList.add('draggable-output');
+            img.ondragstart = e => {
+                if(boardPickSlotId) { e.preventDefault(); return; }
+                e.stopPropagation();
+                img.dataset.dragging = '1';
+                reorderDragKey = key;
+                cell.classList.add('is-dragging');
+                e.dataTransfer.setData(REORDER_MIME, key);
+                setImageDragData(e, data.images[0], true);
+                e.dataTransfer.effectAllowed = 'copyMove';
+            };
+            img.ondragend = () => {
+                reorderDragKey = '';
+                cell.classList.remove('is-dragging');
+                clearReorderDropHints();
+                setTimeout(() => { delete img.dataset.dragging; }, 0);
+            };
+            img.onclick = e => {
+                if(img.dataset.dragging) return;
+                e.stopPropagation();
+                if(boardPickSlotId){
+                    pickOutputForRef(data);
+                    return;
+                }
+                currentResult = data;
+                openLightbox(data);
+            };
+            cell.onclick = e => {
+                if(!boardPickSlotId) return;
+                if(e.target.closest('.cell-actions')) return;
+                e.stopPropagation();
+                pickOutputForRef(data);
+            };
+            cell.ondragover = e => {
+                if(hasImportFiles(e.dataTransfer)){
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                    return;
+                }
+                const dragKey = reorderDragKey;
+                if(!dragKey || dragKey === key) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
+                clearReorderDropHints();
+                const rect = cell.getBoundingClientRect();
+                cell.classList.add((e.clientX - rect.left) < rect.width / 2 ? 'drop-before' : 'drop-after');
+            };
+            cell.ondragleave = e => {
+                if(e.currentTarget.contains(e.relatedTarget)) return;
+                cell.classList.remove('drop-before', 'drop-after');
+            };
+            cell.ondrop = e => {
+                if(hasImportFiles(e.dataTransfer)){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearReorderDropHints();
+                    document.getElementById('resultBox')?.classList.remove('import-drag-over');
+                    importOutputFiles(e.dataTransfer.files);
+                    return;
+                }
+                const dragKey = reorderDragKey || e.dataTransfer.getData(REORDER_MIME);
+                if(!dragKey || dragKey === key) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const rect = cell.getBoundingClientRect();
+                const placeBefore = (e.clientX - rect.left) < rect.width / 2;
+                clearReorderDropHints();
+                reorderHistoryItem(dragKey, key, placeBefore);
+            };
+        }
+        function hasImportFiles(dataTransfer){
+            if(!dataTransfer || reorderDragKey) return false;
+            const types = [...(dataTransfer.types || [])];
+            if(!types.includes('Files')) return false;
+            const items = [...(dataTransfer.items || [])];
+            if(!items.length) return (dataTransfer.files?.length || 0) > 0;
+            return items.some(item => item.kind === 'file' && (!item.type || item.type.startsWith('image/')));
+        }
+        async function importOutputFiles(fileList){
+            const files = [...(fileList || [])].filter(isImageImportFile);
+            if(!files.length) return;
+            const form = new FormData();
+            files.forEach(f => form.append('files', f));
+            try {
+                const res = await fetch('/api/online-import', { method:'POST', body: form }).then(r => {
+                    if(!r.ok) throw new Error('Import failed');
+                    return r.json();
+                });
+                (res.items || []).forEach(item => upsertHistoryItem(item));
+                renderOutputGrid();
+            } catch(e) {
+                alert(tr('online.importFailed') || 'Import failed');
+            }
+        }
+        function bindOutputAreaDrop(){
+            const box = document.getElementById('resultBox');
+            const scroll = document.getElementById('outputScroll');
+            const grid = document.getElementById('outputGrid');
+            const onDragOver = e => {
+                if(!hasImportFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                box?.classList.add('import-drag-over');
+            };
+            const onDragLeave = e => {
+                if(box && !box.contains(e.relatedTarget)) box.classList.remove('import-drag-over');
+            };
+            const onDrop = e => {
+                if(!hasImportFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                box?.classList.remove('import-drag-over');
+                importOutputFiles(e.dataTransfer.files);
+            };
+            [box, scroll, grid].forEach(el => {
+                if(!el) return;
+                el.addEventListener('dragover', onDragOver);
+                el.addEventListener('dragleave', onDragLeave);
+                el.addEventListener('drop', onDrop);
+            });
+        }
+        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        let highlightOutputKey = null;
+        let highlightOutputTimer = null;
+
+        function flashOutputCell(key){
+            if(!key) return;
+            highlightOutputKey = key;
+            renderOutputGrid();
+            requestAnimationFrame(() => {
+                const cell = document.querySelector(`.output-grid-cell[data-ts="${CSS.escape(key)}"]`);
+                cell?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+                clearTimeout(highlightOutputTimer);
+                highlightOutputTimer = setTimeout(() => {
+                    highlightOutputKey = null;
+                    renderOutputGrid();
+                }, 2600);
+            });
+        }
+        function loadOnlineMeta(){
+            try {
+                const pins = JSON.parse(localStorage.getItem(META_PIN_KEY) || '[]');
+                const favs = JSON.parse(localStorage.getItem(META_FAV_KEY) || '[]');
+                const order = JSON.parse(localStorage.getItem(META_ORDER_KEY) || '[]');
+                pinnedIds = Array.isArray(pins) ? pins.map(String) : [];
+                favoriteIds = Array.isArray(favs) ? favs.map(String) : [];
+                displayOrder = Array.isArray(order) ? order.map(String) : [];
+            } catch(e) {
+                pinnedIds = [];
+                favoriteIds = [];
+                displayOrder = [];
+            }
+        }
+        function saveOnlineMeta(){
+            try {
+                localStorage.setItem(META_PIN_KEY, JSON.stringify(pinnedIds));
+                localStorage.setItem(META_FAV_KEY, JSON.stringify(favoriteIds));
+                localStorage.setItem(META_ORDER_KEY, JSON.stringify(displayOrder));
+            } catch(e) {}
+        }
+        function syncDisplayOrder(){
+            const keys = new Set(allHistory.map(historyKey));
+            displayOrder = displayOrder.filter(id => keys.has(id));
+            allHistory.forEach(item => {
+                const key = historyKey(item);
+                if(key && !displayOrder.includes(key)) displayOrder.unshift(key);
+            });
+            saveOnlineMeta();
+        }
+        function isPinned(item){ return pinnedIds.includes(historyKey(item)); }
+        function isFavorite(item){ return favoriteIds.includes(historyKey(item)); }
+        function sortedHistory(){
+            syncDisplayOrder();
+            const pinSet = new Set(pinnedIds);
+            const pinned = displayOrder.filter(id => pinSet.has(id)).map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
+            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
+            return [...pinned, ...rest];
+        }
+        function moveInOrderList(list, sourceKey, targetKey, placeBefore){
+            const from = list.indexOf(sourceKey);
+            let to = list.indexOf(targetKey);
+            if(from < 0 || to < 0) return list;
+            const next = [...list];
+            next.splice(from, 1);
+            to = next.indexOf(targetKey);
+            if(to < 0) return next;
+            if(!placeBefore) to += 1;
+            next.splice(to, 0, sourceKey);
+            return next;
+        }
+        function reorderHistoryItem(sourceKey, targetKey, placeBefore){
+            if(!sourceKey || !targetKey || sourceKey === targetKey) return;
+            const pinSet = new Set(pinnedIds);
+            let srcPinned = pinSet.has(sourceKey);
+            let tgtPinned = pinSet.has(targetKey);
+            if(srcPinned !== tgtPinned){
+                if(srcPinned) pinnedIds = pinnedIds.filter(id => id !== sourceKey);
+                else pinnedIds = [...pinnedIds.filter(id => id !== sourceKey), sourceKey];
+                srcPinned = !srcPinned;
+                tgtPinned = !tgtPinned;
+            }
+            let pinnedList = displayOrder.filter(id => pinnedIds.includes(id));
+            let restList = displayOrder.filter(id => !pinnedIds.includes(id));
+            pinnedIds.forEach(id => { if(!pinnedList.includes(id)) pinnedList.push(id); });
+            restList = [...restList, ...allHistory.map(historyKey).filter(id => !pinnedIds.includes(id) && !restList.includes(id))];
+            if(srcPinned){
+                pinnedList = moveInOrderList(pinnedList, sourceKey, targetKey, placeBefore);
+            } else {
+                restList = moveInOrderList(restList, sourceKey, targetKey, placeBefore);
+            }
+            displayOrder = [...pinnedList, ...restList];
+            saveOnlineMeta();
+            renderOutputGrid();
+        }
+        function clearReorderDropHints(){
+            document.querySelectorAll('.output-grid-cell.drop-before,.output-grid-cell.drop-after').forEach(el => {
+                el.classList.remove('drop-before', 'drop-after');
+            });
+        }
+        function togglePin(item, ev){
+            if(ev) { ev.preventDefault(); ev.stopPropagation(); }
+            const key = historyKey(item);
+            if(!key) return;
+            if(pinnedIds.includes(key)){
+                pinnedIds = pinnedIds.filter(id => id !== key);
+                const pinnedList = pinnedIds.slice();
+                const restList = [key, ...displayOrder.filter(id => !pinnedIds.includes(id) && id !== key)];
+                displayOrder = [...pinnedList, ...restList];
+            } else {
+                pinnedIds = [...pinnedIds.filter(id => id !== key), key];
+                const restList = displayOrder.filter(id => !pinnedIds.includes(id));
+                displayOrder = [...pinnedIds, ...restList];
+            }
+            saveOnlineMeta();
+            renderOutputGrid();
+        }
+        function toggleFavorite(item, ev){
+            if(ev) { ev.preventDefault(); ev.stopPropagation(); }
+            const key = historyKey(item);
+            if(!key) return;
+            if(favoriteIds.includes(key)) favoriteIds = favoriteIds.filter(id => id !== key);
+            else favoriteIds = [key, ...favoriteIds.filter(id => id !== key)];
+            saveOnlineMeta();
+            renderOutputGrid();
+        }
+        function upsertHistoryItem(item){
+            if(!item?.images?.[0]) return;
+            const key = historyKey(item);
+            const idx = allHistory.findIndex(h => historyKey(h) === key);
+            if(idx >= 0) allHistory[idx] = item;
+            else allHistory.unshift(item);
+            if(key && !displayOrder.includes(key)) displayOrder.unshift(key);
+            saveOnlineMeta();
+        }
+        function pendingCellHtml(job){
+            const batchLabel = job.batchTotal > 1 ? `<span class="text-[8px] opacity-70">${job.batchIndex}/${job.batchTotal}</span>` : '';
+            const err = job.error ? `<p>${escapeHtml(job.error)}</p>` : `<p data-i18n="online.generating">Generating</p>${batchLabel}`;
+            return `<div class="output-grid-cell is-pending${job.error ? ' has-error' : ''}" data-pending-id="${escapeHtml(job.id)}">
+                <div class="cell-pending${job.error ? ' is-error' : ''}">
+                    ${job.error ? '' : '<div class="pending-spin"></div>'}
+                    ${err}
+                </div>
+            </div>`;
+        }
+        function outputCellHtml(data){
+            const url = data.images[0];
+            const key = historyKey(data);
+            const pinned = isPinned(data);
+            const fav = isFavorite(data);
+            const highlight = highlightOutputKey === key ? ' is-new-highlight' : '';
+            return `<div class="output-grid-cell group${pinned ? ' is-pinned' : ''}${fav ? ' is-favorite' : ''}${highlight}" data-ts="${escapeHtml(key)}">
+                <img src="${escapeHtml(url)}" alt="" class="draggable-output" draggable="true" loading="lazy">
+                <div class="board-pick-overlay" aria-hidden="true"><i data-lucide="plus"></i></div>
+                <div class="cell-actions">
+                    <button type="button" class="cell-action-btn${pinned ? ' active' : ''}" data-action="pin" title="${tr('online.pin')}"><i data-lucide="arrow-up-to-line"></i></button>
+                    <button type="button" class="cell-action-btn${fav ? ' fav-active active' : ''}" data-action="favorite" title="${tr('online.favorite')}"><i data-lucide="heart"></i></button>
+                    <button type="button" class="cell-action-btn" data-action="apply" title="${tr('online.applyParams')}"><i data-lucide="clipboard-copy"></i></button>
+                    <a href="${escapeHtml(url)}" download class="cell-action-btn" title="${tr('online.download')}" onclick="event.stopPropagation()"><i data-lucide="download"></i></a>
+                    <button type="button" class="cell-action-btn" data-action="delete" title="${tr('online.delete')}"><i data-lucide="trash-2"></i></button>
+                </div>
+            </div>`;
+        }
+        function renderOutputGrid(){
+            const grid = document.getElementById('outputGrid');
+            const box = document.getElementById('resultBox');
+            const placeholder = document.getElementById('placeholder');
+            if(!grid || !box) return;
+            const items = sortedHistory();
+            const hasContent = items.length || pendingJobs.length;
+            if(!hasContent){
+                grid.classList.add('hidden');
+                grid.innerHTML = '';
+                box.classList.remove('has-outputs');
+                placeholder.classList.remove('hidden');
+                return;
+            }
+            placeholder.classList.add('hidden');
+            box.classList.add('has-outputs');
+            grid.classList.remove('hidden');
+            grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0, 1fr))`;
+            grid.innerHTML = pendingJobs.map(pendingCellHtml).join('') + items.map(outputCellHtml).join('');
+            const itemMap = new Map(items.map(item => [historyKey(item), item]));
+            [...grid.querySelectorAll('.output-grid-cell[data-ts]')].forEach(cell => {
+                const data = itemMap.get(cell.dataset.ts);
+                if(!data) return;
+                bindOutputCell(cell, data);
+                cell.querySelector('[data-action="pin"]')?.addEventListener('click', e => togglePin(data, e));
+                cell.querySelector('[data-action="favorite"]')?.addEventListener('click', e => toggleFavorite(data, e));
+                cell.querySelector('[data-action="apply"]')?.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); applyRecordParams(data); });
+                cell.querySelector('[data-action="delete"]')?.addEventListener('click', e => deleteHistoryItem(data.timestamp, e));
+            });
+            lucide.createIcons();
+        }
+        async function loadAllHistory(){
+            if(historyLoading) return;
+            historyLoading = true;
+            try {
+                allHistory = await fetch('/api/history?type=online').then(r => r.json());
+                if(!Array.isArray(allHistory)) allHistory = [];
+                const keys = new Set(allHistory.map(historyKey));
+                pinnedIds = pinnedIds.filter(id => keys.has(id));
+                favoriteIds = favoriteIds.filter(id => keys.has(id));
+                syncDisplayOrder();
+                renderOutputGrid();
+            } catch(e) {
+                console.error(e);
+            } finally {
+                historyLoading = false;
+            }
+        }
+
+        function firstEmptyRefSlot(){
+            return refSlots.find(s => !s.ref)?.id || refSlots[refSlots.length - 1]?.id;
+        }
+        async function handleFile(file, slotId){
+            if(!file) return;
+            const slot = refSlots.find(s => s.id === slotId);
+            if(!slot) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                getImageDimensions(e.target.result).then(dim => {
+                    slot.dim = dim;
+                    updateSizeUI();
+                    renderRefGrid();
+                }).catch(() => renderRefGrid());
+            };
+            reader.readAsDataURL(file);
+            const form = new FormData();
+            form.append('files', file);
+            const data = await fetch('/api/ai/upload', {method:'POST', body:form}).then(r=>r.json());
+            slot.ref = data.files[0];
+            ensureTrailingEmptySlot();
+            renderRefGrid();
+        }
+        async function handleImageUrl(url, slotId){
+            const normalized = normalizeImageUrl(url);
+            if(!normalized) return;
+            let slot = refSlots.find(s => s.id === slotId);
+            if(!slot){
+                if(filledRefCount() >= MAX_REF_SLOTS) return;
+                slot = newRefSlot();
+                refSlots.push(slot);
+            }
+            if(slot.ref && filledRefCount() >= MAX_REF_SLOTS) return;
+            if(slot.ref && filledRefCount() < MAX_REF_SLOTS){
+                const idx = refSlots.indexOf(slot);
+                slot = newRefSlot();
+                refSlots.splice(idx + 1, 0, slot);
+            }
+            slot.ref = { url: normalized, name: normalized.split('/').pop() || 'image.png', role: '' };
+            getImageDimensions(normalized).then(dim => {
+                slot.dim = dim;
+                updateSizeUI();
+                renderRefGrid();
+            }).catch(() => renderRefGrid());
+            ensureTrailingEmptySlot();
+            renderRefGrid();
+        }
+        window.handleImageUrl = handleImageUrl;
+        window.cancelBoardPick = cancelBoardPick;
+        function removeRefSlot(slotId, ev){
+            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+            refSlots = refSlots.filter(s => s.id !== slotId);
+            if(!refSlots.length) refSlots = [newRefSlot()];
+            ensureTrailingEmptySlot();
+            renderRefGrid();
+        }
+        window.addEventListener('paste', e => {
+            const item = [...(e.clipboardData?.items || [])].find(x => x.kind === 'file' && x.type.startsWith('image/'));
+            if(item) handleFile(item.getAsFile(), firstEmptyRefSlot());
+        });
+        async function runGenerateJob(jobId, payload){
+            try {
+                const result = await fetch('/api/online-image', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload)
+                }).then(async r => { if(!r.ok) throw new Error((await r.json()).detail || '生成失败'); return r.json(); });
+                currentResult = result;
+                upsertHistoryItem(result);
+                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                renderOutputGrid();
+            } catch(err) {
+                const job = pendingJobs.find(j => j.id === jobId);
+                if(job) job.error = err.message || 'Generation failed';
+                renderOutputGrid();
+                setTimeout(() => {
+                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                    const placeholder = document.getElementById('placeholder');
+                    if(!allHistory.length && !pendingJobs.length && placeholder) placeholder.classList.remove('hidden');
+                    renderOutputGrid();
+                }, 2800);
+            }
+        }
+        async function submitImage(){
+            const prompt = document.getElementById('promptInput').value.trim();
+            if(!prompt){ alert(tr('online.promptRequired')); return; }
+            const placeholder = document.getElementById('placeholder');
+            const payload = {
+                prompt,
+                provider_id: provider,
+                model: selectedModel,
+                size: currentSize(),
+                reference_images: getReferenceList()
+            };
+            const jobs = [];
+            for(let i = 0; i < batchCount; i++){
+                const jobId = `pending_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`;
+                const jobObj = {
+                    id: jobId,
+                    prompt,
+                    mediaKind: 'image',
+                    batchIndex: batchCount > 1 ? i + 1 : 0,
+                    batchTotal: batchCount
+                };
+                pendingJobs.unshift(jobObj);
+                if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
+                jobs.push(runGenerateJob(jobId, { ...payload, job_id: jobId }));
+            }
+            renderOutputGrid();
+            await Promise.allSettled(jobs);
+            if(!allHistory.length && !pendingJobs.length && placeholder) placeholder.classList.remove('hidden');
+        }
+
+        let lightboxIndex = -1;
+
+        function lightboxItems(){ return sortedHistory(); }
+        function formatViewerTime(ts){
+            if(!ts) return '—';
+            try { return new Date(Number(ts) * 1000).toLocaleString(); } catch(e) { return String(ts); }
+        }
+        function isViewerEditedImage(data){
+            const editType = data?.params?.edit_type;
+            return editType === 'brush' || editType === 'crop';
+        }
+        function viewerMetaRows(data){
+            const rows = [];
+            const edited = isViewerEditedImage(data);
+            const providerName = data.provider_name || providerById(data.params?.provider_id || data.provider_id)?.name || data.provider_id || '—';
+            const modelName = data.params?.model || data.model || '—';
+            const size = data.params?.size || '—';
+            if(data._displaySize) rows.unshift({ label: tr('online.viewerResolution') || 'Resolution', value: data._displaySize });
+            if(!edited){
+                rows.push({ label: tr('api.provider') || 'Platform', value: providerName });
+                rows.push({ label: tr('online.model') || 'Model', value: modelName });
+                rows.push({ label: tr('online.size') || 'Size', value: size });
+            }
+            if(data.seed != null) rows.push({ label: 'Seed', value: String(data.seed) });
+            rows.push({ label: tr('online.viewerCreated') || 'Created', value: formatViewerTime(data.timestamp) });
+            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '✓' });
+            return rows;
+        }
+        function renderViewerRefThumbs(data){
+            const wrap = document.getElementById('lightboxRefsWrap');
+            const el = document.getElementById('lightboxRefs');
+            const refs = (data.params?.reference_images || []).filter(ref => ref?.url);
+            if(!wrap || !el) return;
+            if(!refs.length){
+                wrap.classList.add('hidden');
+                el.innerHTML = '';
+                return;
+            }
+            wrap.classList.remove('hidden');
+            el.innerHTML = refs.map((ref, i) => `
+                <a href="${escapeHtml(ref.url)}" target="_blank" rel="noopener" class="viewer-ref-thumb" title="${escapeHtml(ref.name || ('Ref ' + (i + 1)))}">
+                    <img src="${escapeHtml(ref.url)}" alt="">
+                </a>
+            `).join('');
+        }
+        function renderViewerMetaGrid(container, rows){
+            container.innerHTML = rows.map(row => `
+                <div class="viewer-meta-cell">
+                    <div class="viewer-meta-label">${escapeHtml(row.label)}</div>
+                    <div class="viewer-meta-value">${escapeHtml(row.value)}</div>
+                </div>
+            `).join('');
+        }
+
+        const viewerEdit = { mode: 'brush', drawing: false, undoStack: [], lastPoint: null, cropDrag: null, cropRatio: '1:1', brushHue: 339 };
+        const VIEWER_CROP_RATIOS = [
+            { id: '1:1', label: '1:1', w: 1, h: 1 },
+            { id: '4:3', label: '4:3', w: 4, h: 3 },
+            { id: '3:4', label: '3:4', w: 3, h: 4 },
+            { id: '16:9', label: '16:9', w: 16, h: 9 },
+            { id: '9:16', label: '9:16', w: 9, h: 16 },
+            { id: '3:2', label: '3:2', w: 3, h: 2 },
+            { id: '2:3', label: '2:3', w: 2, h: 3 },
+            { id: 'custom', labelKey: 'online.cropCustom', w: 0, h: 0 }
+        ];
+
+        function isViewerCropRatioLocked(){
+            return viewerEdit.cropRatio !== 'custom';
+        }
+
+        function renderViewerCropRatios(){
+            const wrap = document.getElementById('viewerCropRatios');
+            if(!wrap) return;
+            if(!wrap.dataset.ready){
+                wrap.dataset.ready = '1';
+                wrap.innerHTML = VIEWER_CROP_RATIOS.map(r => `
+                    <button type="button" class="viewer-crop-ratio" data-ratio="${r.id}" onclick="setViewerCropRatio('${r.id}')">${escapeHtml(r.labelKey ? tr(r.labelKey) : r.label)}</button>
+                `).join('');
+            }
+            document.querySelectorAll('.viewer-crop-ratio').forEach(btn => {
+                const r = VIEWER_CROP_RATIOS.find(x => x.id === btn.dataset.ratio);
+                if(r?.labelKey) btn.textContent = tr(r.labelKey);
+                btn.classList.toggle('active', btn.dataset.ratio === viewerEdit.cropRatio);
+            });
+        }
+
+        function setViewerCropRatio(ratioId){
+            viewerEdit.cropRatio = ratioId;
+            renderViewerCropRatios();
+            applyViewerCropRatioBox(ratioId !== 'custom');
+        }
+
+        function getViewerCropRatio(){
+            return VIEWER_CROP_RATIOS.find(r => r.id === viewerEdit.cropRatio) || VIEWER_CROP_RATIOS.find(r => r.id === '1:1');
+        }
+
+        function getViewerImageDisplayRect(img){
+            if(!img) return { left:0, top:0, width:0, height:0, scale:1, naturalWidth:1, naturalHeight:1 };
+            const cw = img.clientWidth || 0;
+            const ch = img.clientHeight || 0;
+            const nw = img.naturalWidth || cw || 1;
+            const nh = img.naturalHeight || ch || 1;
+            if(!cw || !ch) return { left:0, top:0, width:cw, height:ch, scale:1, naturalWidth:nw, naturalHeight:nh };
+            const scale = Math.min(cw / nw, ch / nh);
+            const width = nw * scale;
+            const height = nh * scale;
+            return {
+                left: (cw - width) / 2,
+                top: (ch - height) / 2,
+                width,
+                height,
+                scale,
+                naturalWidth: nw,
+                naturalHeight: nh
+            };
+        }
+
+        function viewerDisplayToNaturalRect(left, top, width, height){
+            const img = document.getElementById('lightboxImg');
+            const disp = getViewerImageDisplayRect(img);
+            const relLeft = Math.max(left, disp.left) - disp.left;
+            const relTop = Math.max(top, disp.top) - disp.top;
+            const relRight = Math.min(left + width, disp.left + disp.width) - disp.left;
+            const relBottom = Math.min(top + height, disp.top + disp.height) - disp.top;
+            const scale = disp.scale || 1;
+            let w = Math.max(1, Math.round((relRight - relLeft) / scale));
+            let h = Math.max(1, Math.round((relBottom - relTop) / scale));
+            let x = Math.max(0, Math.round(relLeft / scale));
+            let y = Math.max(0, Math.round(relTop / scale));
+            if(isViewerCropRatioLocked()){
+                const ratio = getViewerCropRatio();
+                const target = ratio.w / ratio.h;
+                if(w / h > target) w = Math.max(1, Math.round(h * target));
+                else h = Math.max(1, Math.round(w / target));
+            }
+            return { x, y, w, h };
+        }
+
+        function resetViewerCropBoxCustom(){
+            const img = document.getElementById('lightboxImg');
+            const box = document.getElementById('viewerCropBox');
+            const disp = getViewerImageDisplayRect(img);
+            if(!img || !box || !disp.width) return;
+            const w = disp.width * 0.8;
+            const h = disp.height * 0.8;
+            box.style.left = Math.round(disp.left + (disp.width - w) / 2) + 'px';
+            box.style.top = Math.round(disp.top + (disp.height - h) / 2) + 'px';
+            box.style.width = Math.round(w) + 'px';
+            box.style.height = Math.round(h) + 'px';
+        }
+
+        function fitViewerCropBoxToRatio(ratioDef, keepCenter){
+            const img = document.getElementById('lightboxImg');
+            const box = document.getElementById('viewerCropBox');
+            const disp = getViewerImageDisplayRect(img);
+            if(!img || !box || !disp.width || !ratioDef?.w) return;
+            const iw = disp.width;
+            const ih = disp.height;
+            const target = ratioDef.w / ratioDef.h;
+            const curW = parseFloat(box.style.width) || iw * 0.8;
+            const curH = parseFloat(box.style.height) || ih * 0.8;
+            const curLeft = parseFloat(box.style.left) || disp.left + (iw - curW) / 2;
+            const curTop = parseFloat(box.style.top) || disp.top + (ih - curH) / 2;
+            const centerX = curLeft + curW / 2;
+            const centerY = curTop + curH / 2;
+            let w, h;
+            if(iw / ih > target){
+                h = ih * 0.82;
+                w = h * target;
+            } else {
+                w = iw * 0.82;
+                h = w / target;
+            }
+            if(keepCenter){
+                const area = curW * curH;
+                h = Math.sqrt(area / target);
+                w = h * target;
+                w = Math.min(w, iw);
+                h = Math.min(h, ih);
+            } else {
+                w = Math.min(w, iw);
+                h = Math.min(h, ih);
+            }
+            let left = keepCenter ? centerX - w / 2 : disp.left + (iw - w) / 2;
+            let top = keepCenter ? centerY - h / 2 : disp.top + (ih - h) / 2;
+            left = Math.min(Math.max(disp.left, left), Math.max(disp.left, disp.left + iw - w));
+            top = Math.min(Math.max(disp.top, top), Math.max(disp.top, disp.top + ih - h));
+            box.style.width = Math.round(w) + 'px';
+            box.style.height = Math.round(h) + 'px';
+            box.style.left = Math.round(left) + 'px';
+            box.style.top = Math.round(top) + 'px';
+        }
+
+        function applyViewerCropRatioBox(keepCenter){
+            const img = document.getElementById('lightboxImg');
+            const box = document.getElementById('viewerCropBox');
+            const ratio = getViewerCropRatio();
+            if(!img || !box || !img.clientWidth) return;
+            if(ratio.id === 'custom'){
+                if(!parseFloat(box.style.width)) resetViewerCropBoxCustom();
+                return;
+            }
+            fitViewerCropBoxToRatio(ratio, !!keepCenter);
+        }
+
+        function hideViewerBrushCursor(){
+            document.getElementById('viewerBrushCursor')?.classList.remove('visible');
+        }
+
+        function viewerBrushColorFromHue(hue){
+            const h = ((Number(hue) % 360) + 360) % 360;
+            const s = 100;
+            const l = 50;
+            const sat = s / 100;
+            const light = l / 100;
+            const c = (1 - Math.abs(2 * light - 1)) * sat;
+            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            const m = light - c / 2;
+            let r = 0;
+            let g = 0;
+            let b = 0;
+            if(h < 60){ r = c; g = x; }
+            else if(h < 120){ r = x; g = c; }
+            else if(h < 180){ g = c; b = x; }
+            else if(h < 240){ g = x; b = c; }
+            else if(h < 300){ r = x; b = c; }
+            else { r = c; b = x; }
+            const toHex = n => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        function getViewerBrushColor(){
+            return document.getElementById('viewerBrushColor')?.value || viewerBrushColorFromHue(viewerEdit.brushHue ?? 339);
+        }
+
+        function setViewerBrushHue(hue){
+            const nextHue = ((Number(hue) % 360) + 360) % 360;
+            viewerEdit.brushHue = nextHue;
+            const color = viewerBrushColorFromHue(nextHue);
+            const hidden = document.getElementById('viewerBrushColor');
+            const thumb = document.getElementById('viewerHueThumb');
+            const bar = document.getElementById('viewerHueBar');
+            const swatch = document.getElementById('viewerBrushColorSwatch');
+            const cursor = document.getElementById('viewerBrushCursor');
+            if(hidden) hidden.value = color;
+            if(thumb){
+                thumb.style.left = `${(nextHue / 360) * 100}%`;
+                thumb.style.background = color;
+            }
+            if(swatch) swatch.style.background = color;
+            if(bar) bar.setAttribute('aria-valuenow', String(Math.round(nextHue)));
+            if(cursor) cursor.style.borderColor = color;
+        }
+
+        function viewerHueFromPointer(e, bar){
+            const rect = bar.getBoundingClientRect();
+            const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+            return (x / Math.max(rect.width, 1)) * 360;
+        }
+
+        function bindViewerHueBar(){
+            const bar = document.getElementById('viewerHueBar');
+            if(!bar || bar.dataset.bound) return;
+            bar.dataset.bound = '1';
+            const applyPointer = e => setViewerBrushHue(viewerHueFromPointer(e, bar));
+            bar.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                applyPointer(e);
+                bar.setPointerCapture?.(e.pointerId);
+                const move = ev => applyPointer(ev);
+                const up = ev => {
+                    bar.removeEventListener('pointermove', move);
+                    try { bar.releasePointerCapture?.(ev.pointerId); } catch(err) {}
+                };
+                bar.addEventListener('pointermove', move);
+                bar.addEventListener('pointerup', up);
+                bar.addEventListener('pointercancel', up);
+            });
+            setViewerBrushHue(viewerEdit.brushHue ?? 339);
+        }
+
+        function updateViewerBrushCursor(e){
+            const cursor = document.getElementById('viewerBrushCursor');
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const stage = document.getElementById('viewerStage');
+            if(viewerEdit.mode !== 'brush' || !cursor || !canvas || !stage){
+                hideViewerBrushCursor();
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const stageRect = stage.getBoundingClientRect();
+            if(e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom){
+                hideViewerBrushCursor();
+                return;
+            }
+            const size = Number(document.getElementById('viewerBrushSize')?.value || 16);
+            const scale = rect.width / Math.max(canvas.width, 1);
+            const d = Math.max(4, size * scale);
+            cursor.style.width = d + 'px';
+            cursor.style.height = d + 'px';
+            cursor.style.left = (e.clientX - stageRect.left) + 'px';
+            cursor.style.top = (e.clientY - stageRect.top) + 'px';
+            cursor.style.borderColor = getViewerBrushColor();
+            cursor.classList.add('visible');
+        }
+
+        function setViewerEditMode(mode){
+            viewerEdit.mode = mode;
+            document.getElementById('viewerModeBrush')?.classList.toggle('active', mode === 'brush');
+            document.getElementById('viewerModeCrop')?.classList.toggle('active', mode === 'crop');
+            document.getElementById('viewerBrushPanel')?.classList.toggle('hidden', mode !== 'brush');
+            document.getElementById('viewerCropPanel')?.classList.toggle('hidden', mode !== 'crop');
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const cropLayer = document.getElementById('viewerCropLayer');
+            canvas?.classList.toggle('viewer-draw-active', mode === 'brush');
+            cropLayer?.classList.toggle('hidden', mode !== 'crop');
+            if(mode === 'crop'){
+                hideViewerBrushCursor();
+                renderViewerCropRatios();
+                applyViewerCropRatioBox();
+            } else if(mode === 'grid'){
+                hideViewerBrushCursor();
+            }
+            lucide.createIcons();
+        }
+
+        function resetViewerDrawCanvas(){
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const ctx = canvas?.getContext('2d');
+            if(!canvas || !ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            viewerEdit.undoStack = [];
+            pushViewerDrawUndo();
+        }
+
+        function layoutViewerDrawCanvas(){
+            const img = document.getElementById('lightboxImg');
+            const canvas = document.getElementById('viewerDrawCanvas');
+            if(!img || !canvas || !img.complete || !img.naturalWidth) return false;
+            const nw = Math.max(1, img.naturalWidth);
+            const nh = Math.max(1, img.naturalHeight);
+            canvas.width = nw;
+            canvas.height = nh;
+            const disp = getViewerImageDisplayRect(img);
+            canvas.style.left = `${disp.left}px`;
+            canvas.style.top = `${disp.top}px`;
+            canvas.style.width = `${disp.width}px`;
+            canvas.style.height = `${disp.height}px`;
+            canvas.style.right = 'auto';
+            canvas.style.bottom = 'auto';
+            return true;
+        }
+
+        function syncViewerDrawCanvas(){
+            const img = document.getElementById('lightboxImg');
+            if(!img) return;
+            const run = () => {
+                if(!layoutViewerDrawCanvas()) return;
+                resetViewerDrawCanvas();
+                if(viewerEdit.mode === 'crop') initViewerCropBox();
+            };
+            if(img.complete && img.naturalWidth){
+                requestAnimationFrame(() => requestAnimationFrame(run));
+            } else {
+                img.addEventListener('load', () => requestAnimationFrame(() => requestAnimationFrame(run)), { once: true });
+            }
+        }
+
+        function pushViewerDrawUndo(){
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const ctx = canvas?.getContext('2d');
+            if(!canvas || !ctx || !canvas.width || !canvas.height) return;
+            try {
+                viewerEdit.undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+                if(viewerEdit.undoStack.length > 30) viewerEdit.undoStack.shift();
+            } catch(e) {}
+        }
+
+        function undoViewerDraw(){
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const ctx = canvas?.getContext('2d');
+            if(!canvas || !ctx || viewerEdit.undoStack.length <= 1) return;
+            viewerEdit.undoStack.pop();
+            const prev = viewerEdit.undoStack[viewerEdit.undoStack.length - 1];
+            if(prev) ctx.putImageData(prev, 0, 0);
+        }
+
+        function viewerCanvasPoint(e, canvas){
+            const rect = canvas.getBoundingClientRect();
+            const scale = rect.width / Math.max(canvas.width, 1);
+            return {
+                x: (e.clientX - rect.left) / scale,
+                y: (e.clientY - rect.top) / scale,
+            };
+        }
+
+        function beginViewerDraw(e){
+            if(viewerEdit.mode !== 'brush') return;
+            const canvas = document.getElementById('viewerDrawCanvas');
+            if(!canvas) return;
+            e.preventDefault();
+            viewerEdit.drawing = true;
+            pushViewerDrawUndo();
+            const pt = viewerCanvasPoint(e, canvas);
+            viewerEdit.lastPoint = pt;
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+            canvas.setPointerCapture?.(e.pointerId);
+            updateViewerBrushCursor(e);
+        }
+
+        function moveViewerDraw(e){
+            updateViewerBrushCursor(e);
+            if(!viewerEdit.drawing || viewerEdit.mode !== 'brush') return;
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const ctx = canvas?.getContext('2d');
+            if(!canvas || !ctx) return;
+            e.preventDefault();
+            const pt = viewerCanvasPoint(e, canvas);
+            const size = Number(document.getElementById('viewerBrushSize')?.value || 16);
+            const color = getViewerBrushColor();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = size;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineTo(pt.x, pt.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(pt.x, pt.y);
+            viewerEdit.lastPoint = pt;
+        }
+
+        function endViewerDraw(e){
+            if(!viewerEdit.drawing) return;
+            viewerEdit.drawing = false;
+            viewerEdit.lastPoint = null;
+            const canvas = document.getElementById('viewerDrawCanvas');
+            try { canvas?.releasePointerCapture?.(e.pointerId); } catch(err) {}
+            updateViewerBrushCursor(e);
+        }
+
+        function initViewerCropBox(){
+            viewerEdit.cropRatio = viewerEdit.cropRatio || '1:1';
+            applyViewerCropRatioBox(false);
+        }
+
+        function clampViewerCropSize(width, height, maxW, maxH, minSize, target){
+            let w = Math.max(minSize, width);
+            let h = Math.max(minSize, height);
+            if(target){
+                if(w / h > target) w = h * target;
+                else h = w / target;
+            }
+            if(w > maxW){
+                w = maxW;
+                if(target) h = w / target;
+            }
+            if(h > maxH){
+                h = maxH;
+                if(target) w = h * target;
+            }
+            w = Math.max(minSize, Math.min(maxW, w));
+            h = Math.max(minSize, Math.min(maxH, h));
+            if(target){
+                const nextH = w / target;
+                if(nextH <= maxH) h = nextH;
+                else { h = maxH; w = h * target; }
+            }
+            return { width: w, height: h };
+        }
+
+        function resizeViewerCropFromCorner(drag, dx, dy, corner){
+            const minSize = 24;
+            const target = isViewerCropRatioLocked() ? getViewerCropRatio().w / getViewerCropRatio().h : 0;
+            let left = drag.left;
+            let top = drag.top;
+            let width = drag.width;
+            let height = drag.height;
+            if(corner === 'se'){
+                width = drag.width + dx;
+                height = drag.height + dy;
+            } else if(corner === 'sw'){
+                width = drag.width - dx;
+                height = drag.height + dy;
+                left = drag.left + drag.width - width;
+            } else if(corner === 'ne'){
+                width = drag.width + dx;
+                height = drag.height - dy;
+                top = drag.top + drag.height - height;
+            } else if(corner === 'nw'){
+                width = drag.width - dx;
+                height = drag.height - dy;
+                left = drag.left + drag.width - width;
+                top = drag.top + drag.height - height;
+            }
+            if(target){
+                if(Math.abs(dx) >= Math.abs(dy)) height = width / target;
+                else width = height * target;
+                if(corner === 'se'){
+                    left = drag.left;
+                    top = drag.top;
+                } else if(corner === 'sw'){
+                    left = drag.left + drag.width - width;
+                    top = drag.top;
+                } else if(corner === 'ne'){
+                    left = drag.left;
+                    top = drag.top + drag.height - height;
+                } else if(corner === 'nw'){
+                    left = drag.left + drag.width - width;
+                    top = drag.top + drag.height - height;
+                }
+            }
+            width = Math.max(minSize, width);
+            height = Math.max(minSize, height);
+            left = Math.max(drag.minLeft, Math.min(drag.maxLeft - width, left));
+            top = Math.max(drag.minTop, Math.min(drag.maxTop - height, top));
+            width = Math.min(width, drag.maxLeft - left);
+            height = Math.min(height, drag.maxTop - top);
+            if(target){
+                if(width / height > target) width = height * target;
+                else height = width / target;
+                width = Math.max(minSize, Math.min(drag.maxLeft - left, width));
+                height = Math.max(minSize, Math.min(drag.maxTop - top, height));
+                if(corner === 'se'){
+                    left = Math.max(drag.minLeft, Math.min(drag.maxLeft - width, drag.left));
+                    top = Math.max(drag.minTop, Math.min(drag.maxTop - height, drag.top));
+                } else if(corner === 'sw'){
+                    left = Math.max(drag.minLeft, drag.left + drag.width - width);
+                    top = Math.max(drag.minTop, Math.min(drag.maxTop - height, drag.top));
+                } else if(corner === 'ne'){
+                    left = Math.max(drag.minLeft, Math.min(drag.maxLeft - width, drag.left));
+                    top = Math.max(drag.minTop, drag.top + drag.height - height);
+                } else if(corner === 'nw'){
+                    left = Math.max(drag.minLeft, drag.left + drag.width - width);
+                    top = Math.max(drag.minTop, drag.top + drag.height - height);
+                }
+                width = Math.min(width, drag.maxLeft - left);
+                height = Math.min(height, drag.maxTop - top);
+            }
+            return { left, top, width, height };
+        }
+
+        function beginViewerCropDrag(e, kind){
+            if(viewerEdit.mode !== 'crop') return;
+            e.preventDefault();
+            e.stopPropagation();
+            const box = document.getElementById('viewerCropBox');
+            const img = document.getElementById('lightboxImg');
+            const disp = getViewerImageDisplayRect(img);
+            if(!box || !img || !disp.width) return;
+            viewerEdit.cropDrag = {
+                kind,
+                startX: e.clientX,
+                startY: e.clientY,
+                left: parseFloat(box.style.left) || disp.left,
+                top: parseFloat(box.style.top) || disp.top,
+                width: parseFloat(box.style.width) || disp.width * 0.8,
+                height: parseFloat(box.style.height) || disp.height * 0.8,
+                minLeft: disp.left,
+                minTop: disp.top,
+                maxLeft: disp.left + disp.width,
+                maxTop: disp.top + disp.height
+            };
+            window.addEventListener('pointermove', moveViewerCropDrag);
+            window.addEventListener('pointerup', endViewerCropDrag, { once: true });
+        }
+
+        function moveViewerCropDrag(e){
+            const drag = viewerEdit.cropDrag;
+            const box = document.getElementById('viewerCropBox');
+            if(!drag || !box) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if(drag.kind === 'move'){
+                const maxLeft = drag.maxLeft - drag.width;
+                const maxTop = drag.maxTop - drag.height;
+                box.style.left = Math.min(maxLeft, Math.max(drag.minLeft, drag.left + dx)) + 'px';
+                box.style.top = Math.min(maxTop, Math.max(drag.minTop, drag.top + dy)) + 'px';
+                return;
+            }
+            const next = resizeViewerCropFromCorner(drag, dx, dy, drag.kind);
+            box.style.left = next.left + 'px';
+            box.style.top = next.top + 'px';
+            box.style.width = next.width + 'px';
+            box.style.height = next.height + 'px';
+        }
+
+        function endViewerCropDrag(){
+            viewerEdit.cropDrag = null;
+            window.removeEventListener('pointermove', moveViewerCropDrag);
+        }
+
+        async function getViewerMergedCanvas(){
+            const img = document.getElementById('lightboxImg');
+            const drawCanvas = document.getElementById('viewerDrawCanvas');
+            if(!img || !img.complete) return null;
+            const merged = document.createElement('canvas');
+            merged.width = img.naturalWidth;
+            merged.height = img.naturalHeight;
+            const ctx = merged.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            if(drawCanvas?.width) ctx.drawImage(drawCanvas, 0, 0);
+            return merged;
+        }
+
+        function viewerDrawCanvasHasStrokes(){
+            const canvas = document.getElementById('viewerDrawCanvas');
+            const ctx = canvas?.getContext('2d');
+            if(!canvas || !ctx) return false;
+            try {
+                const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                for(let i = 3; i < data.length; i += 4){
+                    if(data[i] > 0) return true;
+                }
+            } catch(e) {}
+            return false;
+        }
+
+        async function getViewerCroppedCanvas(){
+            const img = document.getElementById('lightboxImg');
+            const box = document.getElementById('viewerCropBox');
+            if(!img || !box || !img.clientWidth) return null;
+            const merged = await getViewerMergedCanvas();
+            if(!merged) return null;
+            const boxLeft = parseFloat(box.style.left) || 0;
+            const boxTop = parseFloat(box.style.top) || 0;
+            const boxW = parseFloat(box.style.width) || 0;
+            const boxH = parseFloat(box.style.height) || 0;
+            const { x, y, w, h } = viewerDisplayToNaturalRect(boxLeft, boxTop, boxW, boxH);
+            const out = document.createElement('canvas');
+            out.width = Math.min(w, merged.width - x);
+            out.height = Math.min(h, merged.height - y);
+            out.getContext('2d').drawImage(merged, x, y, out.width, out.height, 0, 0, out.width, out.height);
+            return out;
+        }
+
+        async function restoreViewerOriginal(){
+            const source = currentLightboxData;
+            const img = document.getElementById('lightboxImg');
+            if(!source?.images?.[0] || !img) return;
+            await new Promise(resolve => {
+                if(img.src === source.images[0] && img.complete){ resolve(); return; }
+                img.onload = () => resolve();
+                img.src = source.images[0];
+            });
+            resetViewerDrawCanvas();
+            if(viewerEdit.mode === 'crop') applyViewerCropRatioBox();
+        }
+
+        async function importEditedViewerCanvas(canvas, editType){
+            const source = currentLightboxData;
+            if(!canvas || !source) return null;
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            if(!blob) return null;
+            const file = new File([blob], `online_edit_${Date.now()}.png`, { type: 'image/png' });
+            const form = new FormData();
+            form.append('files', file);
+            const res = await fetch('/api/online-import', { method:'POST', body: form });
+            if(!res.ok) throw new Error('Import failed');
+            const data = await res.json();
+            const items = (data.items || []).map(item => ({
+                ...item,
+                prompt: source.prompt || item.prompt || '',
+                model: source.model || source.params?.model || item.model || '',
+                provider_id: source.provider_id || source.params?.provider_id || item.provider_id || '',
+                provider_name: source.provider_name || item.provider_name || '',
+                params: {
+                    ...(source.params || {}),
+                    imported: true,
+                    edited_from: historyKey(source),
+                    edit_type: editType,
+                    reference_images: source.params?.reference_images || []
+                }
+            }));
+            items.forEach(item => upsertHistoryItem(item));
+            renderOutputGrid();
+            return items[0] || null;
+        }
+
+        async function confirmViewerEdit(){
+            const mode = viewerEdit.mode;
+            try {
+                let newItem = null;
+                if(mode === 'brush'){
+                    if(!viewerDrawCanvasHasStrokes()){
+                        alert(tr('online.viewerNoEdit') || '请先在图片上涂抹');
+                        return;
+                    }
+                    const merged = await getViewerMergedCanvas();
+                    if(!merged) return;
+                    newItem = await importEditedViewerCanvas(merged, 'brush');
+                } else if(mode === 'crop'){
+                    const cropped = await getViewerCroppedCanvas();
+                    if(!cropped) return;
+                    newItem = await importEditedViewerCanvas(cropped, 'crop');
+                } else {
+                    return;
+                }
+                closeLightbox();
+                if(newItem) flashOutputCell(historyKey(newItem));
+                lucide.createIcons();
+            } catch(e) {
+                alert(tr('online.importFailed') || '保存失败');
+            }
+        }
+
+        function initViewerEditTools(){
+            const canvas = document.getElementById('viewerDrawCanvas');
+            if(!canvas || canvas.dataset.bound) return;
+            canvas.dataset.bound = '1';
+            canvas.addEventListener('pointerdown', beginViewerDraw);
+            canvas.addEventListener('pointermove', moveViewerDraw);
+            canvas.addEventListener('pointerup', endViewerDraw);
+            canvas.addEventListener('pointercancel', endViewerDraw);
+            canvas.addEventListener('pointerleave', e => {
+                if(!viewerEdit.drawing) hideViewerBrushCursor();
+            });
+            bindViewerHueBar();
+            document.getElementById('viewerBrushSize')?.addEventListener('input', () => {
+                const evt = viewerEdit.lastPointer;
+                if(evt) updateViewerBrushCursor(evt);
+            });
+            document.getElementById('viewerStage')?.addEventListener('pointermove', e => {
+                viewerEdit.lastPointer = e;
+                updateViewerBrushCursor(e);
+            });
+            document.getElementById('viewerCropBox')?.addEventListener('pointerdown', e => {
+                if(e.target.closest('.viewer-crop-handle')) return;
+                beginViewerCropDrag(e, 'move');
+            });
+            document.querySelectorAll('.viewer-crop-handle').forEach(handle => {
+                handle.addEventListener('pointerdown', e => {
+                    e.stopPropagation();
+                    beginViewerCropDrag(e, handle.dataset.corner);
+                });
+            });
+            window.addEventListener('resize', () => {
+                if(document.getElementById('lightbox')?.classList.contains('open')) syncViewerDrawCanvas();
+            });
+        }
+
+        function renderLightboxSidebar(data){
+            const info = document.getElementById('lightboxInfo');
+            const promptEl = document.getElementById('lightboxPrompt');
+            const promptSection = document.getElementById('lightboxPromptSection');
+            const edited = isViewerEditedImage(data);
+            renderViewerRefThumbs(data);
+            renderViewerMetaGrid(info, viewerMetaRows(data));
+            if(promptSection) promptSection.classList.toggle('hidden', edited);
+            const prompt = (data.prompt || '').trim();
+            promptEl.textContent = prompt || (tr('online.viewerNoPrompt') || 'No prompt');
+            promptEl.classList.toggle('empty', !prompt);
+            const key = historyKey(data);
+            document.getElementById('viewerFavBtn')?.classList.toggle('active', favoriteIds.includes(key));
+            document.getElementById('viewerPinBtn')?.classList.toggle('pin-active', pinnedIds.includes(key));
+        }
+        function updateViewerNav(){
+            const items = lightboxItems();
+            const prev = document.getElementById('viewerPrev');
+            const next = document.getElementById('viewerNext');
+            if(prev) prev.disabled = lightboxIndex <= 0;
+            if(next) next.disabled = lightboxIndex < 0 || lightboxIndex >= items.length - 1;
+        }
+        function showLightboxAt(index){
+            const items = lightboxItems();
+            if(!items.length) return;
+            lightboxIndex = Math.min(items.length - 1, Math.max(0, index));
+            openLightbox(items[lightboxIndex], { preserveIndex: true });
+        }
+        function viewerNav(delta){
+            if(lightboxIndex < 0) return;
+            showLightboxAt(lightboxIndex + delta);
+        }
+        function openLightbox(data, options = {}){
+            if(!data) return;
+            currentLightboxData = data;
+            if(!options.preserveIndex){
+                const items = lightboxItems();
+                lightboxIndex = items.findIndex(item => historyKey(item) === historyKey(data));
+            }
+            const img = document.getElementById('lightboxImg');
+            const onReady = () => {
+                syncViewerDrawCanvas();
+                const enriched = {
+                    ...data,
+                    _displaySize: img.naturalWidth && img.naturalHeight ? `${img.naturalWidth}×${img.naturalHeight}` : (data.params?.size || '')
+                };
+                if(currentLightboxData && historyKey(currentLightboxData) === historyKey(data)) currentLightboxData = enriched;
+                renderLightboxSidebar(enriched);
+            };
+            img.onload = onReady;
+            img.src = data.images[0];
+            if(img.complete && img.naturalWidth) onReady();
+            viewerEdit.cropRatio = '1:1';
+            setViewerEditMode('brush');
+            renderLightboxSidebar(data);
+            updateViewerNav();
+            initViewerEditTools();
+            document.getElementById('lightbox').classList.add('open');
+            document.body.style.overflow = 'hidden';
+            lucide.createIcons();
+        }
+        function closeLightbox(){
+            document.getElementById('lightbox').classList.remove('open');
+            document.body.style.overflow = '';
+            lightboxIndex = -1;
+            viewerEdit.drawing = false;
+            viewerEdit.cropDrag = null;
+            setViewerEditMode('brush');
+        }
+        function handleOutsideClick(e){ if(e.target.id === 'lightbox') closeLightbox(); }
+        function copyLightboxPrompt(ev){
+            ev?.stopPropagation();
+            const text = currentLightboxData?.prompt || '';
+            if(!text) return;
+            navigator.clipboard?.writeText(text).catch(() => {});
+        }
+        async function copyLightboxImage(ev){
+            ev?.stopPropagation();
+            const merged = await getViewerMergedCanvas();
+            if(!merged) return;
+            try {
+                const blob = await new Promise(resolve => merged.toBlob(resolve, 'image/png'));
+                if(blob && navigator.clipboard?.write && window.ClipboardItem){
+                    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                }
+            } catch(e) {}
+        }
+        function openLightboxFullscreen(ev){
+            ev?.stopPropagation();
+            const img = document.getElementById('lightboxImg');
+            const el = img?.requestFullscreen ? img : document.getElementById('lightboxFrame');
+            el?.requestFullscreen?.().catch(() => {});
+        }
+        function toggleViewerFavorite(){
+            if(!currentLightboxData) return;
+            toggleFavorite(currentLightboxData);
+            renderLightboxSidebar(currentLightboxData);
+        }
+        function toggleViewerPin(){
+            if(!currentLightboxData) return;
+            togglePin(currentLightboxData);
+            renderLightboxSidebar(currentLightboxData);
+        }
+        document.addEventListener('keydown', e => {
+            const open = document.getElementById('lightbox')?.classList.contains('open');
+            if(!open) return;
+            if(e.key === 'Escape') closeLightbox();
+            if(e.key === 'ArrowLeft') viewerNav(-1);
+            if(e.key === 'ArrowRight') viewerNav(1);
+        });
+        async function downloadLightboxImage(e){
+            e.stopPropagation();
+            const merged = await getViewerMergedCanvas();
+            if(!merged) return;
+            const link = document.createElement('a');
+            link.href = merged.toDataURL('image/png');
+            link.download = `online-image-${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+        function applyRecordParams(data){
+            if(!data) return;
+            document.getElementById('promptInput').value = data.prompt || '';
+            const pid = data.params?.provider_id || data.provider_id;
+            const mid = data.params?.model || data.model;
+            if(pid && imageProviders().some(p => p.id === pid)) setProvider(pid);
+            if(mid && providerModels(provider).includes(mid)) setModel(mid);
+            refSlots = [];
+            (data.params?.reference_images || []).slice(0, MAX_REF_SLOTS).forEach(ref => {
+                refSlots.push(newRefSlot(ref, null));
+                getImageDimensions(ref.url).then(dim => {
+                    const slot = refSlots.find(s => s.ref?.url === ref.url);
+                    if(slot) slot.dim = dim;
+                    updateSizeUI();
+                }).catch(() => {});
+            });
+            ensureTrailingEmptySlot();
+            renderRefGrid();
+            const size = data.params?.size || '1024x1024';
+            if(String(size).trim() === 'auto' || /^auto:(1k|2k|4k)$/i.test(String(size).trim())){
+                setRatio('auto');
+                setResolution(inferResolutionFromSize(size));
+            } else {
+                const parsed = parseSizeValue(size);
+                if(parsed){
+                    setRatio(inferRatioFromSize(size, selectedModel));
+                    setResolution(inferResolutionFromSize(size));
+                } else {
+                    setResolution('custom');
+                    customWidth = '';
+                    customHeight = '';
+                    updateSizeUI();
+                }
+            }
+        }
+        function applySameStyle(){
+            if(!currentLightboxData) return;
+            applyRecordParams(currentLightboxData);
+            closeLightbox();
+        }
+        async function deleteHistoryItem(ts, ev){
+            if(ev) { ev.preventDefault(); ev.stopPropagation(); }
+            if(!confirm(tr('online.deleteConfirm'))) return;
+            const res = await fetch('/api/history/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({timestamp:ts})}).then(r=>r.json());
+            if(!res.success) return;
+            const key = String(ts);
+            allHistory = allHistory.filter(h => historyKey(h) !== key);
+            pinnedIds = pinnedIds.filter(id => id !== key);
+            favoriteIds = favoriteIds.filter(id => id !== key);
+            displayOrder = displayOrder.filter(id => id !== key);
+            saveOnlineMeta();
+            renderOutputGrid();
+        }
+        window.onload = async () => {
+            applyLanguage();
+            setRatio('1:1');
+            setResolution('1k');
+            loadOutputCols();
+            loadOnlineMeta();
+            setOutputCols(outputCols);
+            const colsSlider = document.getElementById('outputColsSlider');
+            if(colsSlider) colsSlider.oninput = e => setOutputCols(e.target.value);
+            loadBatchCount();
+            setBatchCount(batchCount);
+            refSlots = [newRefSlot()];
+            renderRefGrid();
+            bindOutputAreaDrop();
+            document.addEventListener('click', closeRatioDropdown);
+            document.addEventListener('keydown', e => {
+                if(e.key === 'Escape') cancelBoardPick();
+            });
+            await initModels();
+            await loadAllHistory();
+            if(window.StudioPanelBridge){
+                const bridge = StudioPanelBridge;
+                renderOutputGrid = function(){
+                    bridge.notifyPending(pendingJobs);
+                    bridge.notifyRefresh();
+                };
+                loadAllHistory = async function(){
+                    bridge.notifyRefresh();
+                };
+                upsertHistoryItem = function(item){
+                    if(!item?.images?.[0]) return;
+                    bridge.notifyAddItem(item);
+                };
+            }
+        };
+    </script>
+</body>
+</html>

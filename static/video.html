@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/logo.png" type="image/png">
+    <title>AI 视频</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260520-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260521-studio"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
+    <script src="/static/studio-ref-upload.js?v=20260523-board-ref"></script>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <style>
+        :root { --accent:#ff4d94; --bg:#1e1e1e; --easing:cubic-bezier(0.22,1,0.36,1); }
+        html, body { height:100%; overflow:hidden; }
+        body { background:#1e1e1e; font-family:Inter,sans-serif; color:#f5f5f5; margin:0; }
+        html.embed-panel .container-box { max-width:none; padding:8px 8px 8px; }
+        .container-box { max-width:1680px; margin:0 auto; padding:8px 14px 10px; height:100%; box-sizing:border-box; }
+        .options-panel { overflow-y:auto; max-height:100%; display:flex; flex-direction:column; gap:8px; padding-right:2px; }
+        .options-panel section.tool-panel { display:flex; flex-direction:column; gap:8px; }
+        .nano-input, .size-select { background:#313131; border:1px solid rgba(255,255,255,.08); color:#f5f5f5; border-radius:14px; width:100%; box-sizing:border-box; }
+        .nano-input { padding:0.65rem 0.85rem; font-size:12px; resize:none; outline:none; }
+        .nano-input:focus, .size-select:focus { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.12); outline:none; }
+        .tool-panel { background:#262626; border:1px solid rgba(255,255,255,.08); border-radius:22px; padding:10px; display:flex; flex-direction:column; gap:8px; box-shadow:0 2px 16px rgba(0,0,0,.24); }
+        .control-label { display:flex; align-items:center; gap:6px; color:#737373; font-size:11px; font-weight:600; }
+        .size-select { height:30px; padding:0 8px; font-size:10px; font-weight:700; }
+        .size-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .upload-item { background:#313131; border:1px dashed rgba(255,255,255,.12); aspect-ratio:1; border-radius:14px; transition:all .3s var(--easing); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .upload-item:hover,.upload-item.drag-over { border-color:rgba(255,77,148,.4); transform:none; }
+        .upload-item.drop-before::before,
+        .upload-item.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
+        .upload-item.drop-before::before { left:-5px; }
+        .upload-item.drop-after::after { right:-5px; }
+        .upload-item.is-dragging { opacity:.45; }
+        .ref-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+        .ref-slot-label { font-size:8px; font-weight:800; color:#94a3b8; letter-spacing:.08em; }
+        .ref-slot-btn { position:absolute; z-index:10; opacity:0; pointer-events:none; transition:opacity .18s var(--easing), transform .12s var(--easing), background .12s var(--easing), color .12s var(--easing), border-color .12s var(--easing); }
+        .upload-item:hover .ref-slot-btn { opacity:1; pointer-events:auto; }
+        .upload-item.is-board-target .ref-board-btn { opacity:1; pointer-events:auto; background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .upload-item .ref-slot-btn.cell-action-btn { background:rgba(49,49,49,.96); color:#a3a3a3; border:1px solid rgba(255,255,255,.08); box-shadow:0 1px 6px rgba(0,0,0,.24); width:24px; height:24px; border-radius:999px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+        .upload-item .ref-slot-btn.cell-action-btn:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; transform:translateY(-1px); }
+        .upload-item .ref-slot-btn.cell-action-btn i,
+        .upload-item .ref-slot-btn.cell-action-btn svg { width:9px !important; height:9px !important; stroke-width:2.25; }
+        .ref-del-btn { top:6px; right:6px; display:none; }
+        .upload-item.has-image .ref-del-btn { display:flex; }
+        .ref-reorder-btn { top:6px; left:6px; cursor:grab; display:none; }
+        .upload-item.has-image .ref-reorder-btn { display:flex; }
+        .ref-reorder-btn:active { cursor:grabbing; }
+        .ref-board-btn { left:50%; bottom:10%; transform:translateX(-50%); width:auto; min-width:36px; height:20px; padding:0 10px; border-radius:999px; font-size:8px; font-weight:800; letter-spacing:.04em; line-height:1; }
+        .upload-item .ref-board-btn.cell-action-btn:hover,
+        .upload-item.is-board-target .ref-board-btn.cell-action-btn { transform:translateX(-50%) translateY(-1px); }
+        .upload-item.is-board-target { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.22); }
+        .preview-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+        .glass-btn { background:#ff4d94; color:#fff; border-radius:999px; box-shadow:0 4px 14px rgba(255,77,148,.28); border:none; transition:all .25s var(--easing); }
+        .glass-btn:hover { background:#e8437f; transform:translateY(-1px); }
+        .glass-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+    </style>
+</head>
+<body class="mg-studio embed-panel">
+    <div class="container-box">
+        <main class="options-panel h-full">
+            <section class="tool-panel">
+                <label class="block">
+                    <div class="control-label mb-1"><i data-lucide="server" class="w-3 h-3"></i><span data-i18n="api.provider">平台</span></div>
+                    <select id="providerSelect" class="size-select" onchange="setProvider(this.value)"></select>
+                </label>
+                <label class="block">
+                    <div class="control-label mb-1"><i data-lucide="sliders-horizontal" class="w-3 h-3"></i><span data-i18n="video.model">模型</span></div>
+                    <select id="modelSelect" class="size-select" onchange="selectedModel=this.value;syncVideoParams()"></select>
+                </label>
+            </section>
+            <section class="tool-panel">
+                <div>
+                    <div class="control-label mb-1"><i data-lucide="terminal" class="w-3 h-3"></i><span data-i18n="video.prompt">提示词</span></div>
+                    <textarea id="promptInput" rows="3" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder"></textarea>
+                </div>
+                <div>
+                    <div class="control-label mb-1"><i data-lucide="images" class="w-3 h-3"></i><span data-i18n="video.referenceImages">参考图</span></div>
+                    <div id="refGrid" class="ref-grid"></div>
+                </div>
+            </section>
+            <section class="tool-panel">
+                <div class="size-row">
+                    <label>
+                        <div class="control-label mb-1" data-i18n="canvas.videoDuration">时长</div>
+                        <select id="durationSelect" class="size-select"></select>
+                    </label>
+                    <label>
+                        <div class="control-label mb-1" data-i18n="canvas.videoAspect">比例</div>
+                        <select id="aspectSelect" class="size-select"></select>
+                    </label>
+                </div>
+                <label>
+                    <div class="control-label mb-1" data-i18n="canvas.videoResolution">分辨率</div>
+                    <select id="resolutionSelect" class="size-select">
+                        <option value="480p">480p</option>
+                        <option value="720p" selected>720p</option>
+                        <option value="1080p">1080p</option>
+                    </select>
+                </label>
+            </section>
+            <button id="genBtn" onclick="submitVideo()" class="glass-btn w-full py-3 font-bold flex items-center justify-center gap-2">
+                <i data-lucide="clapperboard" class="w-4 h-4"></i>
+                <span class="tracking-[0.2em] text-[11px] uppercase" data-i18n="video.generate">生成视频</span>
+            </button>
+        </main>
+    </div>
+    <script>
+        lucide.createIcons();
+        function tr(k){ return window.StudioI18n ? StudioI18n.t(k) : k; }
+        function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        let provider = 'comfly', selectedModel = 'veo3-fast', apiProviders = [];
+        let pendingJobs = [];
+
+        function getReferenceList(){
+            return StudioRefUpload.getReferenceList();
+        }
+
+        function videoProviders(){
+            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.video_models || []).length);
+            return list.length ? list : [{ id:'comfly', name:'API', video_models:['veo3-fast'] }];
+        }
+        function isDoubaoSeedance20Model(model){
+            const id = String(model || '').toLowerCase();
+            return /doubao-seedance-2(?:\.0|-0)/.test(id);
+        }
+        function isKling26Model(model){
+            const id = String(model || '').toLowerCase();
+            return /kling[-_]?v?2[-_.]?6|keling2\.6/.test(id);
+        }
+        const DOUBAO_SEEDANCE_20_ASPECTS = ['9:16', '3:4', '1:1', '4:3', '16:9', '21:9'];
+        const DEFAULT_VIDEO_DURATIONS = [5, 8, 10];
+        const DEFAULT_VIDEO_ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+        function kling26AspectOptions(){
+            const en = window.StudioI18n?.lang?.() === 'en';
+            return [
+                {value:'16:9', label: en ? '16:9 (Landscape)' : '16:9 (横屏)'},
+                {value:'9:16', label: en ? '9:16 (Portrait)' : '9:16 (竖屏)'},
+                {value:'1:1', label: en ? '1:1 (Square)' : '1:1 (方形)'},
+            ];
+        }
+        function getVideoModelParamProfile(model){
+            if(isDoubaoSeedance20Model(model)){
+                return {
+                    durations: Array.from({length:12}, (_, i) => i + 4),
+                    aspects: DOUBAO_SEEDANCE_20_ASPECTS,
+                    aspectLabels: null,
+                    defaultAspect: '16:9',
+                    defaultDuration: 5,
+                };
+            }
+            if(isKling26Model(model)){
+                return {
+                    durations: [5, 10],
+                    aspects: kling26AspectOptions(),
+                    aspectLabels: true,
+                    defaultAspect: '16:9',
+                    defaultDuration: 5,
+                };
+            }
+            return null;
+        }
+        function syncVideoParams(){
+            const durationSelect = document.getElementById('durationSelect');
+            const aspectSelect = document.getElementById('aspectSelect');
+            const resolutionSelect = document.getElementById('resolutionSelect');
+            if(!durationSelect || !aspectSelect) return;
+            const prevDuration = Number(durationSelect.value || 5);
+            const prevAspect = aspectSelect.value || '16:9';
+            const prevResolution = resolutionSelect?.value || '720p';
+            const profile = getVideoModelParamProfile(selectedModel);
+            const durations = profile?.durations || DEFAULT_VIDEO_DURATIONS;
+            durationSelect.innerHTML = durations.map(v => `<option value="${v}">${v}s</option>`).join('');
+            if(profile?.aspectLabels){
+                aspectSelect.innerHTML = profile.aspects.map(item => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join('');
+            } else {
+                const aspects = profile?.aspects || DEFAULT_VIDEO_ASPECTS;
+                aspectSelect.innerHTML = aspects.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+            }
+            if(resolutionSelect){
+                const resolutions = isDoubaoSeedance20Model(selectedModel) ? ['480p', '720p'] : ['480p', '720p', '1080p'];
+                resolutionSelect.innerHTML = resolutions.map(v => `<option value="${v}">${v}</option>`).join('');
+                resolutionSelect.value = resolutions.includes(prevResolution) ? prevResolution : (profile?.defaultResolution || '720p');
+            }
+            const allowedAspects = profile?.aspectLabels
+                ? profile.aspects.map(item => item.value)
+                : (profile?.aspects || DEFAULT_VIDEO_ASPECTS);
+            const nextDuration = durations.includes(prevDuration) ? prevDuration : (profile?.defaultDuration || durations[0] || 5);
+            const nextAspect = allowedAspects.includes(prevAspect) ? prevAspect : (profile?.defaultAspect || allowedAspects[0] || '16:9');
+            durationSelect.value = String(nextDuration);
+            aspectSelect.value = nextAspect;
+        }
+        function renderProviderControls(){
+            const providers = videoProviders();
+            if(!providers.some(p => p.id === provider)) provider = providers[0]?.id || 'comfly';
+            const models = providers.find(p => p.id === provider)?.video_models || ['veo3-fast'];
+            if(!models.includes(selectedModel)) selectedModel = models[0];
+            document.getElementById('providerSelect').innerHTML = providers.map(p => `<option value="${escapeHtml(p.id)}" ${p.id===provider?'selected':''}>${escapeHtml(p.name||p.id)}</option>`).join('');
+            document.getElementById('modelSelect').innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m===selectedModel?'selected':''}>${escapeHtml(m)}</option>`).join('');
+            syncVideoParams();
+        }
+        function setProvider(v){ provider = v; renderProviderControls(); }
+
+        async function loadConfig(){
+            try {
+                const cfg = await fetch('/api/config').then(r=>r.json());
+                apiProviders = cfg.api_providers || [];
+                renderProviderControls();
+            } catch(e){}
+        }
+
+        function notifyGallery(){
+            if(window.StudioPanelBridge){
+                StudioPanelBridge.notifyPending(pendingJobs);
+                StudioPanelBridge.notifyRefresh();
+            }
+        }
+
+        async function runJob(jobId, payload){
+            try {
+                const result = await fetch('/api/online-video', {
+                    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+                }).then(async r => { if(!r.ok) throw new Error((await r.json()).detail || tr('video.failed')); return r.json(); });
+                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
+                notifyGallery();
+            } catch(err){
+                const job = pendingJobs.find(j => j.id === jobId);
+                if(job) job.error = err.message || tr('video.failed');
+                notifyGallery();
+                setTimeout(() => {
+                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                    notifyGallery();
+                }, 2800);
+            }
+        }
+
+        async function submitVideo(){
+            const prompt = document.getElementById('promptInput').value.trim();
+            if(!prompt){ alert(tr('video.promptRequired')); return; }
+            const payload = {
+                prompt,
+                provider_id: provider,
+                model: selectedModel,
+                duration: Number(document.getElementById('durationSelect').value || 5),
+                aspect_ratio: document.getElementById('aspectSelect').value,
+                resolution: document.getElementById('resolutionSelect').value,
+                reference_images: getReferenceList(),
+                enhance_prompt: false,
+                enable_upsample: false,
+                generate_audio: false,
+            };
+            const jobId = 'pending_'+Date.now();
+            const jobObj = { id: jobId, prompt, mediaKind: 'video' };
+            pendingJobs.unshift(jobObj);
+            if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
+            notifyGallery();
+            document.getElementById('genBtn').disabled = true;
+            await runJob(jobId, { ...payload, job_id: jobId });
+            document.getElementById('genBtn').disabled = false;
+        }
+
+        window.applyRecordParams = function(data){
+            if(!data) return;
+            if(data.prompt) document.getElementById('promptInput').value = data.prompt;
+            const p = data.params || {};
+            if(p.provider_id) setProvider(p.provider_id);
+            if(p.model){ selectedModel = p.model; renderProviderControls(); }
+            else syncVideoParams();
+            if(p.duration) document.getElementById('durationSelect').value = String(p.duration);
+            if(p.aspect_ratio) document.getElementById('aspectSelect').value = p.aspect_ratio;
+            if(p.resolution) document.getElementById('resolutionSelect').value = p.resolution;
+            if(Array.isArray(p.reference_images)) StudioRefUpload.setReferenceImages(p.reference_images);
+        };
+
+        window.addEventListener('message', e => { if(e.data?.type === 'studio-lang' && window.StudioI18n) StudioI18n.set(e.data.lang); });
+        if(window.StudioI18n) document.title = tr('video.title');
+        StudioRefUpload.init({ tr, escapeHtml, referenceFormat: 'video' });
+        loadConfig();
+        try {
+            const ch = new BroadcastChannel('studio-api');
+            ch.onmessage = e => { if(e.data?.type === 'providers-changed') loadConfig(); };
+        } catch(e){}
+    </script>
+</body>
+</html>

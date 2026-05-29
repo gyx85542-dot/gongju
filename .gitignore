@@ -1,0 +1,30 @@
+# Secrets & local config
+API/.env
+.env
+config.js
+
+# Embedded Python (install via 安装依赖.bat / requirements.txt)
+python/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Runtime / user data
+history.json
+history.json.*
+*.bak
+data/
+output/
+assets/output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~

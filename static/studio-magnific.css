@@ -1,0 +1,264 @@
+/* Magnific light design system */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --mg-bg: #1a1a1a;
+    --mg-surface: #262626;
+    --mg-surface-2: #313131;
+    --mg-surface-hover: #333333;
+    --mg-border: rgba(255, 255, 255, 0.08);
+    --mg-border-strong: rgba(255, 255, 255, 0.12);
+    --mg-text: #f5f5f5;
+    --mg-text-secondary: #a3a3a3;
+    --mg-muted: #737373;
+    --mg-accent: #ff4d94;
+    --mg-accent-hover: #e8437f;
+    --mg-accent-fg: #ffffff;
+    --mg-orange: #ffaa00;
+    --mg-success: #22c55e;
+    --mg-radius-sm: 10px;
+    --mg-radius: 14px;
+    --mg-radius-lg: 22px;
+    --mg-radius-xl: 24px;
+    --mg-radius-full: 999px;
+    --mg-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mg-display: 'Inter', var(--mg-font);
+    --mg-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --mg-shadow: 0 2px 16px rgba(0, 0, 0, 0.24);
+}
+
+.mg-studio,
+.mg-studio body {
+    background: var(--mg-bg) !important;
+    color: var(--mg-text) !important;
+    font-family: var(--mg-font) !important;
+    -webkit-font-smoothing: antialiased;
+}
+
+.mg-studio .nano-input,
+.mg-studio .wf-textarea {
+    background: var(--mg-surface-2) !important;
+    border: 1px solid var(--mg-border) !important;
+    color: var(--mg-text) !important;
+    border-radius: var(--mg-radius) !important;
+}
+
+.mg-studio .nano-input:focus,
+.mg-studio .wf-textarea:focus {
+    border-color: rgba(255, 77, 148, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
+.mg-studio .tool-panel {
+    background: var(--mg-surface) !important;
+    border: 1px solid var(--mg-border) !important;
+    border-radius: var(--mg-radius-lg) !important;
+    box-shadow: var(--mg-shadow) !important;
+}
+
+.mg-studio .result-frame {
+    background: var(--mg-surface) !important;
+    border: 1px solid var(--mg-border) !important;
+    border-radius: var(--mg-radius-xl) !important;
+    box-shadow: var(--mg-shadow) !important;
+}
+
+.mg-studio .result-frame.import-drag-over {
+    border-color: rgba(255, 77, 148, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.1) !important;
+}
+
+.mg-studio .size-select,
+.mg-studio .size-custom,
+.mg-studio .wf-input,
+.mg-studio .size-fit-btn {
+    background: var(--mg-surface-2) !important;
+    border: 1px solid var(--mg-border) !important;
+    color: var(--mg-text) !important;
+    border-radius: var(--mg-radius-sm) !important;
+}
+
+.mg-studio .size-select option {
+    background: #313131 !important;
+    color: #f5f5f5 !important;
+}
+
+.mg-studio .control-label {
+    color: var(--mg-text) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+
+.mg-studio .glass-btn {
+    background: var(--mg-accent) !important;
+    color: var(--mg-accent-fg) !important;
+    border: none !important;
+    border-radius: var(--mg-radius-full) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 4px 14px rgba(255, 77, 148, 0.28) !important;
+}
+
+.mg-studio .glass-btn:hover:not(:disabled) {
+    background: var(--mg-accent-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 77, 148, 0.32) !important;
+}
+
+.mg-studio .glass-btn:disabled {
+    opacity: 0.45;
+    box-shadow: none !important;
+}
+
+.mg-studio .upload-item {
+    background: var(--mg-surface-2) !important;
+    border: 1px dashed var(--mg-border-strong) !important;
+    border-radius: var(--mg-radius) !important;
+}
+
+.mg-studio .upload-item:hover,
+.mg-studio .upload-item.drag-over {
+    border-color: rgba(255, 77, 148, 0.4) !important;
+    transform: none !important;
+}
+
+.mg-studio .output-import-btn {
+    background: var(--mg-surface) !important;
+    border: 1px solid var(--mg-border) !important;
+    color: var(--mg-text-secondary) !important;
+    border-radius: var(--mg-radius-full) !important;
+}
+
+.mg-studio .output-import-btn:hover {
+    background: var(--mg-accent) !important;
+    color: var(--mg-accent-fg) !important;
+    border-color: var(--mg-accent) !important;
+}
+
+.mg-studio .batch-slider,
+.mg-studio .output-cols-slider {
+    accent-color: var(--mg-accent) !important;
+}
+
+.mg-studio .output-grid-cell {
+    background: #141414 !important;
+    border: 1px solid var(--mg-border) !important;
+}
+
+.mg-studio .output-grid-cell:hover {
+    background: #181818 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.mg-studio .output-grid-cell.is-pending {
+    background: #141414 !important;
+}
+
+.mg-studio .output-grid-cell .cell-actions {
+    background: linear-gradient(to top, rgba(38, 38, 38, 0.92) 0%, transparent 100%) !important;
+}
+
+.mg-studio .cell-action-btn {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    background: rgba(49, 49, 49, 0.95) !important;
+    color: var(--mg-text) !important;
+    border: 1px solid var(--mg-border) !important;
+    box-shadow: var(--mg-shadow) !important;
+    padding: 0 !important;
+}
+
+.mg-studio .cell-action-btn i,
+.mg-studio .cell-action-btn svg {
+    width: 9px !important;
+    height: 9px !important;
+    stroke-width: 2.25;
+    flex-shrink: 0;
+}
+
+.mg-studio .cell-action-btn:hover,
+.mg-studio .cell-action-btn.active {
+    background: var(--mg-accent) !important;
+    color: #fff !important;
+    border-color: var(--mg-accent) !important;
+}
+
+.mg-studio .cell-action-btn.fav-active {
+    background: var(--mg-orange) !important;
+    color: #fff !important;
+    border-color: var(--mg-orange) !important;
+}
+
+.mg-studio .viewer-overlay {
+    background: rgba(26, 26, 26, 0.96) !important;
+}
+
+.mg-studio .viewer-main {
+    background: var(--mg-bg) !important;
+}
+
+.mg-studio .viewer-sidebar {
+    background: var(--mg-surface) !important;
+    border-left: 1px solid var(--mg-border) !important;
+    border-radius: var(--mg-radius-xl) 0 0 var(--mg-radius-xl) !important;
+}
+
+.mg-studio .viewer-tab,
+.mg-studio .viewer-block-title {
+    color: var(--mg-text) !important;
+}
+
+.mg-studio .viewer-tab {
+    border-bottom-color: var(--mg-accent) !important;
+}
+
+.mg-studio .viewer-meta-cell,
+.mg-studio .viewer-prompt,
+.mg-studio .viewer-edit-cell {
+    background: var(--mg-surface-2) !important;
+    border-color: var(--mg-border) !important;
+}
+
+.mg-studio .viewer-meta-value {
+    color: var(--mg-text) !important;
+}
+
+.mg-studio .viewer-prompt {
+    color: var(--mg-text-secondary) !important;
+}
+
+.mg-studio .viewer-nav,
+.mg-studio .viewer-tool-btn {
+    background: var(--mg-surface) !important;
+    color: var(--mg-text) !important;
+    border-color: var(--mg-border) !important;
+    box-shadow: var(--mg-shadow) !important;
+}
+
+.mg-studio .viewer-nav i,
+.mg-studio .viewer-nav svg,
+.mg-studio .viewer-tool-btn i,
+.mg-studio .viewer-tool-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+    stroke-width: 2.25;
+}
+
+.mg-studio .viewer-reedit {
+    background: var(--mg-accent) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(255, 77, 148, 0.25) !important;
+}
+
+.mg-studio .viewer-reedit:hover {
+    background: var(--mg-accent-hover) !important;
+}
+
+.mg-studio .empty-hint {
+    background: var(--mg-surface-2) !important;
+    border: 1px dashed var(--mg-border) !important;
+    color: var(--mg-muted) !important;
+}

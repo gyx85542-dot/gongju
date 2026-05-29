@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/logo.png?v=20260520-dingzhen" type="image/png">
+    <title>AI Studio</title>
+    <style>
+        html.studio-route-booting body {
+            visibility: hidden !important;
+        }
+    </style>
+    <script>
+        (function(){
+            try {
+                localStorage.setItem('studio_theme', 'light');
+                localStorage.setItem('canvas_theme', 'light');
+                document.documentElement.classList.add('studio-route-booting');
+            } catch(e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260520-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260525-comfyui"></script>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260526-brush-fix2">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+        /* 本地 Tailwind 工具类兜底：CDN 慢/未就绪时也能立刻给图标尺寸，避免首屏左侧栏空白 */
+        .w-1\.5 { width: 0.375rem; }
+        .h-1\.5 { height: 0.375rem; }
+        .w-4 { width: 1rem; }
+        .h-4 { height: 1rem; }
+        .w-5 { width: 1.25rem; }
+        .h-5 { height: 1.25rem; }
+        .flex-shrink-0 { flex-shrink: 0; }
+        .rounded-full { border-radius: 9999px; }
+        .mb-12 { margin-bottom: 3rem; }
+        .transition-colors { transition-property: color, background-color, border-color, fill, stroke; transition-duration: 150ms; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-pulse { animation: studio-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes studio-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+        :root {
+            --accent: #ff4d94;
+            --accent-fg: #ffffff;
+            --fluid-ease: cubic-bezier(0.22, 1, 0.36, 1);
+            --bg: #1a1a1a;
+            --sidebar-bg: #262626;
+            --stage-bg: #1a1a1a;
+            --border: rgba(255, 255, 255, 0.08);
+            --stage-border: transparent;
+            --text: #f5f5f5;
+            --muted: #737373;
+            --nav-hover-bg: #333333;
+            --nav-active-bg: #333333;
+            --nav-active-text: #fafafa;
+            --monitor-bg: rgba(38, 38, 38, 0.92);
+            --monitor-border: rgba(255, 255, 255, 0.08);
+            --monitor-shadow: 0 2px 12px rgba(0, 0, 0, 0.24);
+            --divider: rgba(255, 255, 255, 0.08);
+            --scrollbar: rgba(255, 255, 255, 0.18);
+            --scrollbar-hover: rgba(255, 255, 255, 0.28);
+            --shell-gap: 6px;
+            --shell-pad: 6px;
+            --panel-radius: 22px;
+        }
+
+        /* 极简滚动条 */
+        html,
+        body {
+            overscroll-behavior: auto;
+        }
+
+        *::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+            background: transparent !important;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar) !important;
+            border: 3px solid transparent !important;
+            border-right-width: 3px !important;
+            background-clip: padding-box !important;
+            border-radius: 10px !important;
+            min-height: 36px;
+        }
+
+        *::-webkit-scrollbar-thumb:hover {
+            background-color: var(--scrollbar-hover) !important;
+        }
+
+        *::-webkit-scrollbar-corner {
+            background: transparent !important;
+        }
+
+        * {
+            scrollbar-width: thin !important;
+            scrollbar-color: var(--scrollbar) transparent !important;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: var(--mg-display, 'Space Grotesk'), 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            color: var(--text);
+            transition: background 0.35s var(--fluid-ease), color 0.35s var(--fluid-ease);
+        }
+
+        .app-shell {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            background: var(--bg);
+            position: relative;
+            transition: background 0.35s;
+            gap: var(--shell-gap);
+            padding: var(--shell-pad);
+            box-sizing: border-box;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 60px;
+            min-width: 60px;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: none;
+            border-radius: var(--panel-radius);
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+            padding: 20px 0 16px;
+            transition: width 0.35s var(--fluid-ease), background 0.35s;
+            z-index: 50;
+        }
+
+        .sidebar.expanded {
+            width: 196px;
+        }
+
+        /* 首次加载时与 iframe 的 0.5s 淡入同步播放，避免侧栏"焊死"在原地造成视觉断层 */
+        @keyframes sidebar-enter {
+            from { opacity: 0; transform: translateX(-6px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        html:not(.studio-route-booting) .sidebar {
+            animation: sidebar-enter 0.5s var(--fluid-ease);
+        }
+
+        .logo-ring {
+            width: 34px;
+            height: 34px;
+            border: 1.5px solid var(--border-strong, var(--border));
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+            transition: border-radius 0.35s var(--fluid-ease), border-color 0.35s, box-shadow 0.35s;
+        }
+
+        .logo-ring img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .logo-status-dot {
+            position: absolute;
+            right: 1px;
+            bottom: 1px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            border: 1.5px solid var(--sidebar-bg);
+            background: var(--text);
+            transition: background-color 0.25s var(--fluid-ease);
+            pointer-events: none;
+        }
+
+        .sidebar.expanded .logo-ring {
+            border-radius: 50%;
+        }
+
+        .sidebar-toggle {
+            width: 40px;
+            height: 32px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--nav-hover-bg);
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .sidebar-toggle svg {
+            width: 14px !important;
+            height: 14px !important;
+            stroke-width: 2;
+        }
+
+        .sidebar nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            gap: 2px;
+        }
+
+        .sidebar.expanded nav {
+            align-items: stretch;
+            padding: 0 12px;
+            box-sizing: border-box;
+        }
+
+        .sidebar-toggle .icon-expand { display: block; }
+        .sidebar-toggle .icon-collapse { display: none; }
+        .sidebar.expanded .sidebar-toggle .icon-expand { display: none; }
+        .sidebar.expanded .sidebar-toggle .icon-collapse { display: block; }
+
+        /* 导航项 */
+        .nav-item {
+            position: relative;
+            width: 40px;
+            height: 34px;
+            margin: 3px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: width 0.35s var(--fluid-ease), background-color 0.2s, color 0.2s, box-shadow 0.2s;
+            color: var(--muted);
+            overflow: hidden;
+            padding: 0;
+            border: 1px solid transparent;
+            box-sizing: border-box;
+        }
+
+        .sidebar.expanded .nav-item {
+            width: 172px;
+            justify-content: flex-start;
+            padding-left: 6px;
+            gap: 10px;
+        }
+
+        .nav-icon {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: inherit;
+            transition: color 0.2s;
+            background: transparent;
+        }
+
+        .nav-icon svg {
+            width: 15px !important;
+            height: 15px !important;
+            stroke-width: 2;
+        }
+
+        .nav-item:hover {
+            background: var(--nav-hover-bg);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: rgba(255, 77, 148, 0.1);
+            color: var(--nav-active-text);
+            border-color: rgba(255, 77, 148, 0.22);
+            box-shadow: inset 0 0 0 1px rgba(255, 77, 148, 0.12);
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--accent);
+        }
+
+        .nav-text {
+            opacity: 0;
+            max-width: 0;
+            overflow: hidden;
+            font-weight: 500;
+            font-size: 12px;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+            transition: opacity 0.25s var(--fluid-ease), max-width 0.3s var(--fluid-ease);
+            line-height: 1;
+        }
+
+        .sidebar.expanded .nav-text {
+            opacity: 1;
+            max-width: 120px;
+        }
+
+        .sidebar:not(.expanded) .nav-item {
+            gap: 0;
+        }
+
+        /* 主舞台区 */
+        .stage {
+            flex: 1;
+            background: var(--stage-bg);
+            margin: 0;
+            border-radius: var(--panel-radius);
+            overflow: hidden;
+            border: none;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+            position: relative;
+            transition: background 0.35s var(--fluid-ease);
+        }
+
+        iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            opacity: 0;
+            transform: translateY(6px);
+            filter: blur(6px);
+            transition: opacity 0.45s var(--fluid-ease), transform 0.45s var(--fluid-ease), filter 0.45s var(--fluid-ease);
+            pointer-events: none;
+        }
+
+        iframe.active {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0);
+            pointer-events: auto;
+        }
+
+        .studio-shell {
+            display: none;
+            width: 100%;
+            height: 100%;
+            gap: 4px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .studio-shell.active {
+            display: flex;
+        }
+
+        .studio-panels {
+            position: relative;
+            flex: 0 0 clamp(280px, 26vw, 380px);
+            min-width: 260px;
+            height: 100%;
+            background: #1e1e1e;
+            border-radius: 0;
+            overflow: hidden;
+        }
+
+        .studio-gallery-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            background: #262626;
+            border-radius: 0;
+            overflow: hidden;
+        }
+
+        .studio-panels iframe,
+        .studio-gallery-wrap iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0;
+            opacity: 0;
+            transform: translateY(6px);
+            filter: blur(6px);
+            transition: opacity 0.45s var(--fluid-ease), transform 0.45s var(--fluid-ease), filter 0.45s var(--fluid-ease);
+            pointer-events: none;
+        }
+
+        .studio-panels iframe.active,
+        .studio-gallery-wrap iframe.active {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0);
+            pointer-events: auto;
+        }
+
+        .full-stage {
+            display: none;
+            position: absolute;
+            inset: 0;
+        }
+
+        .full-stage.active {
+            display: block;
+        }
+
+        .full-stage iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            opacity: 0;
+            transform: translateY(6px);
+            filter: blur(6px);
+            transition: opacity 0.45s var(--fluid-ease), transform 0.45s var(--fluid-ease), filter 0.45s var(--fluid-ease);
+            pointer-events: none;
+        }
+
+        .full-stage iframe.active {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0);
+            pointer-events: auto;
+        }
+
+        /* 右下角监视器 */
+        .nano-monitor {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            left: auto;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--monitor-bg);
+            backdrop-filter: blur(16px) saturate(1.2);
+            -webkit-backdrop-filter: blur(16px) saturate(1.2);
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--monitor-border);
+            box-shadow: var(--monitor-shadow);
+            font-family: var(--mg-font, 'Inter'), ui-monospace, monospace;
+            font-size: 11px;
+            transition: all 0.35s var(--fluid-ease);
+        }
+
+        .nano-monitor.is-hidden {
+            display: none !important;
+        }
+
+        .nano-monitor.is-busy {
+            background: var(--text);
+            color: var(--bg);
+            border-color: transparent;
+        }
+
+        .stat-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .nano-monitor.is-busy .stat-group {
+            color: #fff;
+        }
+
+        .divider {
+            width: 1px;
+            height: 12px;
+            background: var(--divider);
+        }
+
+        .is-busy .divider {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .spinner-nano {
+            width: 10px;
+            height: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .is-busy .spinner-nano { display: block; }
+        .is-busy .pulse-dot { display: none; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .label-nano {
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.5;
+            font-size: 9px;
+        }
+
+        /* 侧栏底部操作区 */
+        .side-actions {
+            margin-top:auto;
+            margin-bottom:12px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:8px;
+            width:100%;
+        }
+
+        .side-pill {
+            width: 40px;
+            height: 32px;
+            border-radius: 999px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: width 0.35s var(--fluid-ease), gap 0.35s var(--fluid-ease), background-color 0.2s, color 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+            overflow: hidden;
+            gap: 0;
+            position: relative;
+            padding: 0;
+        }
+
+        .sidebar.expanded .side-pill {
+            width: 172px;
+            gap: 8px;
+            justify-content: flex-start;
+            padding-left: 10px;
+        }
+
+        .side-pill:hover {
+            background: var(--nav-hover-bg);
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .side-pill.active {
+            background: rgba(255, 77, 148, 0.1);
+            color: var(--text);
+            border-color: rgba(255, 77, 148, 0.22);
+        }
+
+        .side-pill-icon {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .side-pill-icon svg {
+            width: 14px !important;
+            height: 14px !important;
+            stroke-width: 2;
+        }
+        .side-pill-text {
+            opacity:0;
+            max-width:0;
+            font-size:12px;
+            font-weight:800;
+            letter-spacing:.02em;
+            white-space:nowrap;
+            overflow:hidden;
+            transition: opacity 0.25s var(--fluid-ease), max-width 0.3s var(--fluid-ease);
+        }
+        .sidebar.expanded .side-pill-text {
+            opacity: 1;
+            max-width: 120px;
+        }
+        .side-pill { gap: 0; }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div class="logo-ring mb-12">
+                <img src="/static/logo.png?v=20260520-dingzhen" alt="Logo">
+                <div class="logo-status-dot" id="logo-dot"></div>
+            </div>
+
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="展开侧栏" aria-label="Toggle sidebar">
+                <i data-lucide="chevron-right" class="icon-expand"></i>
+                <i data-lucide="chevron-left" class="icon-collapse"></i>
+            </button>
+
+            <nav>
+                <div class="nav-item active" onclick="switchUI(this, 'online')">
+                    <span class="nav-icon"><i data-lucide="image"></i></span>
+                    <span class="nav-text" data-i18n="nav.online">AI 生图</span>
+                </div>
+                <div class="nav-item" onclick="switchUI(this, 'local')">
+                    <span class="nav-icon"><i data-lucide="workflow"></i></span>
+                    <span class="nav-text" data-i18n="nav.local">ComfyUI</span>
+                </div>
+                <div class="nav-item" onclick="switchUI(this, 'video')">
+                    <span class="nav-icon"><i data-lucide="clapperboard"></i></span>
+                    <span class="nav-text" data-i18n="nav.video">AI 视频</span>
+                </div>
+                <div class="nav-item" onclick="switchUI(this, 'gpt-chat')">
+                    <span class="nav-icon"><i data-lucide="messages-square"></i></span>
+                    <span class="nav-text" data-i18n="nav.gpt">AI 对话</span>
+                </div>
+                <div class="nav-item" onclick="switchUI(this, 'canvas')">
+                    <span class="nav-icon"><i data-lucide="layout-grid"></i></span>
+                    <span class="nav-text" data-i18n="nav.canvas">无限画布</span>
+                </div>
+            </nav>
+
+            <div class="side-actions">
+                <button class="side-pill" onclick="toggleLanguage()" id="lang-toggle-btn" type="button" title="Language">
+                    <span class="side-pill-icon"><i data-lucide="languages"></i></span>
+                    <span class="side-pill-text" data-i18n="common.language">中文</span>
+                </button>
+                <button class="side-pill" onclick="switchUI(this, 'api-settings')" type="button" title="API 设置">
+                    <span class="side-pill-icon"><i data-lucide="link-2"></i></span>
+                    <span class="side-pill-text" data-i18n="common.apiSettings">API 设置</span>
+                </button>
+                <button class="side-pill" onclick="switchUI(this, 'comfyui-settings')" type="button" title="ComfyUI 设置">
+                    <span class="side-pill-icon"><i data-lucide="blocks"></i></span>
+                    <span class="side-pill-text" data-i18n="common.comfyuiSettings">ComfyUI 设置</span>
+                </button>
+            </div>
+        </aside>
+        <script>
+            const SIDEBAR_EXPANDED_KEY = 'studio_sidebar_expanded';
+            function setSidebarExpanded(expanded, persist = true){
+                const sidebar = document.querySelector('.sidebar');
+                const toggle = document.getElementById('sidebarToggle');
+                if(!sidebar) return;
+                sidebar.classList.toggle('expanded', expanded);
+                if(toggle) toggle.title = expanded ? '收起侧栏' : '展开侧栏';
+                if(persist){
+                    try { localStorage.setItem(SIDEBAR_EXPANDED_KEY, expanded ? '1' : '0'); } catch(e) {}
+                }
+            }
+            function toggleSidebar(){
+                const sidebar = document.querySelector('.sidebar');
+                setSidebarExpanded(!sidebar?.classList.contains('expanded'));
+            }
+            function initSidebarState(){
+                let expanded = false;
+                try { expanded = localStorage.getItem(SIDEBAR_EXPANDED_KEY) === '1'; } catch(e) {}
+                setSidebarExpanded(expanded, false);
+            }
+            initSidebarState();
+            /* 在侧栏 DOM 解析完后立即把 active 类移到当前页对应的入口 */
+            (function(){
+                try {
+                    var valid = ['online','local','video','gpt-chat','canvas','api-settings','comfyui-settings'];
+                    var STUDIO = ['online','local','video'];
+                    var pageId = localStorage.getItem('studio_active_page');
+                    if(!valid.includes(pageId)) pageId = 'online';
+                    document.querySelectorAll('.nav-item.active, .side-pill.active').forEach(function(n){
+                        n.classList.remove('active');
+                    });
+                    document.querySelectorAll('iframe').forEach(function(f){ f.classList.remove('active'); });
+                    var target = document.querySelector('[onclick*="\'' + pageId + '\'"]');
+                    if(target) target.classList.add('active');
+                    var isStudio = STUDIO.includes(pageId);
+                    var studioShell = document.getElementById('studio-shell');
+                    var fullStage = document.getElementById('full-stage');
+                    if(studioShell) studioShell.classList.toggle('active', isStudio);
+                    if(fullStage) fullStage.classList.toggle('active', !isStudio);
+                    if(isStudio){
+                        var panel = document.getElementById('frame-' + pageId);
+                        if(panel) panel.classList.add('active');
+                        var gallery = document.getElementById('frame-gallery');
+                        if(gallery) gallery.classList.add('active');
+                    } else {
+                        var frame = document.getElementById('frame-' + pageId);
+                        if(frame) frame.classList.add('active');
+                    }
+                } catch(e) {}
+            })();
+        </script>
+
+        <main class="stage">
+            <div id="studio-shell" class="studio-shell active">
+                <div class="studio-panels">
+                    <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260523-ref-drag-white" class="active" scrolling="no"></iframe>
+                    <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260526-comfy-prompt" scrolling="no"></iframe>
+                    <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260526-seedance20" scrolling="no"></iframe>
+                </div>
+                <div class="studio-gallery-wrap">
+                    <iframe id="frame-gallery" data-src="/static/gallery.html?v=20260525-gallery-poll" class="active" scrolling="no"></iframe>
+                </div>
+            </div>
+            <div id="full-stage" class="full-stage">
+                <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260520-composer-wrap" scrolling="yes"></iframe>
+                <iframe id="frame-canvas" data-src="/static/canvas.html?v=20260526-canvas-fix" scrolling="yes"></iframe>
+                <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
+                <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
+            </div>
+
+            <div class="nano-monitor is-hidden" id="nano-monitor">
+                <div class="stat-group">
+                    <div class="pulse-dot animate-pulse"></div>
+                    <div class="spinner-nano"></div>
+                    <span class="label-nano">ONLINE</span>
+                    <span id="online-val">1</span>
+                </div>
+                <div class="divider"></div>
+                <div class="stat-group">
+                    <span class="label-nano">QUEUE</span>
+                    <span id="queue-val">0</span>
+                </div>
+            </div>
+
+            <div id="lightbox" class="viewer-overlay viewer-stage-scope" onclick="handleOutsideClick(event)">
+                <div class="viewer-layout" onclick="event.stopPropagation()">
+                    <div class="viewer-main">
+                        <button type="button" id="viewerPrev" class="viewer-nav prev" onclick="viewerNav(-1)" aria-label="Previous"><i data-lucide="chevron-left"></i></button>
+                        <div id="lightboxFrame" class="viewer-canvas">
+                            <div id="viewerStage" class="viewer-stage">
+                                <img id="lightboxImg" alt="preview">
+                                <canvas id="viewerDrawCanvas" class="viewer-draw-canvas"></canvas>
+                                <div id="viewerBrushCursor" class="viewer-brush-cursor"></div>
+                                <div id="viewerCropLayer" class="viewer-crop-layer hidden">
+                                    <div id="viewerCropBox" class="viewer-crop-box">
+                                        <div class="viewer-crop-handle nw" data-corner="nw"></div>
+                                        <div class="viewer-crop-handle ne" data-corner="ne"></div>
+                                        <div class="viewer-crop-handle sw" data-corner="sw"></div>
+                                        <div class="viewer-crop-handle se" data-corner="se"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" id="viewerNext" class="viewer-nav next" onclick="viewerNav(1)" aria-label="Next"><i data-lucide="chevron-right"></i></button>
+                        <div class="viewer-toolbar">
+                            <button type="button" class="viewer-tool-btn" onclick="closeLightbox()" title="Close"><i data-lucide="x"></i></button>
+                            <button type="button" class="viewer-tool-btn" data-viewer-action="copy-image" onclick="copyLightboxImage(event)" title="Copy"><i data-lucide="copy"></i></button>
+                            <button type="button" id="lightboxDownload" class="viewer-tool-btn" onclick="downloadLightboxImage(event)" title="Download"><i data-lucide="download"></i></button>
+                            <button type="button" class="viewer-tool-btn" onclick="openLightboxFullscreen(event)" title="Fullscreen"><i data-lucide="maximize-2"></i></button>
+                        </div>
+                    </div>
+                    <aside class="viewer-sidebar">
+                        <div class="viewer-sidebar-head">
+                            <button type="button" id="viewerFavBtn" class="viewer-head-btn" onclick="toggleViewerFavorite()" title="Favorite"><i data-lucide="star"></i></button>
+                            <button type="button" id="viewerPinBtn" class="viewer-head-btn" onclick="toggleViewerPin()" title="Pin"><i data-lucide="pin"></i></button>
+                        </div>
+                        <div class="viewer-tabs"><span class="viewer-tab"><i data-lucide="info" class="w-3.5 h-3.5"></i><span data-i18n="online.viewerInfo">Info</span></span></div>
+                        <div class="viewer-sidebar-scroll">
+                            <section>
+                                <div id="lightboxRefsWrap" class="viewer-ref-section hidden">
+                                    <div class="viewer-block-title"><span data-i18n="online.referenceImages">Reference Images</span></div>
+                                    <div id="lightboxRefs" class="viewer-ref-thumbs"></div>
+                                </div>
+                                <div id="lightboxInfo" class="viewer-info-grid"></div>
+                            </section>
+                            <section id="lightboxPromptSection">
+                                <div class="viewer-block-title">
+                                    <span>Prompt</span>
+                                    <button type="button" class="copy-mini" onclick="copyLightboxPrompt(event)" title="Copy prompt"><i data-lucide="copy"></i></button>
+                                </div>
+                                <div id="lightboxPrompt" class="viewer-prompt"></div>
+                            </section>
+                            <section id="lightboxEditSection">
+                                <div class="viewer-block-title"><span data-i18n="online.viewerEdit">Edit</span></div>
+                                <div id="lightboxEdit" class="viewer-edit-tools">
+                                    <div class="viewer-edit-mode-row">
+                                        <button type="button" id="viewerModeBrush" class="viewer-edit-tab active" onclick="setViewerEditMode('brush')"><i data-lucide="paintbrush"></i><span data-i18n="online.viewerBrush">画笔</span></button>
+                                        <button type="button" id="viewerModeCrop" class="viewer-edit-tab" onclick="setViewerEditMode('crop')"><i data-lucide="crop"></i><span data-i18n="online.viewerCrop">裁剪</span></button>
+                                        <button type="button" id="viewerModeGrid" class="viewer-edit-tab" onclick="setViewerEditMode('grid')"><i data-lucide="grid-3x3"></i><span data-i18n="canvas.modeGrid">宫格切分</span></button>
+                                    </div>
+                                    <div id="viewerBrushPanel" class="viewer-edit-panel">
+                                        <div class="viewer-edit-row viewer-hue-row">
+                                            <span class="viewer-edit-label" data-i18n="online.viewerBrushColor">颜色</span>
+                                            <div class="viewer-hue-bar-wrap">
+                                                <div id="viewerHueBar" class="viewer-hue-bar" role="slider" aria-label="Brush hue" aria-valuemin="0" aria-valuemax="360">
+                                                    <div id="viewerHueThumb" class="viewer-hue-thumb"></div>
+                                                </div>
+                                                <span id="viewerBrushColorSwatch" class="viewer-hue-swatch" aria-hidden="true"></span>
+                                            </div>
+                                            <input type="hidden" id="viewerBrushColor" value="#ff4d94">
+                                        </div>
+                                        <div class="viewer-edit-row">
+                                            <span class="viewer-edit-label" data-i18n="canvas.brushSize">笔刷</span>
+                                            <input type="range" id="viewerBrushSize" min="2" max="80" value="16" oninput="document.getElementById('viewerBrushSizeVal').textContent=this.value">
+                                            <span id="viewerBrushSizeVal" class="viewer-edit-val">16</span>
+                                        </div>
+                                        <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
+                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                    </div>
+                                    <div id="viewerCropPanel" class="viewer-edit-panel hidden">
+                                        <p class="viewer-edit-hint" data-i18n="canvas.cropHint">拖动裁剪框移动，拖右下角调整大小</p>
+                                        <div id="viewerCropRatios" class="viewer-crop-ratios"></div>
+                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                    </div>
+                                    <div id="viewerGridPanel" class="viewer-edit-panel hidden">
+                                        <div class="grid-preset-row mb-1">
+                                            <span class="viewer-edit-label" data-i18n="canvas.gridPresets">预设</span>
+                                            <button class="grid-preset-btn" type="button" onclick="applyViewerGridPreset(1, 2)">1×2</button>
+                                            <button class="grid-preset-btn" type="button" onclick="applyViewerGridPreset(2, 1)">2×1</button>
+                                            <button class="grid-preset-btn" type="button" onclick="applyViewerGridPreset(2, 2)">2×2</button>
+                                            <button class="grid-preset-btn" type="button" onclick="applyViewerGridPreset(3, 3)">3×3</button>
+                                        </div>
+                                        <div class="viewer-edit-row mb-1">
+                                            <span class="viewer-edit-label" data-i18n="canvas.gridHLines">横向线</span>
+                                            <input type="number" id="viewerGridHorizontalLines" min="0" max="20" value="1" oninput="refreshViewerGridSplitPreview()" class="viewer-grid-num-input">
+                                        </div>
+                                        <div class="viewer-edit-row mb-1">
+                                            <span class="viewer-edit-label" data-i18n="canvas.gridVLines">竖向线</span>
+                                            <input type="number" id="viewerGridVerticalLines" min="0" max="20" value="1" oninput="refreshViewerGridSplitPreview()" class="viewer-grid-num-input">
+                                        </div>
+                                        <div class="viewer-edit-row mb-2">
+                                            <span class="viewer-edit-label" data-i18n="canvas.gridGapSize">间距</span>
+                                            <input type="range" id="viewerGridGapSize" min="0" max="100" value="0" oninput="refreshViewerGridSplitPreview(); document.getElementById('viewerGridGapSizeVal').textContent=this.value">
+                                            <span id="viewerGridGapSizeVal" class="viewer-edit-val">0</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span id="viewerGridSplitCount" class="viewer-edit-hint">预计输出 4 张图片</span>
+                                        </div>
+                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                    </div>
+                                </div>
+                            </section>
+                            <section>
+                                <div class="viewer-block-title"><span data-i18n="online.viewerMore">More</span></div>
+                                <button type="button" class="viewer-reedit" onclick="applySameStyle()"><i data-lucide="rotate-cw"></i><span data-i18n="online.reEdit">重新编辑</span></button>
+                            </section>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/studio-media-viewer.js?v=20260526-brush-fix2"></script>
+    <script>
+        function generateUUID() {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                try { return crypto.randomUUID(); } catch (e) { }
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+        const CID = localStorage.getItem("client_id") || generateUUID();
+        localStorage.setItem("client_id", CID);
+        const ACTIVE_PAGE_KEY = 'studio_active_page';
+        const DEFAULT_PAGE_ID = 'online';
+        const PAGE_IDS = ['online','local','video','gpt-chat','canvas','api-settings','comfyui-settings'];
+
+        const STUDIO_PAGE_IDS = ['online','local','video'];
+        const STUDIO_AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
+        window.__studioViewerCtx = { items: [], pinnedKeys: [], favoriteKeys: [] };
+
+        function studioHistoryKey(item){ return String(item?.timestamp ?? ''); }
+        function studioEscapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function studioMediaUrl(item){ return (item?.videos && item.videos[0]) || (item?.audios && item.audios[0]) || (item?.images && item.images[0]) || ''; }
+        function studioIsAudioItem(item){
+            if(item?.audios?.length) return true;
+            const url = studioMediaUrl(item);
+            return STUDIO_AUDIO_EXT.test(url || '') || item?.type === 'online-audio';
+        }
+        function studioIsVideoItem(item){ if(studioIsAudioItem(item)) return false; return !!(item?.videos && item.videos.length); }
+        function studioIsImageItem(item){ if(studioIsAudioItem(item) || studioIsVideoItem(item)) return false; return !!(item?.images && item.images.length); }
+
+        function postGalleryViewerAction(action, item, options = {}){
+            const frame = document.getElementById('frame-gallery');
+            try {
+                frame?.contentWindow?.postMessage({ type:'studio-viewer-action', action, item, reply: options.reply !== false }, '*');
+            } catch(e) {}
+        }
+
+        function initStudioViewerHost(){
+            if(!window.StudioMediaViewer) return;
+            StudioMediaViewer.init({
+                tr: (k) => window.StudioI18n ? StudioI18n.t(k) : k,
+                escapeHtml: studioEscapeHtml,
+                historyKey: studioHistoryKey,
+                mediaUrl: studioMediaUrl,
+                isVideoItem: studioIsVideoItem,
+                isAudioItem: studioIsAudioItem,
+                isImageItem: studioIsImageItem,
+                lightboxItems: () => window.__studioViewerCtx.items || [],
+                isPinned: (item) => (window.__studioViewerCtx.pinnedKeys || []).includes(studioHistoryKey(item)),
+                isFavorite: (item) => (window.__studioViewerCtx.favoriteKeys || []).includes(studioHistoryKey(item)),
+                togglePin: (item) => postGalleryViewerAction('togglePin', item),
+                toggleFavorite: (item) => postGalleryViewerAction('toggleFavorite', item),
+                onApplyParams: (item) => { postGalleryViewerAction('applyParams', item, { reply: false }); StudioMediaViewer.close(); },
+                onUpsertItem: (item) => postGalleryViewerAction('upsertItem', item),
+                onRefresh: () => postGalleryViewerAction('refresh', null, { reply: false }),
+                providerById: () => null
+            });
+        }
+
+        window.addEventListener('message', e => {
+            const data = e.data || {};
+            if(data.type === 'studio-viewer-open'){
+                window.__studioViewerCtx = {
+                    items: data.items || [],
+                    pinnedKeys: data.pinnedKeys || [],
+                    favoriteKeys: data.favoriteKeys || []
+                };
+                StudioMediaViewer?.open(data.item);
+                if(window.lucide) lucide.createIcons();
+            }
+            if(data.type === 'studio-viewer-context'){
+                window.__studioViewerCtx = {
+                    items: data.items || [],
+                    pinnedKeys: data.pinnedKeys || [],
+                    favoriteKeys: data.favoriteKeys || []
+                };
+                StudioMediaViewer?.refresh();
+            }
+        });
+
+        const STUDIO_BUILD = '20260526-brush-fix2';
+        const STUDIO_BUILD_KEY = 'studio_shell_build';
+
+        function frameTargetHref(frame){
+            if(!frame?.dataset?.src) return '';
+            try { return new URL(frame.dataset.src, location.origin).href; }
+            catch(e) { return ''; }
+        }
+
+        function ensureFrameLoaded(frame){
+            if(!frame?.dataset?.src) return;
+            const target = frameTargetHref(frame);
+            if(!target) return;
+            const current = frame.src ? frame.src.replace(/#.*$/, '') : '';
+            if(current !== target.replace(/#.*$/, '')) frame.src = frame.dataset.src;
+        }
+
+        function resetStudioFramesIfBuildChanged(){
+            try {
+                const prev = localStorage.getItem(STUDIO_BUILD_KEY);
+                if(prev && prev !== STUDIO_BUILD){
+                    document.querySelectorAll('#studio-shell iframe[data-src], #full-stage iframe[data-src]').forEach(frame => {
+                        frame.removeAttribute('src');
+                    });
+                }
+                localStorage.setItem(STUDIO_BUILD_KEY, STUDIO_BUILD);
+            } catch(e){}
+        }
+
+        function updateMonitorVisibility(pageId) {
+            const monitor = document.getElementById('nano-monitor');
+            if(monitor) monitor.classList.toggle('is-hidden', pageId !== 'canvas');
+        }
+
+        function switchUI(el, id, options = {}) {
+            if(!PAGE_IDS.includes(id)) id = DEFAULT_PAGE_ID;
+            document.querySelectorAll('.nav-item,.side-pill').forEach(n => n.classList.remove('active'));
+            if(el) el.classList.add('active');
+
+            const studioShell = document.getElementById('studio-shell');
+            const fullStage = document.getElementById('full-stage');
+            const isStudio = STUDIO_PAGE_IDS.includes(id);
+
+            if(studioShell) studioShell.classList.toggle('active', isStudio);
+            if(fullStage) fullStage.classList.toggle('active', !isStudio);
+
+            document.querySelectorAll('#studio-shell .studio-panels iframe').forEach(f => f.classList.remove('active'));
+            document.querySelectorAll('#full-stage iframe').forEach(f => f.classList.remove('active'));
+
+            if(isStudio){
+                const panel = document.getElementById('frame-' + id);
+                if(panel) panel.classList.add('active');
+                ensureFrameLoaded(panel);
+                ensureFrameLoaded(document.getElementById('frame-gallery'));
+                syncThemeToFrame(panel);
+                syncLanguageToFrame(panel);
+                syncThemeToFrame(document.getElementById('frame-gallery'));
+                syncLanguageToFrame(document.getElementById('frame-gallery'));
+            } else {
+                const target = document.getElementById('frame-' + id);
+                if(target) target.classList.add('active');
+                ensureFrameLoaded(target);
+                syncThemeToFrame(target);
+                syncLanguageToFrame(target);
+                if (id === 'canvas' && target?.src) {
+                    try { target.contentWindow?.postMessage({ type: 'canvas-focus' }, '*'); } catch(e) {}
+                }
+            }
+
+            if(!options.skipRemember) localStorage.setItem(ACTIVE_PAGE_KEY, id);
+            updateMonitorVisibility(id);
+        }
+
+        function restoreActivePage() {
+            const id = PAGE_IDS.includes(localStorage.getItem(ACTIVE_PAGE_KEY)) ? localStorage.getItem(ACTIVE_PAGE_KEY) : DEFAULT_PAGE_ID;
+            const trigger = document.querySelector(`[onclick*="'${id}'"],[onclick*='"${id}"']`);
+            switchUI(trigger, id, { skipRemember:true });
+            document.documentElement.classList.remove('studio-route-booting');
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            resetStudioFramesIfBuildChanged();
+            restoreActivePage();
+        }, { once:true });
+
+        async function syncStatus() {
+            try {
+                const res = await fetch(`/api/queue_status?client_id=${CID}`);
+                const data = await res.json();
+                const monitor = document.getElementById('nano-monitor');
+                const queueVal = document.getElementById('queue-val');
+                const logoDot = document.getElementById('logo-dot');
+                const total = data.total || 0;
+                const pos = data.position || 0;
+                if (pos > 0) {
+                    monitor.classList.add('is-busy');
+                    queueVal.innerText = `${pos}/${total}`;
+                    logoDot.style.backgroundColor = '#3b82f6';
+                } else {
+                    monitor.classList.remove('is-busy');
+                    queueVal.innerText = total > 0 ? total : '0';
+                    logoDot.style.backgroundColor = 'var(--text)';
+                }
+            } catch (e) { }
+        }
+
+        function getActiveMessageFrame() {
+            const studioShell = document.getElementById('studio-shell');
+            if(studioShell?.classList.contains('active')) {
+                const panel = document.querySelector('#studio-shell .studio-panels iframe.active');
+                if(panel?.contentWindow) return panel;
+            }
+            return document.querySelector('#full-stage iframe.active');
+        }
+
+        const host = window.location.host;
+        if (host) {
+            const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+            const ws = new WebSocket(`${protocol}://${host}/ws/stats?client_id=${CID}`);
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'stats') {
+                    document.getElementById('online-val').innerText = data.online_count;
+                } else if (data.type === 'cloud_status') {
+                    const iframe = getActiveMessageFrame();
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage(data, '*');
+                    }
+                } else if (data.type === 'canvas_updated') {
+                    const iframe = getActiveMessageFrame();
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage(data, '*');
+                    }
+                }
+            };
+            setInterval(syncStatus, 2000);
+        }
+
+        // --- 主题同步（仅浅色） ---
+
+        function syncThemeToFrame(iframe) {
+            try {
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ type: 'studio-theme', theme: 'light' }, '*');
+                }
+            } catch (e) {}
+        }
+
+        function toggleLanguage() {
+            if(!window.StudioI18n) return;
+            window.StudioI18n.toggle();
+            document.querySelectorAll('iframe').forEach(frame => syncLanguageToFrame(frame));
+            if(window.lucide) lucide.createIcons();
+        }
+
+        function syncLanguageToFrame(frame) {
+            if(!window.StudioI18n) return;
+            try {
+                frame.contentWindow?.postMessage({ type:'studio-lang', lang:window.StudioI18n.lang() }, '*');
+            } catch(e) {}
+        }
+
+        function broadcastLanguage() {
+            document.querySelectorAll('iframe').forEach(frame => {
+                try {
+                    frame.contentWindow?.postMessage({ type:'studio-lang', lang:window.StudioI18n.lang() }, '*');
+                } catch(e) {}
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if(window.StudioI18n) window.StudioI18n.apply();
+            initStudioViewerHost();
+            broadcastLanguage();
+            if(window.lucide) lucide.createIcons();
+        });
+
+        // sync theme when iframe loads
+        document.querySelectorAll('iframe').forEach(f => {
+            f.addEventListener('load', () => {
+                syncThemeToFrame(f);
+                syncLanguageToFrame(f);
+                if(window.lucide) lucide.createIcons();
+            });
+        });
+    </script>
+</body>
+
+</html>

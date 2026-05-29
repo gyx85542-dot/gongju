@@ -1,0 +1,29 @@
+/* AI CHAT — sync with AI Image Magnific dark theme */
+
+/* theme.css also styles .composer-wrap as a card — keep wrap invisible */
+.mg-studio .composer-wrap,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .composer-wrap,
+body.mg-studio .composer-wrap {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+.mg-studio .provider-select option {
+    background: #262626;
+    color: #f5f5f5;
+}
+
+.mg-studio .history-popover .history-close,
+.mg-studio .history-popover .history-title {
+    color: #737373;
+}
+
+.mg-studio .history-popover .history-close:hover {
+    color: #f5f5f5;
+}
+
+.mg-studio .empty-history {
+    color: #737373;
+}

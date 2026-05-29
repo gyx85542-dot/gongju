@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Gallery</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/i18n.js?v=20260522-audio"></script>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <style>
+        :root { --accent:#ff4d94; --bg:#262626; --card:#262626; --easing:cubic-bezier(0.22,1,0.36,1); }
+        html, body { height:100%; margin:0; overflow:hidden; background:var(--bg); color:#f5f5f5; font-family:Inter,-apple-system,sans-serif; }
+        .gallery-shell { height:100%; display:flex; flex-direction:column; gap:8px; padding:8px 8px 8px; box-sizing:border-box; }
+        .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; flex-wrap:wrap; }
+        .media-filter-tabs { display:flex; align-items:center; gap:3px; margin-right:auto; }
+        .filter-tab { height:22px; min-width:22px; padding:0; border-radius:999px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#737373; cursor:pointer; line-height:1; transition:all .18s var(--easing); display:inline-flex; align-items:center; justify-content:center; }
+        .filter-tab svg { width:11px !important; height:11px !important; }
+        .filter-tab:hover { color:#a3a3a3; border-color:rgba(255,255,255,.14); }
+        .filter-tab.active { background:rgba(255,77,148,.16); color:#ff4d94; border-color:rgba(255,77,148,.35); }
+        .filter-empty-hint { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; opacity:.35; pointer-events:none; gap:8px; text-align:center; padding:16px; }
+        .filter-empty-hint.visible { display:flex; }
+        .board-pick-hint { display:none; font-size:10px; font-weight:600; color:#ff4d94; letter-spacing:.02em; }
+        body.board-pick-active .board-pick-hint { display:inline-flex; align-items:center; gap:4px; }
+        .toolbar-right { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
+        .toolbar-cols { display:flex; align-items:center; gap:5px; }
+        .tool-icon-btn { width:22px; height:22px; padding:0; border-radius:999px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#737373; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; line-height:1; transition:all .18s var(--easing); position:relative; }
+        .tool-icon-btn svg { width:11px !important; height:11px !important; }
+        .tool-icon-btn:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .tool-icon-btn.active { background:rgba(255,77,148,.16); color:#ff4d94; border-color:rgba(255,77,148,.35); }
+        .tool-icon-btn.accent { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .tool-icon-btn.accent:hover { background:#e8437f; border-color:#e8437f; }
+        .tool-icon-btn.danger { background:#ef4444; color:#fff; border-color:#ef4444; }
+        .tool-icon-btn.danger:hover { background:#dc2626; border-color:#dc2626; }
+        .tool-icon-btn:disabled { opacity:.4; cursor:not-allowed; }
+        .tool-icon-btn:disabled:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .tool-icon-static { cursor:default; pointer-events:auto; }
+        .tool-icon-static:hover { background:#262626; color:#737373; border-color:rgba(255,255,255,.08); }
+        .bulk-toolbar-active { display:flex; align-items:center; gap:4px; }
+        .bulk-toolbar-active[hidden] { display:none !important; }
+        #bulkToolbarNormal[hidden] { display:none !important; }
+        [data-tip]::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); bottom:auto; left:50%; transform:translateX(-50%); background:#313131; color:#f5f5f5; font-size:10px; font-weight:600; padding:4px 8px; border-radius:6px; white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .15s var(--easing); z-index:30; border:1px solid rgba(255,255,255,.08); box-shadow:0 4px 12px rgba(0,0,0,.28); letter-spacing:.02em; }
+        [data-tip]:hover::after { opacity:1; }
+        .output-cols-slider { width:72px; height:3px; accent-color:#ff4d94; margin:0; }
+        .output-cols-value { font-size:10px; font-weight:700; color:#a3a3a3; min-width:0.75rem; text-align:center; font-variant-numeric:tabular-nums; }
+        #importInput { position:absolute; width:0; height:0; opacity:0; pointer-events:none; overflow:hidden; }
+        .result-frame { background:#262626; border-radius:24px; border:1px solid rgba(255,255,255,.08); box-shadow:0 2px 16px rgba(0,0,0,.24); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; position:relative; }
+        .result-frame.has-outputs { justify-content:flex-start; }
+        .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; }
+        .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
+        .output-grid-cell { position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); transition:border-color .2s; }
+        .output-grid-cell:hover { border-color:rgba(255,255,255,.1); }
+        .output-grid-cell.is-pinned { border-color:rgba(255,77,148,.42); box-shadow:0 0 0 1px rgba(255,77,148,.18); }
+        .output-grid-cell.is-pinned.is-favorite::before { top:8px; left:8px; }
+        .output-grid-cell.is-pinned:not(.is-favorite)::after { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#ff4d94; z-index:4; pointer-events:none; }
+        .output-grid-cell.is-favorite::before { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#ffaa00; z-index:4; pointer-events:none; }
+        .output-grid-cell.is-pinned.is-favorite::before { background:#ffaa00; box-shadow:0 0 0 1px rgba(255,77,148,.55); }
+        .output-grid-cell img, .output-grid-cell video { width:100%; height:100%; object-fit:contain; display:block; border-radius:12px; background:#0f0f0f; }
+        .audio-cover { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(145deg,#1a1a1a,#262626); border-radius:12px; color:#737373; }
+        .audio-cover svg { width:36px !important; height:36px !important; opacity:.55; }
+        .video-badge, .audio-badge { position:absolute; left:6px; bottom:6px; z-index:3; height:16px; padding:0 6px; border-radius:999px; background:rgba(15,15,15,.78); color:#fff; font-size:8px; font-weight:800; display:flex; align-items:center; gap:3px; pointer-events:none; }
+        .cell-actions-top { position:absolute; top:6px; right:6px; z-index:6; display:flex; align-items:center; gap:4px; opacity:0; transition:opacity .18s; pointer-events:none; }
+        .cell-actions-bottom { position:absolute; left:0; right:0; bottom:0; height:20%; min-height:32px; z-index:5; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 8px 5px; opacity:0; transition:opacity .18s; pointer-events:none; background:linear-gradient(to top,rgba(38,38,38,.92),transparent); }
+        .output-grid-cell:hover .cell-actions-top,
+        .output-grid-cell:hover .cell-actions-bottom { opacity:1; pointer-events:auto; }
+        body.board-pick-active .output-grid-cell .cell-actions-top,
+        body.board-pick-active .output-grid-cell .cell-actions-bottom { opacity:0 !important; pointer-events:none !important; }
+        .cell-action-btn { width:24px; height:24px; border:none; border-radius:999px; background:rgba(49,49,49,.96); color:#a3a3a3; display:flex; align-items:center; justify-content:center; cursor:pointer; border:1px solid rgba(255,255,255,.08); padding:0; }
+        .cell-action-btn:hover, .cell-action-btn.active { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .cell-action-btn.fav-active { background:#ffaa00; border-color:#ffaa00; color:#fff; }
+        .board-pick-overlay { display:none; position:absolute; inset:0; z-index:6; align-items:center; justify-content:center; pointer-events:none; }
+        body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio) .board-pick-overlay { display:flex; }
+        .board-pick-overlay svg { width:40px !important; height:40px !important; color:rgba(255,255,255,.32); stroke-width:2.75; }
+        body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):hover { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.28); cursor:pointer; }
+        body.bulk-select-mode .output-grid-cell .cell-actions-top,
+        body.bulk-select-mode .output-grid-cell .cell-actions-bottom { opacity:0 !important; pointer-events:none !important; }
+        body.bulk-select-mode .output-grid-cell[data-ts] { cursor:pointer; }
+        body.bulk-select-mode .output-grid-cell[data-ts] img,
+        body.bulk-select-mode .output-grid-cell[data-ts] video { pointer-events:none; -webkit-user-drag:none; user-drag:none; }
+        body.bulk-select-mode, body.bulk-select-mode * { user-select:none !important; -webkit-user-select:none !important; }
+        body.bulk-select-mode .output-scroll-wrap { cursor:crosshair; }
+        .bulk-check-mark { position:absolute; left:8px; bottom:8px; width:18px; height:18px; border-radius:6px; border:1.5px solid rgba(255,255,255,.45); background:rgba(15,15,15,.72); display:none; align-items:center; justify-content:center; z-index:7; pointer-events:none; color:#fff; }
+        .bulk-check-mark svg { width:11px !important; height:11px !important; opacity:0; }
+        body.bulk-select-mode .output-grid-cell[data-ts] .bulk-check-mark { display:flex; }
+        body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.22); }
+        body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected .bulk-check-mark { background:#ff4d94; border-color:#ff4d94; }
+        body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected .bulk-check-mark svg { opacity:1; }
+        body.bulk-select-mode .video-badge,
+        body.bulk-select-mode .audio-badge { left:auto; right:8px; }
+        .bulk-select-box { position:fixed; z-index:9999; border:1px solid rgba(255,77,148,.75); background:rgba(255,77,148,.12); pointer-events:none; border-radius:8px; box-shadow:0 0 0 1px rgba(255,255,255,.18) inset; }
+        .output-grid-cell.is-pending { background:#141414; }
+        .cell-pending { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#94a3b8; }
+        .pending-spin { width:28px; height:28px; border:2px solid #e5e7eb; border-top-color:#ff4d94; border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .placeholder { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:.2; pointer-events:none; }
+        .result-frame.import-drag-over { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.1); }
+        .output-grid-cell.is-dragging { opacity:.45; }
+        .output-grid-cell.drop-before::before,
+        .output-grid-cell.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
+        .output-grid-cell.drop-before::before { left:-7px; }
+        .output-grid-cell.drop-after::after { right:-7px; }
+        .output-grid-cell .draggable-output { cursor:grab; user-select:none; -webkit-user-drag:element; }
+        .output-grid-cell .draggable-output:active { cursor:grabbing; }
+        .video-progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            overflow: hidden;
+        }
+        .output-grid-cell:hover .video-progress-bar {
+            opacity: 1;
+        }
+        .video-progress-fill {
+            height: 100%;
+            background: #ff4d94;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body class="mg-studio">
+    <div class="gallery-shell">
+        <div class="output-toolbar">
+            <div class="media-filter-tabs" role="tablist">
+                <button type="button" class="filter-tab active" data-filter="all" data-i18n-tip="gallery.filterAll" onclick="setMediaFilter('all', this)" aria-label="All"><i data-lucide="layout-grid"></i></button>
+                <button type="button" class="filter-tab" data-filter="image" data-i18n-tip="gallery.filterImages" onclick="setMediaFilter('image', this)" aria-label="Images"><i data-lucide="image"></i></button>
+                <button type="button" class="filter-tab" data-filter="video" data-i18n-tip="gallery.filterVideos" onclick="setMediaFilter('video', this)" aria-label="Videos"><i data-lucide="clapperboard"></i></button>
+                <button type="button" class="filter-tab" data-filter="audio" data-i18n-tip="gallery.filterAudio" onclick="setMediaFilter('audio', this)" aria-label="Audio"><i data-lucide="music"></i></button>
+            </div>
+            <span class="board-pick-hint" data-i18n="online.boardPickHint">点击下方图片添加到参考图</span>
+            <div class="toolbar-right">
+                <div id="bulkToolbarNormal">
+                    <button type="button" id="bulkEnterBtn" class="tool-icon-btn" data-i18n-tip="gallery.batchMode" onclick="enterBulkSelectMode()" aria-label="Batch mode">
+                        <i data-lucide="square-check"></i>
+                    </button>
+                </div>
+                <div id="bulkToolbarActive" class="bulk-toolbar-active" hidden>
+                    <button type="button" id="bulkCancelBtn" class="tool-icon-btn" data-i18n-tip="gallery.bulkCancel" onclick="setBulkSelectMode(false)" aria-label="Cancel">
+                        <i data-lucide="x"></i>
+                    </button>
+                    <button type="button" id="bulkDownloadBtn" class="tool-icon-btn accent" data-i18n-tip="gallery.downloadSelected" onclick="downloadSelectedBulk()" aria-label="Download selected">
+                        <i data-lucide="download"></i>
+                    </button>
+                    <button type="button" id="bulkDeleteBtn" class="tool-icon-btn danger" data-i18n-tip="gallery.deleteSelected" onclick="deleteSelectedBulk()" aria-label="Delete selected">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </div>
+                <button type="button" class="tool-icon-btn" data-i18n-tip="online.import" onclick="document.getElementById('importInput').click()" aria-label="Import">
+                    <i data-lucide="upload"></i>
+                </button>
+                <input type="file" id="importInput" accept="image/*,video/*,audio/*" multiple tabindex="-1" aria-hidden="true" onchange="importFiles(this.files); this.value='';">
+                <div class="toolbar-cols">
+                    <span class="tool-icon-btn tool-icon-static" data-i18n-tip="online.colsPerRow" aria-hidden="true"><i data-lucide="grid-3x3"></i></span>
+                    <input type="range" id="outputColsSlider" class="output-cols-slider" min="1" max="6" value="4" oninput="setOutputCols(this.value)">
+                    <span id="outputColsValue" class="output-cols-value">4</span>
+                </div>
+            </div>
+        </div>
+        <div id="resultBox" class="result-frame">
+            <div id="placeholder" class="placeholder">
+                <i data-lucide="layout" class="w-12 h-12 stroke-[1px]"></i>
+                <p class="text-[10px] font-black tracking-[0.5em] uppercase" data-i18n="gallery.ready">Media Ready</p>
+            </div>
+            <div id="filterEmpty" class="filter-empty-hint">
+                <i data-lucide="filter-x" class="w-10 h-10 stroke-[1px]"></i>
+                <p class="text-[10px] font-black tracking-[0.35em] uppercase" data-i18n="gallery.filterEmpty">该分类暂无内容</p>
+            </div>
+            <div id="outputScroll" class="output-scroll-wrap">
+                <div id="outputGrid" class="output-grid hidden"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        lucide.createIcons();
+        function tr(k){ return window.StudioI18n ? StudioI18n.t(k) : k; }
+        function applyTooltips(root=document){
+            root.querySelectorAll('[data-i18n-tip]').forEach(el => {
+                const key = el.getAttribute('data-i18n-tip');
+                if(key) el.setAttribute('data-tip', tr(key));
+            });
+        }
+        function loadOutputCols(){
+            try {
+                let saved = parseInt(localStorage.getItem(META_COLS) || '', 10);
+                if(!saved) saved = parseInt(localStorage.getItem('online_output_cols') || '4', 10);
+                outputCols = (saved >= 1 && saved <= 6) ? saved : 4;
+            } catch(e){ outputCols = 4; }
+        }
+        const META_PIN = 'studio_pinned', META_FAV = 'studio_favorites', META_ORDER = 'studio_display_order';
+        const META_FILTER = 'studio_media_filter';
+        const META_COLS = 'studio_output_cols';
+        const STUDIO_TYPES = new Set(['online', 'local-comfy', 'online-video', 'online-audio']);
+        let allHistory = [], pendingJobs = [], outputCols = 4, boardPickSlotId = '';
+        let bulkSelectMode = false, selectedKeys = new Set(), bulkDrag = null, bulkDown = null;
+        let mediaFilter = localStorage.getItem(META_FILTER) || 'all';
+        if(!['all','image','video','audio'].includes(mediaFilter)) mediaFilter = 'all';
+        function normalizeIdList(raw){
+            if(Array.isArray(raw)) return raw.map(String).filter(Boolean);
+            if(raw == null || raw === '') return [];
+            return [String(raw)];
+        }
+        function readIdList(key){
+            try { return normalizeIdList(JSON.parse(localStorage.getItem(key) || '[]')); }
+            catch(e){ return []; }
+        }
+        let pinnedIds = readIdList(META_PIN);
+        let favoriteIds = readIdList(META_FAV);
+        let displayOrder = readIdList(META_ORDER);
+        let reorderDragKey = '';
+        const REORDER_MIME = 'text/mg-studio-reorder-ts';
+        const channel = new BroadcastChannel('studio-gallery');
+        let galleryPollTimer = null;
+        let lastHistoryFingerprint = '';
+        let lastPendingFingerprint = '';
+
+        function historyDataFingerprint(list){
+            return (list || []).map(item => `${historyKey(item)}:${mediaUrl(item)}:${item.type || ''}`).join('|');
+        }
+        function pendingFingerprint(jobs){
+            return (jobs || []).map(j => `${j.id}:${j.error || ''}:${j.mediaKind || 'image'}`).join('|');
+        }
+        function syncGalleryFingerprints(){
+            lastHistoryFingerprint = historyDataFingerprint(allHistory);
+            lastPendingFingerprint = pendingFingerprint(pendingJobs);
+        }
+        function nextGalleryPollDelay(){
+            if(document.hidden) return 30000;
+            return pendingJobs.length ? 4000 : 15000;
+        }
+        function scheduleGalleryPoll(delay){
+            clearTimeout(galleryPollTimer);
+            galleryPollTimer = setTimeout(async () => {
+                if(!document.hidden){
+                    await loadAllHistory();
+                    await syncPendingJobs();
+                }
+                scheduleGalleryPoll();
+            }, delay ?? nextGalleryPollDelay());
+        }
+
+        function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        function mediaUrl(item){ return (item?.videos && item.videos[0]) || (item?.audios && item.audios[0]) || (item?.images && item.images[0]) || ''; }
+        function normalizeImageUrl(url){
+            const raw = String(url || '').trim();
+            if(!raw) return '';
+            try {
+                if(/^https?:\/\//i.test(raw)){
+                    const parsed = new URL(raw);
+                    if(parsed.pathname.startsWith('/assets/') || parsed.pathname.startsWith('/output/')) return parsed.pathname;
+                }
+            } catch(e){}
+            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
+            return raw;
+        }
+        function setImageDragData(e, url){
+            const normalized = normalizeImageUrl(url);
+            if(!normalized) return;
+            e.dataTransfer.setData('application/x-online-output-image', normalized);
+            e.dataTransfer.setData('text/uri-list', normalized);
+            e.dataTransfer.setData('text/plain', normalized);
+        }
+        const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
+        function isAudioItem(item){
+            if(item?.audios?.length) return true;
+            const url = mediaUrl(item);
+            return AUDIO_EXT.test(url || '') || item?.type === 'online-audio';
+        }
+        function isVideoItem(item){
+            if(isAudioItem(item)) return false;
+            return !!(item?.videos && item.videos.length);
+        }
+        function isImageItem(item){
+            if(isAudioItem(item) || isVideoItem(item)) return false;
+            return !!(item?.images && item.images.length);
+        }
+        function hasMedia(item){ return isVideoItem(item) || isImageItem(item) || isAudioItem(item); }
+        function pendingKind(job){ return job?.mediaKind === 'video' ? 'video' : job?.mediaKind === 'audio' ? 'audio' : 'image'; }
+        function matchesMediaFilter(item){
+            if(mediaFilter === 'all') return true;
+            if(mediaFilter === 'video') return isVideoItem(item);
+            if(mediaFilter === 'audio') return isAudioItem(item);
+            return isImageItem(item);
+        }
+        function matchesPendingFilter(job){
+            if(mediaFilter === 'all') return true;
+            return pendingKind(job) === mediaFilter;
+        }
+
+        function setMediaFilter(next, btn){
+            mediaFilter = ['all','image','video','audio'].includes(next) ? next : 'all';
+            localStorage.setItem(META_FILTER, mediaFilter);
+            document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.filter === mediaFilter));
+            renderOutputGrid();
+        }
+        function initMediaFilterTabs(){
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === mediaFilter);
+            });
+        }
+        function saveMeta(){ localStorage.setItem(META_PIN, JSON.stringify(pinnedIds)); localStorage.setItem(META_FAV, JSON.stringify(favoriteIds)); localStorage.setItem(META_ORDER, JSON.stringify(displayOrder)); }
+        function mergeMetaKeys(target, sources){
+            const seen = new Set(Array.isArray(target) ? target.map(String) : []);
+            (sources || []).flat().map(String).forEach(id => { if(id && !seen.has(id)){ seen.add(id); target.push(id); } });
+            return target;
+        }
+        function migrateLegacyMeta(){
+            try {
+                if(!pinnedIds.length) pinnedIds = mergeMetaKeys([], [JSON.parse(localStorage.getItem('online_pinned')||'[]'), JSON.parse(localStorage.getItem('local_pinned')||'[]')]);
+                if(!favoriteIds.length) favoriteIds = mergeMetaKeys([], [JSON.parse(localStorage.getItem('online_favorites')||'[]'), JSON.parse(localStorage.getItem('local_favorites')||'[]')]);
+                if(!displayOrder.length) displayOrder = mergeMetaKeys([], [JSON.parse(localStorage.getItem('online_display_order')||'[]'), JSON.parse(localStorage.getItem('local_display_order')||'[]')]);
+                pinnedIds = normalizeIdList(pinnedIds);
+                favoriteIds = normalizeIdList(favoriteIds);
+                displayOrder = normalizeIdList(displayOrder);
+                saveMeta();
+            } catch(e){}
+        }
+        function rebuildDisplayOrderFromPins(){
+            const pinSet = new Set(pinnedIds);
+            const pinnedList = pinnedIds.slice();
+            displayOrder.filter(id => pinSet.has(id) && !pinnedList.includes(id)).forEach(id => pinnedList.push(id));
+            let restList = displayOrder.filter(id => !pinSet.has(id));
+            allHistory.forEach(item => {
+                const k = historyKey(item);
+                if(k && !pinSet.has(k) && !restList.includes(k)) restList.push(k);
+            });
+            displayOrder = [...pinnedList, ...restList];
+        }
+        function isPinned(item){ return pinnedIds.includes(historyKey(item)); }
+        function isFavorite(item){ return favoriteIds.includes(historyKey(item)); }
+
+        function syncDisplayOrder(){
+            const keys = new Set(allHistory.map(historyKey));
+            pinnedIds = pinnedIds.filter(id => keys.has(id));
+            favoriteIds = favoriteIds.filter(id => keys.has(id));
+            displayOrder = displayOrder.filter(id => keys.has(id));
+            rebuildDisplayOrderFromPins();
+            saveMeta();
+        }
+        function sortedHistory(){
+            syncDisplayOrder();
+            const pinSet = new Set(pinnedIds);
+            const pinned = pinnedIds.map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
+            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
+            return [...pinned, ...rest];
+        }
+
+        function moveInOrderList(list, sourceKey, targetKey, placeBefore){
+            const from = list.indexOf(sourceKey);
+            let to = list.indexOf(targetKey);
+            if(from < 0 || to < 0) return list;
+            const next = [...list];
+            next.splice(from, 1);
+            to = next.indexOf(targetKey);
+            if(to < 0) return next;
+            if(!placeBefore) to += 1;
+            next.splice(to, 0, sourceKey);
+            return next;
+        }
+
+        function reorderHistoryItem(sourceKey, targetKey, placeBefore){
+            if(!sourceKey || !targetKey || sourceKey === targetKey) return;
+            const pinSet = new Set(pinnedIds);
+            let srcPinned = pinSet.has(sourceKey);
+            let tgtPinned = pinSet.has(targetKey);
+            if(srcPinned !== tgtPinned){
+                if(srcPinned) pinnedIds = pinnedIds.filter(id => id !== sourceKey);
+                else pinnedIds = [...pinnedIds.filter(id => id !== sourceKey), sourceKey];
+                srcPinned = !srcPinned;
+                tgtPinned = !tgtPinned;
+            }
+            let pinnedList = displayOrder.filter(id => pinnedIds.includes(id));
+            let restList = displayOrder.filter(id => !pinnedIds.includes(id));
+            pinnedIds.forEach(id => { if(!pinnedList.includes(id)) pinnedList.push(id); });
+            restList = [...restList, ...allHistory.map(historyKey).filter(id => !pinnedIds.includes(id) && !restList.includes(id))];
+            if(srcPinned){
+                pinnedList = moveInOrderList(pinnedList, sourceKey, targetKey, placeBefore);
+            } else {
+                restList = moveInOrderList(restList, sourceKey, targetKey, placeBefore);
+            }
+            displayOrder = [...pinnedList, ...restList];
+            saveMeta();
+            renderOutputGrid();
+        }
+
+        function clearReorderDropHints(){
+            document.querySelectorAll('.output-grid-cell.drop-before,.output-grid-cell.drop-after').forEach(el => {
+                el.classList.remove('drop-before', 'drop-after');
+            });
+        }
+
+        function setOutputCols(v){
+            outputCols = Math.max(1, Math.min(6, Number(v) || 4));
+            try { localStorage.setItem(META_COLS, String(outputCols)); } catch(e){}
+            const slider = document.getElementById('outputColsSlider');
+            const label = document.getElementById('outputColsValue');
+            if(slider) slider.value = outputCols;
+            if(label) label.textContent = outputCols;
+            renderOutputGrid();
+        }
+
+        function pendingCellHtml(job){
+            const label = job.error ? tr('online.generationFailed') : tr('online.generating');
+            return `<div class="output-grid-cell is-pending" data-pending="${escapeHtml(job.id)}"><div class="cell-pending${job.error?' is-error':''}">${job.error ? `<p>${escapeHtml(job.error)}</p>` : `<div class="pending-spin"></div><p>${escapeHtml(label)}</p>`}</div></div>`;
+        }
+        function outputCellHtml(data){
+            const key = historyKey(data);
+            const url = mediaUrl(data);
+            const video = isVideoItem(data);
+            const audio = isAudioItem(data);
+            const pinned = isPinned(data), fav = isFavorite(data);
+            let media;
+            if(video){
+                media = `<video src="${escapeHtml(url)}" muted playsinline preload="auto" class="draggable-output" draggable="true"></video>
+                         <div class="video-progress-bar"><div class="video-progress-fill" id="progress-fill-${escapeHtml(key)}"></div></div>
+                         <span class="video-badge"><i data-lucide="clapperboard" class="w-2.5 h-2.5"></i>VIDEO</span>`;
+            } else if(audio){
+                media = `<div class="audio-cover draggable-output" draggable="true"><i data-lucide="music"></i></div><span class="audio-badge"><i data-lucide="music-2" class="w-3 h-3"></i>AUDIO</span>`;
+            } else {
+                media = `<img src="${escapeHtml(url)}" alt="" loading="lazy" class="draggable-output" draggable="true">`;
+            }
+            return `<div class="output-grid-cell${video?' is-video':''}${audio?' is-audio':''}${pinned?' is-pinned':''}${fav?' is-favorite':''}${selectedKeys.has(key)?' bulk-selected':''}" data-ts="${escapeHtml(key)}">
+                ${media}
+                <div class="bulk-check-mark"><i data-lucide="check"></i></div>
+                <div class="board-pick-overlay"><i data-lucide="plus"></i></div>
+                <div class="cell-actions-top">
+                    <button type="button" class="cell-action-btn${pinned?' active':''}" data-action="pin"><i data-lucide="arrow-up-to-line"></i></button>
+                    <a href="${escapeHtml(url)}" download class="cell-action-btn" onclick="event.stopPropagation()"><i data-lucide="download"></i></a>
+                    <button type="button" class="cell-action-btn" data-action="delete"><i data-lucide="trash-2"></i></button>
+                </div>
+                <div class="cell-actions-bottom">
+                    <button type="button" class="cell-action-btn${fav?' fav-active active':''}" data-action="favorite"><i data-lucide="heart"></i></button>
+                    <button type="button" class="cell-action-btn" data-action="apply"><i data-lucide="clipboard-copy"></i></button>
+                </div>
+            </div>`;
+        }
+
+        function renderOutputGrid(){
+            const grid = document.getElementById('outputGrid');
+            const box = document.getElementById('resultBox');
+            const placeholder = document.getElementById('placeholder');
+            const filterEmpty = document.getElementById('filterEmpty');
+            const items = sortedHistory().filter(matchesMediaFilter);
+            const visiblePending = pendingJobs.filter(matchesPendingFilter);
+            const totalItems = sortedHistory();
+            const hasAnyContent = totalItems.length || pendingJobs.length;
+            const hasVisibleContent = items.length || visiblePending.length;
+            if(!hasAnyContent){
+                grid.classList.add('hidden'); grid.innerHTML = '';
+                box.classList.remove('has-outputs');
+                placeholder.style.display = 'flex';
+                filterEmpty?.classList.remove('visible');
+                return;
+            }
+            if(!hasVisibleContent){
+                grid.classList.add('hidden'); grid.innerHTML = '';
+                box.classList.add('has-outputs');
+                placeholder.style.display = 'none';
+                filterEmpty?.classList.add('visible');
+                return;
+            }
+            placeholder.style.display = 'none';
+            filterEmpty?.classList.remove('visible');
+            box.classList.add('has-outputs');
+            grid.classList.remove('hidden');
+            grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0,1fr))`;
+            grid.innerHTML = visiblePending.map(pendingCellHtml).join('') + items.map(outputCellHtml).join('');
+            const itemMap = new Map(items.map(item => [historyKey(item), item]));
+            grid.querySelectorAll('.output-grid-cell[data-ts]').forEach(cell => {
+                const data = itemMap.get(cell.dataset.ts);
+                if(!data) return;
+                const url = mediaUrl(data);
+                const pickable = isImageItem(data);
+                const key = historyKey(data);
+                const dragEl = cell.querySelector('.draggable-output');
+
+                if(dragEl){
+                    dragEl.ondragstart = e => {
+                        if(boardPickSlotId || bulkSelectMode) { e.preventDefault(); return; }
+                        e.stopPropagation();
+                        dragEl.dataset.dragging = '1';
+                        reorderDragKey = key;
+                        cell.classList.add('is-dragging');
+                        e.dataTransfer.setData(REORDER_MIME, key);
+                        if(pickable) setImageDragData(e, url);
+                        e.dataTransfer.effectAllowed = pickable ? 'copyMove' : 'move';
+                    };
+                    dragEl.ondragend = () => {
+                        reorderDragKey = '';
+                        cell.classList.remove('is-dragging');
+                        clearReorderDropHints();
+                        setTimeout(() => { delete dragEl.dataset.dragging; }, 0);
+                    };
+                }
+
+                cell.onclick = (e) => {
+                    if(dragEl && dragEl.dataset.dragging) return;
+                    if(bulkSelectMode && !e.target.closest('.cell-actions-top, .cell-actions-bottom')){
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleBulkSelectKey(cell.dataset.ts);
+                        return;
+                    }
+                    if(boardPickSlotId && pickable && !e.target.closest('.cell-actions-top, .cell-actions-bottom')){
+                        channel.postMessage({ type:'gallery-board-select', url });
+                        return;
+                    }
+                    if(!e.target.closest('.cell-actions-top, .cell-actions-bottom')) openLightbox(data);
+                };
+
+                cell.ondragover = e => {
+                    const dragKey = reorderDragKey;
+                    if(!dragKey || dragKey === key) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'move';
+                    clearReorderDropHints();
+                    const rect = cell.getBoundingClientRect();
+                    cell.classList.add((e.clientX - rect.left) < rect.width / 2 ? 'drop-before' : 'drop-after');
+                };
+                cell.ondragleave = e => {
+                    if(e.currentTarget.contains(e.relatedTarget)) return;
+                    cell.classList.remove('drop-before', 'drop-after');
+                };
+                cell.ondrop = e => {
+                    const dragKey = reorderDragKey || e.dataTransfer.getData(REORDER_MIME);
+                    if(!dragKey || dragKey === key) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = cell.getBoundingClientRect();
+                    const placeBefore = (e.clientX - rect.left) < rect.width / 2;
+                    clearReorderDropHints();
+                    reorderHistoryItem(dragKey, key, placeBefore);
+                };
+
+                cell.querySelector('[data-action="pin"]')?.addEventListener('click', e => { e.stopPropagation(); togglePin(data); });
+                cell.querySelector('[data-action="favorite"]')?.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(data); });
+                cell.querySelector('[data-action="apply"]')?.addEventListener('click', e => { e.stopPropagation(); channel.postMessage({ type:'gallery-apply-params', item:data }); });
+                cell.querySelector('[data-action="delete"]')?.addEventListener('click', e => { e.stopPropagation(); deleteHistoryItem(data.timestamp); });
+
+                const videoEl = cell.querySelector('video');
+                if(videoEl){
+                    const setFirstFrame = () => {
+                        if(videoEl.currentTime === 0) {
+                            videoEl.currentTime = 0.1;
+                        }
+                    };
+                    if(videoEl.readyState >= 1){
+                        setFirstFrame();
+                    } else {
+                        videoEl.addEventListener('loadedmetadata', setFirstFrame);
+                    }
+                    const fill = cell.querySelector('.video-progress-fill');
+                    videoEl.addEventListener('timeupdate', () => {
+                        if(videoEl.duration && fill){
+                            fill.style.width = (videoEl.currentTime / videoEl.duration * 100) + '%';
+                        }
+                    });
+                    cell.addEventListener('mouseenter', () => {
+                        if(!bulkSelectMode){
+                            videoEl.play().catch(e => console.log('Autoplay prevented:', e));
+                        }
+                    });
+                    cell.addEventListener('mouseleave', () => {
+                        videoEl.pause();
+                        videoEl.currentTime = 0.1;
+                        if(fill) fill.style.width = '0%';
+                    });
+                }
+            });
+            lucide.createIcons();
+            syncBulkToolbarUI();
+            syncGalleryFingerprints();
+        }
+
+        function syncBulkToolbarUI(){
+            document.body.classList.toggle('bulk-select-mode', bulkSelectMode);
+            const normal = document.getElementById('bulkToolbarNormal');
+            const active = document.getElementById('bulkToolbarActive');
+            const dlBtn = document.getElementById('bulkDownloadBtn');
+            const delBtn = document.getElementById('bulkDeleteBtn');
+            if(normal) normal.hidden = bulkSelectMode;
+            if(active) active.hidden = !bulkSelectMode;
+            if(dlBtn){
+                dlBtn.disabled = !selectedKeys.size;
+                const base = tr('gallery.downloadSelected');
+                dlBtn.setAttribute('data-tip', selectedKeys.size ? `${base} (${selectedKeys.size})` : base);
+            }
+            if(delBtn){
+                delBtn.disabled = !selectedKeys.size;
+                const base = tr('gallery.deleteSelected');
+                delBtn.setAttribute('data-tip', selectedKeys.size ? `${base} (${selectedKeys.size})` : base);
+            }
+            applyTooltips();
+            lucide.createIcons();
+        }
+
+        function enterBulkSelectMode(){
+            if(boardPickSlotId) return;
+            setBulkSelectMode(true);
+        }
+
+        function toggleBulkSelectKey(key){
+            if(!key) return;
+            if(selectedKeys.has(key)) selectedKeys.delete(key);
+            else selectedKeys.add(key);
+            const cell = document.querySelector(`.output-grid-cell[data-ts="${CSS.escape(key)}"]`);
+            cell?.classList.toggle('bulk-selected', selectedKeys.has(key));
+            syncBulkToolbarUI();
+        }
+
+        function setBulkSelectMode(next){
+            bulkSelectMode = Boolean(next);
+            if(!bulkSelectMode) selectedKeys.clear();
+            removeBulkSelectBoxes();
+            bulkDrag = null;
+            bulkDown = null;
+            syncBulkToolbarUI();
+            renderOutputGrid();
+        }
+
+        async function downloadSelectedBulk(){
+            const itemMap = new Map(allHistory.map(item => [historyKey(item), item]));
+            const urls = [...selectedKeys].map(key => mediaUrl(itemMap.get(key))).filter(Boolean);
+            if(!urls.length){ alert(tr('gallery.bulkNothingSelected')); return; }
+            const btn = document.getElementById('bulkDownloadBtn');
+            if(btn) btn.disabled = true;
+            try {
+                const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                const res = await fetch('/api/canvas-assets/download', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ urls, filename:`studio-media-${stamp}.zip` })
+                });
+                if(!res.ok){
+                    let detail = tr('gallery.downloadFailed');
+                    try { detail = (await res.json()).detail || detail; } catch(e){}
+                    throw new Error(detail);
+                }
+                const blob = await res.blob();
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `studio-media-${stamp}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+                setBulkSelectMode(false);
+            } catch(err){
+                alert(err.message || tr('gallery.downloadFailed'));
+            } finally {
+                if(btn) btn.disabled = false;
+            }
+        }
+
+        async function deleteSelectedBulk(){
+            if(!selectedKeys.size){ alert(tr('gallery.bulkNothingSelectedDelete')); return; }
+            if(!confirm(tr('online.deleteConfirm'))) return;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if(btn) btn.disabled = true;
+            try {
+                const timestamps = [...selectedKeys].map(Number).filter(t => !isNaN(t));
+                const res = await fetch('/api/history/delete-batch', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ timestamps })
+                });
+                if(!res.ok){
+                    throw new Error('Batch delete failed');
+                }
+                const keysToRemove = new Set([...selectedKeys]);
+                allHistory = allHistory.filter(h => !keysToRemove.has(historyKey(h)));
+                pinnedIds = pinnedIds.filter(id => !keysToRemove.has(id));
+                favoriteIds = favoriteIds.filter(id => !keysToRemove.has(id));
+                displayOrder = displayOrder.filter(id => !keysToRemove.has(id));
+                saveMeta();
+                setBulkSelectMode(false);
+            } catch(err){
+                alert(err.message || '删除失败');
+            } finally {
+                if(btn) btn.disabled = false;
+            }
+        }
+
+        function removeBulkSelectBoxes(){
+            document.querySelectorAll('.bulk-select-box').forEach(box => box.remove());
+        }
+
+        function bulkSelectableCells(){
+            return [...document.querySelectorAll('#outputGrid .output-grid-cell[data-ts]')];
+        }
+
+        function clearNativeSelection(){
+            const sel = window.getSelection?.();
+            if(sel?.rangeCount) sel.removeAllRanges();
+        }
+
+        function initBulkBoxSelect(){
+            const surface = document.getElementById('resultBox');
+            const scroll = document.getElementById('outputScroll');
+            if(!surface || scroll._bulkBoxReady) return;
+            scroll._bulkBoxReady = true;
+
+            function insideSurface(y){
+                const rect = surface.getBoundingClientRect();
+                return y >= rect.top - 12 && y <= rect.bottom + 12;
+            }
+            function shouldIgnoreBulkPointer(e){
+                return Boolean(e.target.closest('.output-toolbar,button,a,input,textarea,select'));
+            }
+
+            scroll.addEventListener('mousedown', e => {
+                if(!bulkSelectMode || e.button !== 0) return;
+                if(shouldIgnoreBulkPointer(e)) return;
+                if(!insideSurface(e.clientY)) return;
+                e.preventDefault();
+                removeBulkSelectBoxes();
+                bulkDrag = null;
+                clearNativeSelection();
+                bulkDown = { sx:e.clientX, sy:e.clientY, dragged:false };
+            }, true);
+
+            window.addEventListener('mousemove', e => {
+                if((bulkDrag || bulkDown) && e.buttons === 0){ finishBulkDrag(); return; }
+                if(!bulkSelectMode || !bulkDown) return;
+                if(!bulkDrag){
+                    const moved = Math.hypot(e.clientX - bulkDown.sx, e.clientY - bulkDown.sy);
+                    if(moved < 6) return;
+                    e.preventDefault();
+                    clearNativeSelection();
+                    bulkDown.dragged = true;
+                    const box = document.createElement('div');
+                    box.className = 'bulk-select-box';
+                    document.body.appendChild(box);
+                    bulkDrag = { sx:bulkDown.sx, sy:bulkDown.sy, box };
+                }
+                e.preventDefault();
+                clearNativeSelection();
+                const x = Math.min(bulkDrag.sx, e.clientX);
+                const y = Math.min(bulkDrag.sy, e.clientY);
+                const w = Math.abs(e.clientX - bulkDrag.sx);
+                const h = Math.abs(e.clientY - bulkDrag.sy);
+                Object.assign(bulkDrag.box.style, { left:`${x}px`, top:`${y}px`, width:`${w}px`, height:`${h}px` });
+                const r = { left:x, top:y, right:x + w, bottom:y + h };
+                bulkSelectableCells().forEach(cell => {
+                    const cr = cell.getBoundingClientRect();
+                    const hit = cr.left < r.right && cr.right > r.left && cr.top < r.bottom && cr.bottom > r.top;
+                    if(hit) selectedKeys.add(cell.dataset.ts);
+                });
+                bulkSelectableCells().forEach(cell => cell.classList.toggle('bulk-selected', selectedKeys.has(cell.dataset.ts)));
+                syncBulkToolbarUI();
+            });
+
+            function finishBulkDrag(){
+                if(bulkDrag){ bulkDrag = null; syncBulkToolbarUI(); }
+                removeBulkSelectBoxes();
+                if(bulkDown) setTimeout(() => { bulkDown = null; }, 0);
+            }
+            ['mouseup','pointerup','pointercancel'].forEach(evt => {
+                document.addEventListener(evt, finishBulkDrag, true);
+                window.addEventListener(evt, finishBulkDrag, true);
+            });
+            window.addEventListener('blur', finishBulkDrag);
+
+            scroll.addEventListener('click', e => {
+                if(!bulkSelectMode || !bulkDown?.dragged) return;
+                e.preventDefault();
+                e.stopPropagation();
+            }, true);
+
+            document.addEventListener('selectstart', e => {
+                if(!bulkSelectMode) return;
+                if(e.clientY && !insideSurface(e.clientY)) return;
+                e.preventDefault();
+            }, true);
+
+            document.addEventListener('keydown', e => {
+                if(e.key === 'Escape' && bulkSelectMode) setBulkSelectMode(false);
+            });
+        }
+
+        async function loadAllHistory(){
+            try {
+                let data = await fetch('/api/history?type=studio').then(r => r.json());
+                if(!Array.isArray(data)) data = [];
+                if(!data.length){
+                    const all = await fetch('/api/history').then(r => r.json());
+                    if(Array.isArray(all)){
+                        data = all.filter(item => STUDIO_TYPES.has(item.type) && hasMedia(item));
+                    }
+                }
+                const fp = historyDataFingerprint(data);
+                if(fp === lastHistoryFingerprint) return;
+                lastHistoryFingerprint = fp;
+                allHistory = data;
+                syncDisplayOrder();
+                renderOutputGrid();
+            } catch(e){ console.error(e); }
+        }
+
+        async function syncPendingJobs(){
+            try {
+                const jobs = await fetch('/api/online-pending').then(r => r.json());
+                if(Array.isArray(jobs)){
+                    const cleanedJobs = [];
+                    for(const job of jobs){
+                        const isCompleted = allHistory.some(item => {
+                            const params = item.params || {};
+                            if(params.job_id && params.job_id === job.id){
+                                return true;
+                            }
+                            const itemPrompt = (item.prompt || '').trim();
+                            const jobPrompt = (job.prompt || '').trim();
+                            const itemTimestamp = item.timestamp || 0;
+                            
+                            let matchesMedia = false;
+                            if(job.mediaKind === 'video' && item.videos && item.videos.length > 0){
+                                matchesMedia = true;
+                            } else if(job.mediaKind === 'audio' && item.audios && item.audios.length > 0){
+                                matchesMedia = true;
+                            } else if(job.mediaKind === 'image' && item.images && item.images.length > 0){
+                                matchesMedia = true;
+                            }
+                            
+                            const isPromptMatch = itemPrompt === jobPrompt || itemPrompt.includes(jobPrompt) || jobPrompt.includes(itemPrompt);
+                            const isNewer = itemTimestamp >= (job.timestamp - 15);
+                            
+                            return matchesMedia && isPromptMatch && isNewer;
+                        });
+                        
+                        if(isCompleted){
+                            fetch('/api/online-pending/' + encodeURIComponent(job.id), { method:'DELETE' }).catch(()=>{});
+                        } else {
+                            cleanedJobs.push(job);
+                        }
+                    }
+                    
+                    // 智能合并：保留服务器端的在线任务，以及本地内存中极为新鲜、可能还在注册请求过程中的任务
+                    const serverJobIds = new Set(cleanedJobs.map(j => j.id));
+                    const mergedJobs = [...cleanedJobs];
+                    
+                    for(const localJob of pendingJobs){
+                        if(!serverJobIds.has(localJob.id)){
+                            let isVeryNew = false;
+                            if(typeof localJob.id === 'string' && localJob.id.startsWith('pending_')){
+                                const parts = localJob.id.split('_');
+                                if(parts.length > 1){
+                                    const ts = parseInt(parts[1], 10);
+                                    if(!isNaN(ts) && (Date.now() - ts < 6000)){ // 6秒内创建的本地任务
+                                        isVeryNew = true;
+                                    }
+                                }
+                            }
+                            if(isVeryNew){
+                                mergedJobs.push(localJob);
+                            }
+                        }
+                    }
+                    
+                    // 按创建时间或 ID 排序，确保新任务排在最上面
+                    mergedJobs.sort((a, b) => {
+                        const tsA = (typeof a.id === 'string' && a.id.startsWith('pending_')) ? parseInt(a.id.split('_')[1], 10) : 0;
+                        const tsB = (typeof b.id === 'string' && b.id.startsWith('pending_')) ? parseInt(b.id.split('_')[1], 10) : 0;
+                        return (tsB || 0) - (tsA || 0);
+                    });
+
+                    const fp = pendingFingerprint(mergedJobs);
+                    if(fp === lastPendingFingerprint) return;
+                    lastPendingFingerprint = fp;
+                    pendingJobs = mergedJobs;
+                    renderOutputGrid();
+                }
+            } catch(e){ console.error("Sync pending jobs failed:", e); }
+        }
+
+        function upsertHistoryItem(item){
+            const key = historyKey(item);
+            const idx = allHistory.findIndex(h => historyKey(h) === key);
+            if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
+            if(!displayOrder.includes(key)) displayOrder.unshift(key);
+            rebuildDisplayOrderFromPins();
+            saveMeta();
+            renderOutputGrid();
+        }
+
+        function togglePin(item){
+            const key = historyKey(item);
+            if(!key) return;
+            if(pinnedIds.includes(key)) pinnedIds = pinnedIds.filter(id => id !== key);
+            else pinnedIds = [...pinnedIds.filter(id => id !== key), key];
+            rebuildDisplayOrderFromPins();
+            saveMeta();
+            renderOutputGrid();
+        }
+        function toggleFavorite(item){
+            const key = historyKey(item);
+            if(favoriteIds.includes(key)) favoriteIds = favoriteIds.filter(id => id !== key);
+            else favoriteIds.push(key);
+            saveMeta(); renderOutputGrid();
+        }
+        async function deleteHistoryItem(ts){
+            if(!confirm(tr('online.deleteConfirm'))) return;
+            await fetch('/api/history/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ timestamp: ts }) });
+            const key = String(ts);
+            allHistory = allHistory.filter(h => historyKey(h) !== key);
+            pinnedIds = pinnedIds.filter(id => id !== key);
+            favoriteIds = favoriteIds.filter(id => id !== key);
+            displayOrder = displayOrder.filter(id => id !== key);
+            saveMeta(); renderOutputGrid();
+        }
+
+        async function importFiles(files){
+            if(!files?.length) return;
+            const form = new FormData();
+            [...files].forEach(f => form.append('files', f));
+            const data = await fetch('/api/online-import', { method:'POST', body: form }).then(r => r.json());
+            (data.items || []).forEach(upsertHistoryItem);
+        }
+
+        function buildViewerPayload(item){
+            return {
+                type: 'studio-viewer-open',
+                item,
+                items: sortedHistory().filter(matchesMediaFilter),
+                pinnedKeys: pinnedIds.slice(),
+                favoriteKeys: favoriteIds.slice()
+            };
+        }
+        function openLightbox(data){
+            try {
+                if(window.parent && window.parent !== window){
+                    window.parent.postMessage(buildViewerPayload(data), '*');
+                    return;
+                }
+            } catch(e){}
+        }
+
+        channel.onmessage = (event) => {
+            const data = event.data || {};
+            if(data.type === 'gallery-refresh') { loadAllHistory(); syncPendingJobs(); }
+            if(data.type === 'gallery-add-item' && data.item) { upsertHistoryItem(data.item); syncPendingJobs(); }
+            if(data.type === 'gallery-set-pending'){
+                pendingJobs = data.jobs || [];
+                renderOutputGrid();
+                syncPendingJobs();
+            }
+            if(data.type === 'gallery-board-pick'){
+                boardPickSlotId = data.slotId || '';
+                document.body.classList.toggle('board-pick-active', !!boardPickSlotId);
+                if(boardPickSlotId){
+                    if(bulkSelectMode) setBulkSelectMode(false);
+                    if(mediaFilter === 'video' || mediaFilter === 'audio') setMediaFilter('image');
+                }
+                renderOutputGrid();
+            }
+        };
+
+        window.addEventListener('message', e => {
+            const data = e.data || {};
+            if(data.type === 'studio-viewer-action'){
+                const item = data.item;
+                switch(data.action){
+                    case 'togglePin': togglePin(item); break;
+                    case 'toggleFavorite': toggleFavorite(item); break;
+                    case 'applyParams': channel.postMessage({ type:'gallery-apply-params', item }); break;
+                    case 'upsertItem': upsertHistoryItem(item); break;
+                    case 'refresh': renderOutputGrid(); return;
+                }
+                if(data.reply){
+                    window.parent.postMessage({
+                        type: 'studio-viewer-context',
+                        items: sortedHistory().filter(matchesMediaFilter),
+                        pinnedKeys: pinnedIds.slice(),
+                        favoriteKeys: favoriteIds.slice()
+                    }, '*');
+                }
+                return;
+            }
+            if(data.type === 'studio-lang' && window.StudioI18n){
+                StudioI18n.set(e.data.lang);
+                applyTooltips();
+                syncBulkToolbarUI();
+            }
+        });
+        function hasImportFiles(dataTransfer){
+            if(!dataTransfer || reorderDragKey) return false;
+            const types = [...(dataTransfer.types || [])];
+            if(!types.includes('Files')) return false;
+            const items = [...(dataTransfer.items || [])];
+            if(!items.length) return (dataTransfer.files?.length || 0) > 0;
+            return items.some(item => item.kind === 'file' && (!item.type || item.type.startsWith('image/') || item.type.startsWith('video/') || item.type.startsWith('audio/')));
+        }
+
+        function initFileDropZone(){
+            const box = document.getElementById('resultBox');
+            if(!box) return;
+            const onDragOver = e => {
+                if(!hasImportFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                box.classList.add('import-drag-over');
+            };
+            const onDragLeave = e => {
+                if(e.currentTarget.contains(e.relatedTarget)) return;
+                box.classList.remove('import-drag-over');
+            };
+            const onDrop = e => {
+                if(!hasImportFiles(e.dataTransfer)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                box.classList.remove('import-drag-over');
+                importFiles(e.dataTransfer.files);
+            };
+            box.addEventListener('dragenter', onDragOver);
+            box.addEventListener('dragover', onDragOver);
+            box.addEventListener('dragleave', onDragLeave);
+            box.addEventListener('drop', onDrop);
+        }
+
+        migrateLegacyMeta();
+        loadOutputCols();
+        setOutputCols(outputCols);
+        applyTooltips();
+        initMediaFilterTabs();
+        initBulkBoxSelect();
+        initFileDropZone();
+        loadAllHistory();
+        syncPendingJobs();
+        scheduleGalleryPoll(15000);
+        document.addEventListener('visibilitychange', () => {
+            if(!document.hidden) scheduleGalleryPoll(500);
+        });
+    </script>
+</body>
+</html>
