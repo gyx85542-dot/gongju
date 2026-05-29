@@ -1,119 +1,45 @@
 # gongju
-Supports comfyui/API calls/modelscope calls
 
-详细教程：[https://youtu.be/1y9ShTvgC_w](https://youtu.be/r_y_9ALr7fg)
+gongju 是一个面向 AI 创作的工作流工具，基于无限画布界面，把图像生成、视频生成、对话和节点编排整合在同一套环境里。
 
-由于最近很多API网址关停，我找到一个稳定的网址：
+## 项目简介
 
-https://apimart.ai/register?aff=1uyAbb
+你可以在画布上通过节点连接的方式组织任务：上传参考图、编写提示词、调用外部 API、串联 ComfyUI 工作流，并把结果集中管理和复用。项目适合需要批量出图、多步骤自动化、或把多种模型服务组合在一起使用的场景。
 
-----
+## 主要能力
 
-【新增了version文件，我每次更新都会更新version的版本号，如果你下载version文件，打开项目后，导航栏的GitHub按键就会提示新版本，如果不想查看更新提示，就删除version文件】
+- **无限画布**：节点式编辑，支持拖拽、连线、分组与多画布管理
+- **AI 图像生成**：对接多种 API 服务，支持文生图、图生图及参考图输入
+- **AI 视频生成**：支持视频相关生成与处理流程
+- **ComfyUI 工作流**：可导入并调用自定义 ComfyUI 工作流，在画布节点中配置参数
+- **ModelScope / LLM**：支持对话、视觉理解及提示词辅助
+- **网页内配置**：API Key、模型列表、工作流等可在界面中设置，无需改代码
+- **中英文界面**：内置多语言切换
 
-【A version file has been added. I update the version number with each update. If you download the version file, the GitHub button in the navigation bar will indicate the new version after opening the project. If you don't want to see update notifications, delete the version file.】
+## 运行环境
 
-----
-5/13日更新：
-1. 修复了安装依赖的报错
-2. 增加了更便捷的API设置方式，现在可以全程在网页中设置，并且可以拉取模型一键添加
-3. LLM节点支持图片输入反推，可以使用modelscope的VL模型测试
-4. 增加了中英文切换
-5. 增加了自定义comfyui工作流的功能，可以自己设置需要的输入和要调整的参数，可以在无限画布的comfyui节点中调用。
-6. 增加了视频生成功能
-7. 修复了2k/4k生成报错问题
-8. 新增了生成节点可以通过output前后连接一键生成
+- Python 3（项目提供 Windows / macOS 启动脚本）
+- 依赖见 `requirements.txt`，首次使用可运行安装依赖脚本后再启动服务
 
-5/14日更新：
-1. 修复mac的一些bug
-2. modelscope支持lora调用
-3. 支持OpenAI协议和异步协议（生成失败不扣费）
+## 目录说明
 
-5/15日更新：
-1. 增加了循环组件和计数功能，可以将节点循环/并发运行N次，同时有提示词计数功能，可以设置提示词为：运行第二张卖点图。
-用法可以是：使用Gemini生成产品10个卖点提示词。用循环节点，增加提示词：运行第X张卖点图，输入给API节点，调用GPT生成，就可以一次性并发生成10个卖点图。
-2. 增加协议的验证按键，可以方便的验证自己的API平台是什么协议
-3. 修复了LLM节点的一些bug
-4. 上传了精简版的python，运行“安装依赖.bat”，完成之后，运行"run.bat"
+| 目录/文件 | 说明 |
+|-----------|------|
+| `main.py` | 后端服务入口 |
+| `static/` | 前端页面与脚本 |
+| `workflows/` | ComfyUI 工作流定义 |
+| `API/.env` | API 密钥等本地配置（需自行创建，不会纳入版本库） |
+| `assets/` | 运行时上传与生成的资源（启动后自动创建） |
+| `data/` | 画布、对话等本地数据 |
 
-5/18日更新：
-1. 修复了视频生成bug
-2. 增加了画笔编辑
-3. 修复了ccomfyui的并发bug
-   
------
+## 快速开始
 
-Detailed tutorial: [https://youtu.be/1y9ShTvgC_w](https://youtu.be/r_y_9ALr7fg)
+1. 安装依赖（Windows 运行 `安装依赖.bat`，macOS 参考对应 shell 脚本）
+2. 在 `API/.env` 中配置所需的 API 密钥
+3. 运行 `run.bat` 或 `windows-启动服务.bat` 启动服务
+4. 在浏览器中打开本地服务页面，从侧边栏进入「无限画布」等功能模块
 
-Due to the recent shutdown of many API websites, I found a stable one:
+## 说明
 
-https://apimart.ai/register?aff=1uyAbb
-
-[Discount code (daxiong): 10% off your first top-up, invoice available.]
-
-
-May 13th Update:
-
-1. Fixed dependency installation errors.
-
-2. Added a more convenient API setup method; settings can now be configured entirely through the webpage, and models can be added with a single click.
-
-3. LLM nodes support image input for reverse engineering; VL models from ModelScope can be used for testing.
-
-4. Added Chinese/English switching functionality.
-
-5. Added the ability to customize ComfyUI workflows; users can set their own inputs and adjust parameters, and these workflows can be invoked within ComfyUI nodes on an infinite canvas.
-
-6. Added video generation functionality.
-
-7. Fixed 2K/4K generation error issues.
-
-8. Added the ability to generate videos with a single click by connecting output nodes before and after.
-
-May 14th Update:
-
-1. Fixed some bugs on Mac.
-
-2. ModelScope supports LoRa calls.
-
-3. Supports OpenAI protocol and asynchronous protocol (no charge for generation failures).
-
-May 15th Update:
-
-1. Added a loop component and counting function, allowing nodes to run concurrently N times. It also includes a prompt word counting function, where the prompt word can be set to: "Run the second selling point image."
-
-Usage: Use Gemini to generate 10 selling point prompt words for a product. Use the loop node, add the prompt word: "Run the Xth selling point image," input it to the API node, call GPT to generate, and you can generate 10 selling point images concurrently at once.
-
-2. Added a protocol verification button for easy verification of your API platform's protocol.
-
-3. Fixed some bugs in the LLM node.
-
-4. Uploaded a simplified version of Python. Run "安装依赖.bat", and then run "run.bat".
-   
-
-May 18th Update:
-
-1. Fixed a video generation bug.
-
-2. Added brush editing.
-
-3. Fixed a concurrency bug in ccomfyui.
-
-
-
-<img width="1696" height="1350" alt="b68e144c5b04a322bfd035da4d89aba3" src="https://github.com/user-attachments/assets/0a6090fb-a8dd-4c3d-adee-b1f9233a2d91" />
-
-   
-<img width="1525" height="1473" alt="image" src="https://github.com/user-attachments/assets/6f61fcf9-746c-425b-9e36-cfc8d252da7c" />
-
-   <img width="1261" height="864" alt="image" src="https://github.com/user-attachments/assets/57f3e230-3134-488f-8179-d97e7d15383a" />
-<img width="1530" height="858" alt="image" src="https://github.com/user-attachments/assets/9990e42d-22d5-4a10-a1e1-ad35a634edd2" />
-
-<img width="1735" height="1400" alt="image" src="https://github.com/user-attachments/assets/d8328ff8-bbe0-4f1c-9ffa-7b56e8a1a51d" />
-<img width="2258" height="969" alt="image" src="https://github.com/user-attachments/assets/4a752d99-885d-4ba9-8b86-91b495786b5c" />
-
-
-<img width="1531" height="1374" alt="image" src="https://github.com/user-attachments/assets/0af79e38-0955-4740-9e65-5c9bb057f58c" />
-
-<img width="2196" height="1040" alt="image" src="https://github.com/user-attachments/assets/6d823668-cde2-4836-8332-1858efe5f520" />
-<img width="2214" height="771" alt="image" src="https://github.com/user-attachments/assets/52e10958-753f-45ba-a50e-3bbec27be436" />
+- `assets/`、`history.json`、`python/` 等目录为本地运行数据或环境，默认不纳入 Git 仓库
+- 克隆仓库后首次启动会自动创建 `assets/input`、`assets/output` 等空目录
