@@ -1,4 +1,4 @@
-# Infinite-Canvas
+# gongju
 Supports comfyui/API calls/modelscope calls
 
 详细教程：[https://youtu.be/1y9ShTvgC_w](https://youtu.be/r_y_9ALr7fg)

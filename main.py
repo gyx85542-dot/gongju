@@ -144,8 +144,8 @@ class ConnectionManager:
 manager = ConnectionManager()
 GLOBAL_LOOP = None
 APP_VERSION = "2026.05.19"
-GITHUB_REPO_URL = "https://github.com/hero8152/Infinite-Canvas"
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/hero8152/Infinite-Canvas/main/VERSION"
+GITHUB_REPO_URL = "https://github.com/gyx85542-dot/gongju"
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/gyx85542-dot/gongju/main/VERSION"
 
 @app.on_event("startup")
 async def startup_event():
