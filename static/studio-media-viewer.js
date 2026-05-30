@@ -62,10 +62,29 @@ function isViewerEditedImage(data){
     const editType = data?.params?.edit_type;
     return editType === 'brush' || editType === 'crop';
 }
+function viewerProviderSource(data){
+    const type = String(data?.type || '').trim().toLowerCase();
+    const model = String(data.params?.model || data.model || '').trim();
+    if(type === 'local-comfy') return 'comfyui';
+    if(type === 'runninghub') return 'runninghub';
+    const onlineTypes = new Set(['online', 'online-video', 'online-audio', 'online-image']);
+    if(onlineTypes.has(type)){
+        if(model) return model;
+        return data.provider_name
+            || providerById(data.params?.provider_id || data.provider_id)?.name
+            || data.provider_id
+            || '—';
+    }
+    if(model) return model;
+    return data.provider_name
+        || providerById(data.params?.provider_id || data.provider_id)?.name
+        || data.provider_id
+        || '—';
+}
 function viewerMetaRows(data){
     const rows = [];
     const edited = isViewerEditedImage(data);
-    const providerName = data.provider_name || providerById(data.params?.provider_id || data.provider_id)?.name || data.provider_id || '—';
+    const providerName = viewerProviderSource(data);
             const kind = getMediaKind(data);
     const modelName = data.params?.model || data.model || '—';
     const size = data.params?.size || '—';
@@ -114,7 +133,49 @@ function renderViewerMetaGrid(container, rows){
     `).join('');
 }
 
-const viewerEdit = { mode: 'brush', drawing: false, undoStack: [], lastPoint: null, cropDrag: null, cropRatio: '1:1', brushHue: 339 };
+const viewerEdit = { mode: 'brush', drawing: false, undoStack: [], lastPoint: null, cropDrag: null, cropRatio: '1:1', brushHue: 339, lastPointer: null };
+const VIEWER_BRUSH_RATIO_MIN = 5;
+const VIEWER_BRUSH_RATIO_MAX = 150;
+const VIEWER_BRUSH_RATIO_DEFAULT = 16;
+
+function getViewerImageMinDim(){
+    const img = document.getElementById('lightboxImg');
+    const nw = img?.naturalWidth || 1024;
+    const nh = img?.naturalHeight || 1024;
+    return Math.max(1, Math.min(nw, nh));
+}
+
+function getViewerBrushRatio(){
+    const slider = document.getElementById('viewerBrushSize');
+    const raw = Number(slider?.value || VIEWER_BRUSH_RATIO_DEFAULT);
+    const clamped = Math.max(VIEWER_BRUSH_RATIO_MIN, Math.min(VIEWER_BRUSH_RATIO_MAX, raw));
+    return clamped / 1000;
+}
+
+function getViewerBrushSizePx(){
+    return Math.max(2, Math.round(getViewerImageMinDim() * getViewerBrushRatio()));
+}
+
+function syncViewerBrushSizeUI(){
+    const slider = document.getElementById('viewerBrushSize');
+    const valEl = document.getElementById('viewerBrushSizeVal');
+    if(!slider) return;
+    const ratioVal = Math.max(VIEWER_BRUSH_RATIO_MIN, Math.min(VIEWER_BRUSH_RATIO_MAX, Number(slider.value || VIEWER_BRUSH_RATIO_DEFAULT)));
+    slider.value = String(ratioVal);
+    const pct = (ratioVal / 10).toFixed(1);
+    if(valEl) valEl.textContent = `${pct}%`;
+}
+
+function adjustViewerBrushSize(delta){
+    const slider = document.getElementById('viewerBrushSize');
+    if(!slider || viewerEdit.mode !== 'brush') return;
+    const next = Math.max(VIEWER_BRUSH_RATIO_MIN, Math.min(VIEWER_BRUSH_RATIO_MAX, Number(slider.value || VIEWER_BRUSH_RATIO_DEFAULT) + delta));
+    if(next === Number(slider.value)) return;
+    slider.value = String(next);
+    syncViewerBrushSizeUI();
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    if(viewerEdit.lastPointer) updateViewerBrushCursor(viewerEdit.lastPointer);
+}
 const VIEWER_CROP_RATIOS = [
     { id: '1:1', label: '1:1', w: 1, h: 1 },
     { id: '4:3', label: '4:3', w: 4, h: 3 },
@@ -355,7 +416,7 @@ function updateViewerBrushCursor(e){
         hideViewerBrushCursor();
         return;
     }
-    const size = Number(document.getElementById('viewerBrushSize')?.value || 16);
+    const size = getViewerBrushSizePx();
     const scale = rect.width / Math.max(canvas.width, 1);
     const d = Math.max(4, size * scale);
     cursor.style.width = d + 'px';
@@ -367,6 +428,7 @@ function updateViewerBrushCursor(e){
 }
 
 function setViewerEditMode(mode){
+    const prevMode = viewerEdit.mode;
     viewerEdit.mode = mode;
     document.getElementById('viewerModeBrush')?.classList.toggle('active', mode === 'brush');
     document.getElementById('viewerModeCrop')?.classList.toggle('active', mode === 'crop');
@@ -380,8 +442,15 @@ function setViewerEditMode(mode){
     cropLayer?.classList.toggle('hidden', mode !== 'crop');
 
     const ctx = canvas?.getContext('2d');
-    if(ctx && mode !== 'brush'){
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if(ctx){
+        const leavingGridGuides = prevMode === 'grid' && mode !== 'grid';
+        if(mode !== 'brush' || leavingGridGuides){
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        if(mode === 'brush' && leavingGridGuides){
+            viewerEdit.undoStack = [];
+            pushViewerDrawUndo();
+        }
     }
 
     if(mode === 'crop'){
@@ -391,6 +460,8 @@ function setViewerEditMode(mode){
     } else if(mode === 'grid'){
         hideViewerBrushCursor();
         refreshViewerGridSplitPreview();
+    } else if(mode === 'brush'){
+        hideViewerBrushCursor();
     }
     lucide.createIcons();
 }
@@ -428,6 +499,7 @@ function syncViewerDrawCanvas(){
     const run = () => {
         if(!layoutViewerDrawCanvas()) return;
         resetViewerDrawCanvas();
+        syncViewerBrushSizeUI();
         if(viewerEdit.mode === 'crop') initViewerCropBox();
     };
     if(img.complete && img.naturalWidth){
@@ -489,7 +561,7 @@ function moveViewerDraw(e){
     if(!canvas || !ctx) return;
     e.preventDefault();
     const pt = viewerCanvasPoint(e, canvas);
-    const size = Number(document.getElementById('viewerBrushSize')?.value || 16);
+    const size = getViewerBrushSizePx();
     const color = getViewerBrushColor();
     ctx.strokeStyle = color;
     ctx.lineWidth = size;
@@ -926,7 +998,9 @@ function initViewerEditTools(){
         if(!viewerEdit.drawing) hideViewerBrushCursor();
     });
     bindViewerHueBar();
+    syncViewerBrushSizeUI();
     document.getElementById('viewerBrushSize')?.addEventListener('input', () => {
+        syncViewerBrushSizeUI();
         const evt = viewerEdit.lastPointer;
         if(evt) updateViewerBrushCursor(evt);
     });
@@ -934,6 +1008,12 @@ function initViewerEditTools(){
         viewerEdit.lastPointer = e;
         updateViewerBrushCursor(e);
     });
+    document.getElementById('viewerStage')?.addEventListener('wheel', e => {
+        if(viewerEdit.mode !== 'brush') return;
+        if(!document.getElementById('lightbox')?.classList.contains('open')) return;
+        e.preventDefault();
+        adjustViewerBrushSize(e.deltaY > 0 ? -2 : 2);
+    }, { passive: false });
     document.getElementById('viewerCropBox')?.addEventListener('pointerdown', e => {
         if(e.target.closest('.viewer-crop-handle')) return;
         beginViewerCropDrag(e, 'move');
@@ -1116,6 +1196,7 @@ function bindViewerGlobals(){
   global.applySameStyle = applySameStyle;
   global.applyViewerGridPreset = applyViewerGridPreset;
   global.refreshViewerGridSplitPreview = refreshViewerGridSplitPreview;
+  global.syncViewerBrushSizeUI = syncViewerBrushSizeUI;
   if(!global._studioViewerKeyBound){
     global._studioViewerKeyBound = true;
     document.addEventListener('keydown', e => {

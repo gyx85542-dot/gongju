@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <title>AI Studio</title>
+    <title>🐻 studio</title>
     <style>
         html.studio-route-booting body {
             visibility: hidden !important;
@@ -27,9 +27,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260525-comfyui"></script>
-    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
-    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-borderless">
-    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260526-brush-fix2">
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-cell-hover">
+    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260530-viewer-ui">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -75,6 +76,9 @@
             --params-bg: #161616;
             --gallery-bg: #1a1a1a;
             --sidebar-control-radius: 12px;
+            --studio-panel-width: 320px;
+            --studio-panel-min: 280px;
+            --studio-panel-max: 500px;
         }
 
         /* 三栏模块：统一高度与圆角 */
@@ -184,7 +188,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
+            overflow: visible;
             position: relative;
             flex-shrink: 0;
             transition: border-radius 0.35s var(--fluid-ease), border-color 0.35s, box-shadow 0.35s;
@@ -196,6 +200,7 @@
             display: block;
             user-select: none;
             transition: opacity 0.25s var(--fluid-ease), transform 0.25s var(--fluid-ease);
+            border-radius: inherit;
         }
 
         .logo-ring .logo-emoji-expanded {
@@ -225,10 +230,16 @@
             background: var(--text);
             transition: background-color 0.25s var(--fluid-ease);
             pointer-events: none;
+            z-index: 2;
         }
 
         .sidebar.expanded .logo-ring {
             border-radius: 50%;
+        }
+
+        .sidebar.expanded .logo-status-dot {
+            right: -1px;
+            bottom: -1px;
         }
 
         .sidebar-toggle-wrap {
@@ -313,9 +324,12 @@
 
         .sidebar.expanded .nav-item {
             width: 172px;
+            height: auto;
+            min-height: 38px;
             justify-content: flex-start;
-            padding-left: 6px;
+            padding: 7px 0 7px 6px;
             gap: 10px;
+            overflow: visible;
         }
 
         .nav-icon {
@@ -363,13 +377,13 @@
             letter-spacing: -0.01em;
             white-space: nowrap;
             transition: opacity 0.25s var(--fluid-ease), max-width 0.3s var(--fluid-ease);
-            line-height: 1;
+            line-height: 1.25;
             color: #ffffff;
         }
 
         .sidebar.expanded .nav-text {
             opacity: 1;
-            max-width: 120px;
+            max-width: 132px;
         }
 
         .sidebar:not(.expanded) .nav-item {
@@ -433,10 +447,50 @@
 
         .studio-panels {
             position: relative;
-            flex: 0 0 clamp(280px, 26vw, 380px);
-            min-width: 260px;
+            flex: 0 0 var(--studio-panel-width);
+            width: var(--studio-panel-width);
+            min-width: var(--studio-panel-min);
+            max-width: min(var(--studio-panel-max), 35vw);
             background: var(--params-bg);
             border-right: none;
+        }
+
+        .studio-panel-resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 30;
+            touch-action: none;
+        }
+
+        .studio-panel-resize-handle::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            width: 1px;
+            background: transparent;
+            transition: background 0.18s var(--fluid-ease);
+            pointer-events: none;
+        }
+
+        .studio-panel-resize-handle:hover::after,
+        .studio-shell.is-resizing-panel .studio-panel-resize-handle::after {
+            background: rgba(255, 255, 255, 0.38);
+        }
+
+        .studio-shell.is-resizing-panel {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .studio-shell.is-resizing-panel .studio-panels iframe,
+        .studio-shell.is-resizing-panel .studio-gallery-wrap iframe {
+            pointer-events: none;
         }
 
         .studio-gallery-wrap {
@@ -667,6 +721,7 @@
         }
         .side-pill { gap: 0; }
     </style>
+    <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
 </head>
 
 <body>
@@ -691,21 +746,21 @@
                     <span class="nav-icon"><i data-lucide="image"></i></span>
                     <span class="nav-text" data-i18n="nav.online">AI 生图</span>
                 </div>
-                <div class="nav-item" onclick="switchUI(this, 'local')">
-                    <span class="nav-icon"><i data-lucide="workflow"></i></span>
-                    <span class="nav-text" data-i18n="nav.local">ComfyUI</span>
-                </div>
                 <div class="nav-item" onclick="switchUI(this, 'video')">
                     <span class="nav-icon"><i data-lucide="clapperboard"></i></span>
                     <span class="nav-text" data-i18n="nav.video">AI 视频</span>
                 </div>
-                <div class="nav-item" onclick="switchUI(this, 'gpt-chat')">
-                    <span class="nav-icon"><i data-lucide="messages-square"></i></span>
-                    <span class="nav-text" data-i18n="nav.gpt">AI 对话</span>
+                <div class="nav-item" onclick="switchUI(this, 'local')">
+                    <span class="nav-icon"><i data-lucide="workflow"></i></span>
+                    <span class="nav-text" data-i18n="nav.local">ComfyUI</span>
                 </div>
                 <div class="nav-item" onclick="switchUI(this, 'runninghub')">
                     <span class="nav-icon"><i data-lucide="zap"></i></span>
                     <span class="nav-text" data-i18n="nav.runninghub">RunningHub</span>
+                </div>
+                <div class="nav-item" onclick="switchUI(this, 'gpt-chat')">
+                    <span class="nav-icon"><i data-lucide="messages-square"></i></span>
+                    <span class="nav-text" data-i18n="nav.gpt">AI 对话</span>
                 </div>
             </nav>
 
@@ -757,20 +812,21 @@
         <main class="stage">
             <div id="studio-shell" class="studio-shell active">
                     <div class="studio-panels studio-module">
-                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260530-module" class="active" scrolling="no"></iframe>
-                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260530-module" scrolling="no"></iframe>
-                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260530-module" scrolling="no"></iframe>
-                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-module" scrolling="no"></iframe>
+                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260530-provider-sync" class="active" scrolling="no"></iframe>
+                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260530-range-white" scrolling="no"></iframe>
+                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260530-provider-sync" scrolling="no"></iframe>
+                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-rh-options" scrolling="no"></iframe>
+                        <div id="studioPanelResizeHandle" class="studio-panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize parameter panel" title="拖拽调整参数面板宽度"></div>
                     </div>
                     <div class="studio-gallery-wrap studio-module">
-                        <iframe id="frame-gallery" data-src="/static/gallery.html?embed=1&v=20260530-module" class="active" scrolling="no"></iframe>
+                        <iframe id="frame-gallery" data-src="/static/gallery.html?embed=1&v=20260530-cell-hover" class="active" scrolling="no"></iframe>
                     </div>
             </div>
             <div id="full-stage" class="full-stage">
-                <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260520-composer-wrap" scrolling="yes"></iframe>
-                <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
-                <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
-                <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260525-runninghub" scrolling="yes"></iframe>
+                <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260530-provider-sync" scrolling="yes"></iframe>
+                <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260530-provider-sync" scrolling="yes"></iframe>
+                <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260530-pullup-select" scrolling="yes"></iframe>
+                <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260530-rh-options" scrolling="yes"></iframe>
             </div>
 
             <div class="nano-monitor is-hidden" id="nano-monitor">
@@ -856,17 +912,21 @@
                                         </div>
                                         <div class="viewer-edit-row">
                                             <span class="viewer-edit-label" data-i18n="canvas.brushSize">笔刷</span>
-                                            <input type="range" id="viewerBrushSize" min="2" max="80" value="16" oninput="document.getElementById('viewerBrushSizeVal').textContent=this.value">
-                                            <span id="viewerBrushSizeVal" class="viewer-edit-val">16</span>
+                                            <input type="range" id="viewerBrushSize" min="5" max="150" step="1" value="16" oninput="syncViewerBrushSizeUI()">
+                                            <span id="viewerBrushSizeVal" class="viewer-edit-val">1.6%</span>
                                         </div>
-                                        <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
-                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        <div class="viewer-edit-actions">
+                                            <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
+                                            <button type="button" class="viewer-edit-action primary" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        </div>
                                     </div>
                                     <div id="viewerCropPanel" class="viewer-edit-panel hidden">
                                         <p class="viewer-edit-hint" data-i18n="canvas.cropHint">拖动裁剪框移动，拖右下角调整大小</p>
                                         <div id="viewerCropRatios" class="viewer-crop-ratios"></div>
-                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
-                                        <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                        <div class="viewer-edit-actions">
+                                            <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                            <button type="button" class="viewer-edit-action primary" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        </div>
                                     </div>
                                     <div id="viewerGridPanel" class="viewer-edit-panel hidden">
                                         <div class="grid-preset-row mb-1">
@@ -892,8 +952,10 @@
                                         <div class="mb-2">
                                             <span id="viewerGridSplitCount" class="viewer-edit-hint">预计输出 4 张图片</span>
                                         </div>
-                                        <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
-                                        <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                        <div class="viewer-edit-actions">
+                                            <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                            <button type="button" class="viewer-edit-action primary" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -908,7 +970,8 @@
         </main>
     </div>
 
-    <script src="/static/studio-media-viewer.js?v=20260526-brush-fix2"></script>
+    <script src="/static/studio-history-meta.js?v=20260530-apply-route"></script>
+    <script src="/static/studio-media-viewer.js?v=20260530-grid-clear"></script>
     <script>
         function generateUUID() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -929,7 +992,7 @@
         const STUDIO_AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
         window.__studioViewerCtx = { items: [], pinnedKeys: [], favoriteKeys: [] };
 
-        function studioHistoryKey(item){ return String(item?.timestamp ?? ''); }
+        function studioHistoryKey(item){ return window.StudioHistoryMeta ? StudioHistoryMeta.historyKey(item) : String(item?.timestamp ?? ''); }
         function studioEscapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         function studioMediaUrl(item){ return (item?.videos && item.videos[0]) || (item?.audios && item.audios[0]) || (item?.images && item.images[0]) || ''; }
         function studioIsAudioItem(item){
@@ -947,6 +1010,37 @@
             } catch(e) {}
         }
 
+        function studioPageForHistoryItem(item){
+            if(window.StudioHistoryMeta?.studioPageForHistoryType){
+                return StudioHistoryMeta.studioPageForHistoryType(item?.type);
+            }
+            const t = String(item?.type || '').trim().toLowerCase();
+            if(t === 'runninghub') return 'runninghub';
+            if(t === 'local-comfy') return 'local';
+            if(t === 'online-video' || t === 'online-audio') return 'video';
+            return 'online';
+        }
+
+        function postApplyParamsToPanel(page, item){
+            if(!item || !STUDIO_PAGE_IDS.includes(page)) return;
+            const frame = document.getElementById('frame-' + page);
+            if(!frame) return;
+            const payload = { type: 'gallery-apply-params', item };
+            const send = () => {
+                try { frame.contentWindow?.postMessage(payload, '*'); } catch(e) {}
+            };
+            ensureFrameLoaded(frame);
+            send();
+            frame.addEventListener('load', send, { once: true });
+        }
+
+        function applyStudioHistoryParams(item){
+            if(!item) return;
+            const page = studioPageForHistoryItem(item);
+            switchUI(navTriggerForPage(page), page);
+            postApplyParamsToPanel(page, item);
+        }
+
         function initStudioViewerHost(){
             if(!window.StudioMediaViewer) return;
             StudioMediaViewer.init({
@@ -962,7 +1056,7 @@
                 isFavorite: (item) => (window.__studioViewerCtx.favoriteKeys || []).includes(studioHistoryKey(item)),
                 togglePin: (item) => postGalleryViewerAction('togglePin', item),
                 toggleFavorite: (item) => postGalleryViewerAction('toggleFavorite', item),
-                onApplyParams: (item) => { postGalleryViewerAction('applyParams', item, { reply: false }); StudioMediaViewer.close(); },
+                onApplyParams: (item) => { applyStudioHistoryParams(item); StudioMediaViewer.close(); },
                 onUpsertItem: (item) => postGalleryViewerAction('upsertItem', item),
                 onRefresh: () => postGalleryViewerAction('refresh', null, { reply: false }),
                 providerById: () => null
@@ -1090,8 +1184,91 @@
         }
         document.addEventListener('DOMContentLoaded', () => {
             resetStudioFramesIfBuildChanged();
+            initStudioPanelResize();
             restoreActivePage();
         }, { once:true });
+
+        const STUDIO_PANEL_WIDTH_KEY = 'studio_panel_width';
+        function getStudioPanelMaxWidth(){
+            return Math.min(
+                parseInt(getComputedStyle(document.documentElement).getPropertyValue('--studio-panel-max'), 10) || 500,
+                Math.floor(window.innerWidth * 0.35)
+            );
+        }
+        function getStudioPanelWidth(){
+            const raw = getComputedStyle(document.documentElement).getPropertyValue('--studio-panel-width').trim();
+            const parsed = parseInt(raw, 10);
+            return Number.isFinite(parsed) ? parsed : 320;
+        }
+        function clampStudioPanelWidth(px){
+            const min = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--studio-panel-min'), 10) || 280;
+            return Math.round(Math.max(min, Math.min(getStudioPanelMaxWidth(), px)));
+        }
+        function setStudioPanelWidth(px, persist = true){
+            const width = clampStudioPanelWidth(px);
+            document.documentElement.style.setProperty('--studio-panel-width', `${width}px`);
+            if(persist){
+                try { localStorage.setItem(STUDIO_PANEL_WIDTH_KEY, String(width)); } catch(e){}
+            }
+            notifyStudioLayoutResize();
+        }
+        function notifyStudioLayoutResize(){
+            document.querySelectorAll('#studio-shell iframe').forEach(frame => {
+                try { frame.contentWindow?.postMessage({ type: 'studio-layout-resize', width: getStudioPanelWidth() }, '*'); } catch(e){}
+            });
+        }
+        function initStudioPanelResize(){
+            const handle = document.getElementById('studioPanelResizeHandle');
+            const shell = document.getElementById('studio-shell');
+            if(!handle || !shell) return;
+            let saved = 320;
+            try { saved = parseInt(localStorage.getItem(STUDIO_PANEL_WIDTH_KEY) || '320', 10); } catch(e){}
+            setStudioPanelWidth(saved, false);
+            let dragging = false;
+            let startX = 0;
+            let startWidth = 0;
+            function onMove(e){
+                if(!dragging) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                setStudioPanelWidth(startWidth + (clientX - startX), false);
+            }
+            function onUp(){
+                if(!dragging) return;
+                dragging = false;
+                shell.classList.remove('is-resizing-panel');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                window.removeEventListener('touchmove', onMove);
+                window.removeEventListener('touchend', onUp);
+                setStudioPanelWidth(getStudioPanelWidth(), true);
+            }
+            handle.addEventListener('mousedown', e => {
+                if(e.button !== 0) return;
+                e.preventDefault();
+                dragging = true;
+                startX = e.clientX;
+                startWidth = getStudioPanelWidth();
+                shell.classList.add('is-resizing-panel');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                window.addEventListener('mousemove', onMove);
+                window.addEventListener('mouseup', onUp);
+            });
+            handle.addEventListener('touchstart', e => {
+                if(!e.touches?.length) return;
+                e.preventDefault();
+                dragging = true;
+                startX = e.touches[0].clientX;
+                startWidth = getStudioPanelWidth();
+                shell.classList.add('is-resizing-panel');
+                document.body.style.userSelect = 'none';
+                window.addEventListener('touchmove', onMove, { passive: false });
+                window.addEventListener('touchend', onUp);
+            }, { passive: false });
+            window.addEventListener('resize', () => setStudioPanelWidth(getStudioPanelWidth(), false));
+        }
 
         async function syncStatus() {
             try {
@@ -1178,7 +1355,31 @@
             });
         }
 
+        function broadcastProvidersChanged(payload) {
+            document.querySelectorAll('iframe').forEach(frame => {
+                try { frame.contentWindow?.postMessage(payload, '*'); } catch(e) {}
+            });
+        }
+
+        try {
+            new BroadcastChannel('studio-api').onmessage = (e) => {
+                if (e.data?.type === 'providers-changed') {
+                    broadcastProvidersChanged(e.data);
+                }
+            };
+        } catch(e) {}
+
         window.addEventListener('message', (e) => {
+            if (e.data?.type === 'providers-changed' && e.source !== window) {
+                broadcastProvidersChanged(e.data);
+            }
+        });
+
+        window.addEventListener('message', (e) => {
+            if(e.data?.type === 'studio-apply-params' && e.data.item){
+                applyStudioHistoryParams(e.data.item);
+                return;
+            }
             const page = e.data?.type === 'studio-navigate' ? e.data.page : '';
             if(!page || !PAGE_IDS.includes(page)) return;
             switchUI(navTriggerForPage(page), page);

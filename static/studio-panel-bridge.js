@@ -36,8 +36,20 @@
 
     channel.onmessage = (event) => {
         const data = event.data || {};
-        if(data.type === 'gallery-apply-params' && typeof window.applyRecordParams === 'function'){
-            window.applyRecordParams(data.item, null);
+        if(data.type === 'gallery-apply-params'){
+            const item = data.item;
+            const target = window.StudioHistoryMeta?.studioPageForHistoryType
+                ? StudioHistoryMeta.studioPageForHistoryType(item?.type)
+                : (String(item?.type || '').toLowerCase() === 'runninghub' ? 'runninghub'
+                    : String(item?.type || '').toLowerCase() === 'local-comfy' ? 'local'
+                    : (['online-video', 'online-audio'].includes(String(item?.type || '').toLowerCase()) ? 'video' : 'online'));
+            if(StudioPanelBridge.pageType !== target){
+                try { window.parent.postMessage({ type: 'studio-apply-params', item }, '*'); } catch(err) {}
+                return;
+            }
+            if(typeof window.applyRecordParams === 'function'){
+                window.applyRecordParams(item, null);
+            }
         }
         if(data.type === 'gallery-board-select' && data.url){
             const slotId = window.boardPickSlotId;
@@ -48,6 +60,9 @@
             } else if(typeof window.cancelBoardPick === 'function'){
                 window.cancelBoardPick();
             }
+        }
+        if(data.type === 'gallery-board-pick-exit' && typeof window.cancelBoardPick === 'function'){
+            window.cancelBoardPick();
         }
     };
 

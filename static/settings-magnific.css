@@ -14,9 +14,21 @@ body.mg-studio {
     --muted: #a3a3a3;
     --faint: #737373;
     --accent: #ff4d94;
+    --accent-hover: #e8437f;
+    --settings-radius: 12px;
+    --settings-radius-sm: 8px;
+    --settings-gap: 10px;
+    --settings-gap-lg: 16px;
+    --settings-section-gap: 16px;
+    --settings-label-gap: 4px;
+    --settings-control-bg: #262626;
+    --settings-surface: #313131;
+    --settings-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --settings-hover-ring: 0 0 0 1px rgba(255, 77, 148, 0.35);
+    --settings-hover-glow: 0 4px 14px rgba(255, 77, 148, 0.22);
 }
 
-.mg-studio .sidebar,
+.mg-studio .sidebar:not(.sidebar-stack),
 .mg-studio .side-card,
 .mg-studio .content-head,
 .mg-studio .block,
@@ -25,8 +37,15 @@ body.mg-studio {
 .mg-studio .popup-panel {
     background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 10px !important;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
+    border-radius: var(--settings-radius) !important;
+    box-shadow: none !important;
+}
+
+.mg-studio .sidebar.sidebar-stack {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
 }
 
 .mg-studio .page-head .title,
@@ -57,11 +76,13 @@ body.mg-studio {
 
 .mg-studio .provider-card,
 .mg-studio .workflow-card {
-    border-radius: 6px !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), border-color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
 }
 
 .mg-studio .provider-card:hover,
 .mg-studio .workflow-card:hover {
+    background: #333333 !important;
     border-color: rgba(255, 77, 148, 0.35) !important;
     color: #f5f5f5 !important;
 }
@@ -77,7 +98,7 @@ body.mg-studio {
 .mg-studio .workflow-icon {
     background: #313131 !important;
     color: #a3a3a3 !important;
-    border-radius: 5px !important;
+    border-radius: var(--settings-radius-sm) !important;
 }
 
 .mg-studio .provider-card.active .provider-mark,
@@ -94,18 +115,28 @@ body.mg-studio {
 .mg-studio .small-input,
 .mg-studio .lora-field input,
 .mg-studio .lora-field select {
-    background: #313131 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 5px !important;
+    background: var(--settings-control-bg) !important;
+    border: none !important;
+    border-radius: var(--settings-radius) !important;
     color: #f5f5f5 !important;
+    transition: background-color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .field-frame:hover:not(:focus-within),
+.mg-studio .picker-search:hover:not(:focus),
+.mg-studio .small-input:hover:not(:focus) {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38) !important;
 }
 
 .mg-studio .field-frame:focus-within,
 .mg-studio .picker-search:focus,
 .mg-studio .lora-field input:focus,
-.mg-studio .lora-field select:focus {
-    border-color: rgba(255, 77, 148, 0.35) !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+.mg-studio .lora-field select:focus,
+.mg-studio .small-input:focus {
+    background: var(--settings-control-bg) !important;
+    border: none !important;
+    box-shadow: inset 0 0 0 1px #ffffff !important;
+    outline: none !important;
 }
 
 .mg-studio .field-frame input,
@@ -120,9 +151,20 @@ body.mg-studio {
 
 .mg-studio .add-btn,
 .mg-studio .upload-btn {
+    width: 100%;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px dashed rgba(255, 255, 255, 0.12) !important;
+    background: transparent !important;
     border-color: rgba(255, 255, 255, 0.12) !important;
     color: #a3a3a3 !important;
-    border-radius: 6px !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), border-color 0.22s var(--settings-ease) !important;
 }
 
 .mg-studio .add-btn:hover,
@@ -136,55 +178,70 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #f5f5f5 !important;
-    border-radius: 8px !important;
+    border-radius: var(--settings-radius) !important;
     box-shadow: none !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), border-color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease), transform 0.22s var(--settings-ease) !important;
 }
 
 .mg-studio .api-link-btn:hover {
     background: #ff4d94 !important;
     border-color: #ff4d94 !important;
     color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: var(--settings-hover-glow) !important;
 }
 
 .mg-studio .action-btn,
 .mg-studio .ghost-btn,
 .mg-studio .key-btn,
 .mg-studio .graph-ctrl-btn {
-    background: #313131 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: var(--settings-surface) !important;
+    border: none !important;
     color: #a3a3a3 !important;
-    border-radius: 8px !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease), transform 0.22s var(--settings-ease) !important;
 }
 
 .mg-studio .action-btn:hover,
 .mg-studio .ghost-btn:hover,
 .mg-studio .key-btn:hover,
-.mg-studio .graph-ctrl-btn:hover {
+.mg-studio .graph-ctrl-btn:hover,
+.mg-studio .picker-close:hover,
+.mg-studio .picker-cat-tab:hover {
     background: #3a3a3a !important;
     color: #f5f5f5 !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: var(--settings-hover-ring) !important;
 }
 
 .mg-studio .action-btn.save-btn,
-.mg-studio .action-btn.primary-btn:hover,
 .mg-studio .api-page-save-btn,
-.mg-studio .create-confirm {
+.mg-studio .create-confirm,
+.mg-studio .picker-foot .save-btn {
     background: #ff4d94 !important;
     color: #fff !important;
     border-color: #ff4d94 !important;
-    box-shadow: 0 4px 14px rgba(255, 77, 148, 0.28) !important;
+    box-shadow: var(--settings-hover-glow) !important;
 }
 
 .mg-studio .action-btn.save-btn:hover,
-.mg-studio .api-page-save-btn:hover {
-    background: #e8437f !important;
-    border-color: #e8437f !important;
+.mg-studio .api-page-save-btn:hover,
+.mg-studio .picker-foot .save-btn:hover {
+    background: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+    color: #fff !important;
     transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(255, 77, 148, 0.34) !important;
 }
 
 .mg-studio .action-btn.primary-btn {
     background: #313131 !important;
-    color: #a3a3a3 !important;
+    color: #f5f5f5 !important;
+}
+
+.mg-studio .action-btn.primary-btn:hover {
+    background: #3a3a3a !important;
+    color: #fff !important;
+    box-shadow: var(--settings-hover-ring) !important;
 }
 
 .mg-studio .action-btn.danger-btn,
@@ -200,6 +257,8 @@ body.mg-studio {
     background: #ff4d94 !important;
     color: #fff !important;
     border-color: #ff4d94 !important;
+    transform: translateY(-1px);
+    box-shadow: var(--settings-hover-glow) !important;
 }
 
 .mg-studio .picker-overlay {
@@ -248,23 +307,159 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px dashed rgba(255, 255, 255, 0.12) !important;
     color: #737373 !important;
-    border-radius: 6px !important;
+    border-radius: var(--settings-radius) !important;
 }
 
 .mg-studio .advanced-endpoints {
     background: #313131 !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    border-radius: 6px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: var(--settings-radius) !important;
+}
+
+.mg-studio .endpoint-help code {
+    border-radius: var(--settings-radius-sm) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: var(--settings-control-bg) !important;
+    color: #f5f5f5 !important;
+}
+
+.mg-studio .layout {
+    gap: 24px !important;
+}
+
+.mg-studio .content {
+    gap: var(--settings-section-gap) !important;
+}
+
+.mg-studio .sidebar {
+    gap: var(--settings-gap) !important;
+    padding: var(--settings-gap-lg) !important;
+}
+
+.mg-studio .provider-list {
+    gap: 6px !important;
+}
+
+.mg-studio .block {
+    gap: var(--settings-gap-lg) !important;
+    padding: 20px 22px !important;
+}
+
+.mg-studio .block-head {
+    padding-bottom: 14px !important;
+    margin-bottom: 0 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.mg-studio .form {
+    gap: 14px !important;
+}
+
+.mg-studio .field {
+    gap: var(--settings-label-gap) !important;
+}
+
+.mg-studio .model-list {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .model-grid {
+    gap: var(--settings-section-gap) !important;
+}
+
+.mg-studio .models-toolbar {
+    gap: 12px !important;
+}
+
+.mg-studio .verify-action-row,
+.mg-studio .content-actions,
+.mg-studio .models-toolbar-actions,
+.mg-studio .key-row {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .picker-modal {
+    border-radius: var(--settings-radius) !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45) !important;
 }
 
 .mg-studio .picker-cat-tabs {
     background: #313131 !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: var(--settings-radius) !important;
+}
+
+.mg-studio .picker-cat-tab {
+    border-radius: var(--settings-radius-sm) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .picker-cat-tab.active {
+    background: var(--settings-control-bg) !important;
+    color: #f5f5f5 !important;
+    box-shadow: var(--settings-hover-ring) !important;
+}
+
+.mg-studio .picker-cat-tab .cat-count {
+    border-radius: 6px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.mg-studio .picker-row {
+    border-radius: var(--settings-radius-sm) !important;
+    transition: background-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .picker-row:hover {
+    background: rgba(255, 77, 148, 0.08) !important;
+}
+
+.mg-studio .picker-row.has-sel {
+    background: rgba(255, 77, 148, 0.12) !important;
+}
+
+.mg-studio .picker-checkbox {
+    border-radius: 6px !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+    transition: background-color 0.22s var(--settings-ease), border-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .picker-row:hover .picker-checkbox {
+    border-color: rgba(255, 77, 148, 0.55) !important;
+}
+
+.mg-studio .picker-sum-chip,
+.mg-studio .picker-sum-chip-empty {
+    border-radius: var(--settings-radius-sm) !important;
+}
+
+.mg-studio .picker-close {
+    border-radius: var(--settings-radius-sm) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .protocol-selector-wrap select {
+    height: 38px !important;
+    padding: 0 28px 0 0 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+}
+
+.mg-studio .icon-btn {
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease), color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
 }
 
 .mg-studio .icon-btn:hover {
     background: rgba(255, 77, 148, 0.15) !important;
     color: #ff4d94 !important;
+    box-shadow: var(--settings-hover-ring) !important;
+}
+
+.mg-studio .key-btn.key-clear:hover {
+    background: rgba(255, 77, 148, 0.12) !important;
+    color: #ff4d94 !important;
+    box-shadow: var(--settings-hover-ring) !important;
 }
 
 .mg-studio .page-head .status {
@@ -310,6 +505,8 @@ html.studio-theme-dark .mg-studio .api-link-btn:hover {
     background: #ff4d94 !important;
     border-color: #ff4d94 !important;
     color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: var(--settings-hover-glow) !important;
 }
 
 .mg-studio .action-btn.save-btn,
@@ -475,7 +672,6 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
     color: #f5f5f5 !important;
 }
 
-.mg-studio .pfield-slider input[type=range],
 .mg-studio .random-toggle input {
     accent-color: #ff4d94 !important;
 }
@@ -513,4 +709,496 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 .mg-studio .provider-name,
 .mg-studio .workflow-name {
     font-weight: 600 !important;
+}
+
+/* Native selects — match main studio panel (size-select) */
+.mg-studio .field-frame.field-frame--select {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.mg-studio .field-frame.field-frame--select:focus-within {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.mg-studio select.size-select,
+.mg-studio .small-select,
+.mg-studio .pfield-select,
+.mg-studio .lora-field select {
+    width: 100%;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 28px 0 8px;
+    border: none !important;
+    border-radius: 12px !important;
+    background-color: #262626 !important;
+    color: #f5f5f5 !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    line-height: 1.2;
+    cursor: pointer;
+    outline: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    color-scheme: dark;
+    transition: background-color 0.22s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 12px !important;
+}
+
+.mg-studio .field-frame select.size-select {
+    height: 30px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+}
+
+.mg-studio select.size-select:hover:not(:focus):not(:active),
+.mg-studio .small-select:hover:not(:focus):not(:active),
+.mg-studio .pfield-select:hover:not(:focus):not(:active),
+.mg-studio .lora-field select:hover:not(:focus):not(:active) {
+    background-color: #333333 !important;
+}
+
+.mg-studio select.size-select:focus,
+.mg-studio select.size-select:active,
+.mg-studio .small-select:focus,
+.mg-studio .small-select:active,
+.mg-studio .pfield-select:focus,
+.mg-studio .pfield-select:active,
+.mg-studio .lora-field select:focus,
+.mg-studio .lora-field select:active {
+    background-color: #3a3a3a !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.mg-studio select.size-select option,
+.mg-studio .small-select option,
+.mg-studio .pfield-select option,
+.mg-studio .lora-field select option,
+.mg-studio select optgroup {
+    background: #313131 !important;
+    color: #f5f5f5 !important;
+}
+
+.mg-studio select.size-select:disabled,
+.mg-studio .small-select:disabled,
+.mg-studio .pfield-select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ── Settings layout: spacing & RunningHub / API shared ── */
+.mg-studio .content {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .content-head {
+    padding: 12px 14px !important;
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .content-actions {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .block {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 12px !important;
+    gap: var(--settings-gap) !important;
+    border: none !important;
+    min-width: 0 !important;
+}
+
+.mg-studio .form {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .field {
+    gap: var(--settings-label-gap) !important;
+}
+
+.mg-studio .sidebar:not(.sidebar-stack) {
+    padding: 12px !important;
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .workflow-list {
+    gap: 6px !important;
+}
+
+.mg-studio .workflow-mark {
+    border-radius: 8px !important;
+}
+
+.mg-studio .param-list {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .param-row {
+    padding: 10px !important;
+    gap: var(--settings-gap) !important;
+    background: var(--settings-surface) !important;
+    border: none !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .param-row:hover {
+    background: #333333 !important;
+}
+
+.mg-studio .param-row-main {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .node-explorer {
+    gap: var(--settings-gap) !important;
+    margin-top: var(--settings-gap) !important;
+    padding-top: var(--settings-gap) !important;
+}
+
+.mg-studio .node-list {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .node-card {
+    background: var(--settings-surface) !important;
+    border: none !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .node-card-head {
+    padding: 10px 12px !important;
+    transition: background-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .node-card-head:hover {
+    background: #333333 !important;
+}
+
+.mg-studio .node-card.expanded .node-card-head {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mg-studio .node-inputs {
+    gap: var(--settings-gap) !important;
+    padding: 10px 12px !important;
+}
+
+.mg-studio .input-row {
+    padding: 8px 10px !important;
+    gap: var(--settings-gap) !important;
+    background: var(--settings-control-bg) !important;
+    border: none !important;
+    border-radius: var(--settings-radius) !important;
+    transition: background-color 0.22s var(--settings-ease), box-shadow 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .input-row:hover:not(.is-active) {
+    background: #333333 !important;
+}
+
+.mg-studio .check-toggle {
+    border-radius: 6px !important;
+    transition: background-color 0.22s var(--settings-ease), border-color 0.22s var(--settings-ease) !important;
+}
+
+.mg-studio .explorer-empty {
+    border-radius: var(--settings-radius) !important;
+    border-style: dashed !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.mg-studio .workflow-footer {
+    gap: var(--settings-gap) !important;
+    margin-top: var(--settings-gap) !important;
+    padding-top: var(--settings-gap) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mg-studio .workflow-save-btn {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    border-radius: var(--settings-radius) !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+.mg-studio .workflow-save-btn:hover {
+    transform: translateY(-1px) !important;
+}
+
+.mg-studio .key-row,
+.mg-studio .wf-id-row {
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .action-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+}
+
+.mg-studio .content-head .action-btn.save-btn,
+.mg-studio .key-row .action-btn.save-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+}
+
+.mg-studio .ghost-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+}
+
+.mg-studio .ghost-btn:hover {
+    background: #333333 !important;
+    color: #f5f5f5 !important;
+    border: none !important;
+}
+
+/* RunningHub settings — editor grid */
+.mg-studio .rh-section-title {
+    margin: 0 !important;
+}
+
+.mg-studio .rh-workflow-hint {
+    margin: 0 !important;
+}
+
+.mg-studio .node-explorer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--settings-gap) !important;
+    min-width: 0 !important;
+}
+
+.mg-studio .node-explorer-head {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: var(--settings-gap) !important;
+    flex-wrap: wrap !important;
+}
+
+.mg-studio .rh-editor-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.mg-studio .rh-editor-col {
+    min-width: 0 !important;
+}
+
+.mg-studio .rh-params-head .block-desc {
+    margin-top: 4px !important;
+}
+
+.mg-studio .param-row .label {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+
+.mg-studio .param-row .action-btn,
+.mg-studio .rh-param-row .param-delete-btn {
+    align-self: end !important;
+}
+
+/* RunningHub settings — shared tip & button nowrap */
+.mg-studio .settings-tip {
+    margin: 0;
+    padding: 10px 12px 10px 14px;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.55;
+    color: var(--muted, #a3a3a3);
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid rgba(255, 77, 148, 0.45);
+    border-radius: 0 var(--settings-radius-sm, 8px) var(--settings-radius-sm, 8px) 0;
+}
+
+.mg-studio.settings-page.rh-settings .action-btn,
+.mg-studio.settings-page.rh-settings .ghost-btn {
+    white-space: nowrap !important;
+}
+
+/* ComfyUI settings — preview, instances, mini canvas */
+.mg-studio .side-card {
+    padding: 16px !important;
+    gap: 12px !important;
+}
+
+.mg-studio .instance-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    background: #313131 !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mg-studio .instance-row:focus-within {
+    border-color: rgba(255, 77, 148, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
+.mg-studio .instance-index {
+    width: 20px;
+    text-align: center;
+    font-size: 10.5px;
+    color: #737373;
+    font-weight: 800;
+    flex: 0 0 auto;
+}
+
+.mg-studio .instance-row .small-input {
+    flex: 1;
+    min-width: 0;
+    height: 30px !important;
+    font-family: ui-monospace, Menlo, monospace;
+}
+
+.mg-studio .preview-empty,
+.mg-studio .empty-state {
+    border-radius: 8px !important;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.mg-studio .preview-empty:hover {
+    border-color: rgba(255, 77, 148, 0.35) !important;
+    color: #a3a3a3 !important;
+}
+
+.mg-studio .preview-pill {
+    background: #313131 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 6px !important;
+    color: #a3a3a3 !important;
+}
+
+.mg-studio .nodes-toggle {
+    border-radius: 8px !important;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.mg-studio .nodes-toggle:hover {
+    border-color: rgba(255, 77, 148, 0.4) !important;
+    color: #ff4d94 !important;
+    background: rgba(255, 77, 148, 0.08) !important;
+}
+
+.mg-studio .node-card-head:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.mg-studio .popup-close:hover {
+    background: rgba(255, 77, 148, 0.12) !important;
+    color: #ff4d94 !important;
+}
+
+.mg-studio .opt-del {
+    border-radius: 6px !important;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.mg-studio .opt-del:hover {
+    color: #fff !important;
+    background: #ff4d94 !important;
+}
+
+.mg-studio .mini-tool,
+.mg-studio .mini-delete,
+.mg-studio .random-btn,
+.mg-studio .random-toggle {
+    border-radius: 8px !important;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.mg-studio .mini-tool:hover,
+.mg-studio .random-btn:hover:not(.active),
+.mg-studio .random-toggle:hover {
+    color: #f5f5f5 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background: #3a3a3a !important;
+}
+
+.mg-studio .mini-delete:hover {
+    background: rgba(255, 77, 148, 0.12) !important;
+    color: #ff4d94 !important;
+}
+
+.mg-studio .pfield-image-drop:hover {
+    border-color: rgba(255, 77, 148, 0.4) !important;
+    color: #ff4d94 !important;
+    background: rgba(255, 77, 148, 0.06) !important;
+}
+
+.mg-studio .mini-image-drop:hover {
+    border-color: rgba(255, 77, 148, 0.4) !important;
+    color: #ff4d94 !important;
+}
+
+.mg-studio .mini-canvas,
+.mg-studio .mini-card,
+.mg-studio .graph-svg-wrap {
+    border-radius: 8px !important;
+}
+
+.mg-studio .workspace-mode-tabs button {
+    border-radius: 8px !important;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mg-studio .workspace-mode-tabs button:not(.active):hover {
+    color: #f5f5f5 !important;
+}
+
+.mg-studio .upload-btn.save-instances-btn {
+    border-style: solid !important;
+    background: #313131 !important;
+    color: #f5f5f5 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.mg-studio .instance-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mg-studio .upload-btn.save-instances-btn:hover {
+    background: #ff4d94 !important;
+    border-color: #ff4d94 !important;
+    color: #fff !important;
+}
+
+.mg-studio .sidebar.sidebar-stack {
+    gap: 12px !important;
+}
+
+.mg-studio .graph-card {
+    padding: 22px 24px !important;
+    gap: var(--settings-gap) !important;
+}
+
+.mg-studio .graph-head {
+    gap: var(--settings-gap) !important;
 }

@@ -108,14 +108,113 @@ html.embed-gallery .gallery-shell {
     border: none !important;
 }
 
-.size-select:focus,
+/* 文本类输入：聚焦保留纯白描边 */
 .size-custom:focus,
-.ratio-select-trigger:focus,
 .wf-input:focus,
-.wf-select:focus {
+.wf-textarea:focus {
     border: none !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    box-shadow: inset 0 0 0 1px #ffffff !important;
     outline: none !important;
+}
+
+/* 下拉类组件：聚焦/点击仅高亮，无描边 */
+select.size-select:focus,
+select.size-select:active,
+.ratio-select-trigger:focus,
+.ratio-select-trigger:active,
+.wf-select:focus,
+.wf-select:active,
+.provider-select:focus,
+.provider-select:active,
+.options-panel select:focus,
+.options-panel select:active,
+.select-shell:focus-within {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #3a3a3a !important;
+}
+
+/* 文本类输入：悬停保留半透明白边 */
+.size-custom:hover:not(:focus),
+.wf-input:hover:not(:focus),
+.wf-textarea:hover:not(:focus) {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38) !important;
+}
+
+/* 下拉类组件：悬停微高亮，无描边 */
+select.size-select:hover:not(:focus),
+.ratio-select-trigger:hover:not(:focus),
+.wf-select:hover:not(:focus),
+.provider-select:hover:not(:focus),
+.options-panel select:hover:not(:focus),
+.select-shell:hover:not(:focus-within) {
+    border: none !important;
+    box-shadow: none !important;
+    background: #333333 !important;
+}
+
+/* ── 上拉选择器：与下拉同套 hover / focus / 展开交互 ── */
+.ratio-select-wrap,
+.pullup-select-wrap {
+    position: relative;
+}
+
+.ratio-select-trigger,
+.pullup-select-trigger {
+    border: none !important;
+    background: #262626 !important;
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.ratio-select-wrap:has(.ratio-select-menu:not(.hidden)) .ratio-select-trigger,
+.ratio-select-wrap:focus-within .ratio-select-trigger,
+.pullup-select-wrap:has(.pullup-select-menu:not(.hidden)) .pullup-select-trigger,
+.pullup-select-wrap:focus-within .pullup-select-trigger {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #3a3a3a !important;
+}
+
+.ratio-select-menu,
+.pullup-select-menu {
+    border: none !important;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.32) !important;
+}
+
+.ratio-select-item,
+.pullup-select-item {
+    border: none !important;
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.ratio-select-item:hover,
+.pullup-select-item:hover {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #333333 !important;
+    color: #f5f5f5 !important;
+}
+
+.ratio-select-item:focus,
+.ratio-select-item:focus-visible,
+.ratio-select-item:active,
+.ratio-select-item.active,
+.pullup-select-item:focus,
+.pullup-select-item:focus-visible,
+.pullup-select-item:active,
+.pullup-select-item.active {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #3a3a3a !important;
+    color: #f5f5f5 !important;
 }
 
 .filter-tab.active,
@@ -143,17 +242,66 @@ html.embed-gallery .gallery-shell {
 }
 
 .output-grid-cell.is-pinned,
+.output-grid-cell.is-pinned:hover,
+.output-grid-cell.is-pinned:focus-within,
+.mg-studio .output-grid-cell.is-pinned,
+.mg-studio .output-grid-cell.is-pinned:hover {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* 置顶：仅左上角粉色圆点，无卡片描边 */
+.output-grid-cell.is-pinned:not(.is-favorite)::after,
+.mg-studio .output-grid-cell.is-pinned:not(.is-favorite)::after {
+    content: '' !important;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff4d94 !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.output-grid-cell.is-favorite::before,
+.mg-studio .output-grid-cell.is-favorite::before {
+    content: '' !important;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ffaa00 !important;
+    border: none !important;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.output-grid-cell.is-pinned.is-favorite::before,
+.mg-studio .output-grid-cell.is-pinned.is-favorite::before {
+    background: #ffaa00 !important;
+    box-shadow: 0 0 0 1px rgba(255, 77, 148, 0.55) !important;
+}
+
+.output-grid-cell.is-pinned.is-favorite::after,
+.mg-studio .output-grid-cell.is-pinned.is-favorite::after {
+    content: none !important;
+    display: none !important;
+}
+
 .output-grid-cell.is-new-highlight::after,
-body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):hover,
+body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):not(.is-pinned):hover,
 body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected {
     border: none !important;
 }
 
-.output-grid-cell.is-pinned {
-    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.35) !important;
-}
-
-body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):hover {
+body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):not(.is-pinned):hover {
     box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.35) !important;
 }
 
@@ -202,106 +350,120 @@ body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected .bulk-check-mark 
     border: none !important;
 }
 
-/* Generate 按钮饱和度 */
+/* Generate 按钮 — 扁平蓝底、左文右图标 */
 .options-panel .glass-btn,
-.mg-studio .options-panel .glass-btn {
-    background: #4e6aef !important;
-    box-shadow: 0 4px 16px rgba(78, 106, 239, 0.42) !important;
+.mg-studio .options-panel .glass-btn,
+.generate-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 0 16px !important;
+    background: #5865f2 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    transition: background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .options-panel .glass-btn:hover:not(:disabled),
-.mg-studio .options-panel .glass-btn:hover:not(:disabled) {
-    background: #4358d4 !important;
-    box-shadow: 0 6px 22px rgba(78, 106, 239, 0.48) !important;
+.mg-studio .options-panel .glass-btn:hover:not(:disabled),
+.generate-btn:hover:not(:disabled) {
+    background: #4752c4 !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-/* ── 滑块：仅色块轨道 ── */
-.batch-slider,
-.output-cols-slider,
-input[type="range"],
-.ios-slider {
-    border: none !important;
-    accent-color: #ffffff !important;
+.options-panel .glass-btn:disabled,
+.mg-studio .options-panel .glass-btn:disabled,
+.generate-btn:disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
-.batch-slider,
-.output-cols-slider,
-.wf-slider-row input[type="range"],
-.gallery-shell input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
+/* Generate 禁用态：外层 wrap 承接 hover，显示提示 */
+.generate-btn-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
 }
 
-.batch-slider::-webkit-slider-runnable-track,
-.output-cols-slider::-webkit-slider-runnable-track,
-.wf-slider-row input[type="range"]::-webkit-slider-runnable-track,
-.gallery-shell input[type="range"]::-webkit-slider-runnable-track {
-    height: 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
+.generate-btn-wrap .generate-btn:disabled {
+    pointer-events: none !important;
 }
 
-.batch-slider::-webkit-slider-thumb,
-.output-cols-slider::-webkit-slider-thumb,
-.wf-slider-row input[type="range"]::-webkit-slider-thumb,
-.gallery-shell input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    margin-top: -4px;
-    border-radius: 50%;
-    background: #ffffff !important;
-    border: none;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-    cursor: pointer;
+.generate-btn-wrap[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #313131;
+    color: #f5f5f5;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 40;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+    letter-spacing: 0.02em;
 }
 
-.batch-slider::-moz-range-track,
-.output-cols-slider::-moz-range-track,
-.wf-slider-row input[type="range"]::-moz-range-track,
-.gallery-shell input[type="range"]::-moz-range-track {
-    height: 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
+.generate-btn-wrap[data-tip]:hover::after {
+    opacity: 1;
 }
 
-.batch-slider::-moz-range-progress,
-.output-cols-slider::-moz-range-progress,
-.wf-slider-row input[type="range"]::-moz-range-progress,
-.gallery-shell input[type="range"]::-moz-range-progress {
-    height: 4px;
-    border-radius: 999px;
-    background: #ffffff;
+.generate-btn-label {
+    flex: 1;
+    text-align: left;
 }
 
-.batch-slider::-moz-range-thumb,
-.output-cols-slider::-moz-range-thumb,
-.wf-slider-row input[type="range"]::-moz-range-thumb,
-.gallery-shell input[type="range"]::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #ffffff;
-    border: none;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-    cursor: pointer;
+.generate-btn-icon,
+.options-panel .glass-btn .generate-btn-icon,
+.options-panel .glass-btn > svg,
+.options-panel .glass-btn > i svg {
+    width: calc(18px * 0.8) !important;
+    height: calc(18px * 0.8) !important;
+    flex-shrink: 0;
+    stroke-width: 2;
 }
 
-/* ── 保留：Prompt 文本框 ── */
+/* ── 保留：Prompt 文本框 — 白色描边 hover / focus ── */
 textarea.nano-input,
 .options-panel textarea.nano-input,
 .mg-studio textarea.nano-input {
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-style: solid !important;
+    transition: border-color 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+textarea.nano-input:hover:not(:focus),
+.options-panel textarea.nano-input:hover:not(:focus),
+.mg-studio textarea.nano-input:hover:not(:focus) {
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    box-shadow: none !important;
 }
 
 textarea.nano-input:focus,
 .options-panel textarea.nano-input:focus,
 .mg-studio textarea.nano-input:focus {
-    border: 1px solid rgba(255, 77, 148, 0.35) !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    border: 1px solid #ffffff !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
 /* 非 textarea 的 nano-input 不保留描边 */
@@ -320,8 +482,11 @@ select.nano-input {
 .upload-item:hover,
 .upload-item.drag-over,
 .mg-studio .upload-item:hover,
-.mg-studio .upload-item.drag-over {
-    border: 1px dashed rgba(255, 77, 148, 0.4) !important;
+.mg-studio .upload-item.drag-over,
+.options-panel .upload-item:hover,
+.options-panel .upload-item.drag-over {
+    border: 1px dashed rgba(255, 255, 255, 0.38) !important;
+    box-shadow: none !important;
 }
 
 .upload-item.is-board-target,
@@ -349,6 +514,52 @@ select.nano-input {
 
 .mg-studio .viewer-meta-cell,
 .mg-studio .viewer-prompt,
+.mg-studio .viewer-edit-panel,
+.mg-studio .viewer-edit-tab,
+.mg-studio .viewer-edit-action:not(.primary),
+.mg-studio .viewer-crop-ratio,
 .mg-studio .viewer-edit-cell {
     border: none !important;
+}
+
+/* ── 图片展示区滚动条：透明轨道 + 低调圆角滑块 ── */
+.output-scroll-wrap {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(88, 88, 88, 0.32) transparent;
+}
+
+.output-scroll-wrap::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+    background: transparent;
+}
+
+.output-scroll-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.output-scroll-wrap::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.output-scroll-wrap::-webkit-scrollbar-thumb {
+    background-color: rgba(72, 72, 72, 0.26);
+    border-radius: 4px;
+    min-height: 48px;
+    min-width: 48px;
+    transition: background-color 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.output-scroll-wrap:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(92, 92, 92, 0.4);
+}
+
+.output-scroll-wrap::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(108, 108, 108, 0.52);
+}
+
+.output-scroll-wrap::-webkit-scrollbar-thumb:active {
+    background-color: rgba(128, 128, 128, 0.62);
 }

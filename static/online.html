@@ -17,9 +17,11 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260519-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-board-pick-v2"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-board-pick-v2"></script>
+    <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --card:#1a1a1a; --easing:var(--mg-ease,cubic-bezier(0.22,1,0.36,1)); }
@@ -27,10 +29,11 @@
         body { background:var(--bg); font-family:var(--mg-font,'Inter',sans-serif); color:#f5f5f5; -webkit-font-smoothing:antialiased; margin:0; }
         .container-box { max-width:1680px; margin:0 auto; padding:8px 14px 10px; height:100%; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; }
         .page-main { flex:1; min-height:0; overflow:hidden; }
-        .nano-input { background:#313131; border:1px solid rgba(255,255,255,.08); transition:all .3s var(--easing); color:#f5f5f5; }
-        .nano-input:focus { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.12); outline:none; }
+        .nano-input { background:#313131; border:1px solid rgba(255,255,255,.08); transition:border-color .22s var(--easing), box-shadow .22s var(--easing); color:#f5f5f5; }
+        .nano-input:hover:not(:focus) { border-color:rgba(255,255,255,.38); box-shadow:none; }
+        .nano-input:focus { border-color:#ffffff; box-shadow:none; outline:none; }
         .upload-item { background:#262626; border:1px dashed rgba(255,255,255,.12); transition:all .3s var(--easing); position:relative; overflow:hidden; }
-        .upload-item:hover,.upload-item.drag-over { border-color:rgba(255,77,148,.4); transform:none; }
+        .upload-item:hover,.upload-item.drag-over { border-color:rgba(255,255,255,.38); transform:none; }
         .upload-item.drop-before::before,
         .upload-item.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
         .upload-item.drop-before::before { left:-5px; }
@@ -68,25 +71,28 @@
         body.board-pick-active .output-grid-cell[data-ts]:hover .board-pick-overlay svg { color:rgba(255,77,148,.78); }
         .board-pick-hint { display:none; font-size:10px; font-weight:600; color:#ff4d94; letter-spacing:.02em; margin-right:auto; padding-right:12px; }
         body.board-pick-active .board-pick-hint { display:inline-flex; align-items:center; gap:4px; }
-        .batch-slider { width:100%; height:4px; accent-color:#ffffff; cursor:pointer; }
+        .batch-slider { width:100%; height:4px; cursor:pointer; }
         .batch-value { font-size:12px; font-weight:900; min-width:1rem; text-align:center; }
         .preview-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; animation:fadeIn .5s var(--easing); }
-        .glass-btn { transition:all .25s var(--easing); border:none; }
-        .glass-btn:hover { transform:translateY(-1px); }
+        .glass-btn { transition:background-color .2s var(--easing); border:none; box-shadow:none; }
+        .glass-btn:hover { transform:none; }
         .result-frame { background:#1a1a1a; border:1px solid rgba(255,255,255,.08); box-shadow:0 2px 16px rgba(0,0,0,.24); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
         .result-frame.has-outputs { justify-content:flex-start; }
         .result-frame.import-drag-over { border-color:rgba(255,77,148,.35); box-shadow:0 0 0 3px rgba(255,77,148,.1); }
         .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
         .output-import-btn { height:28px; padding:0 12px; border-radius: 4px; border:1px solid rgba(255,255,255,.08); background:#1a1a1a; color:#a3a3a3; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; transition:all .15s var(--easing); display:inline-flex; align-items:center; gap:5px; }
         .output-import-btn:hover { background:#ff4d94; color:#fff; border-color:#ff4d94; }
-        .output-cols-slider { width:100%; max-width:140px; height:4px; accent-color:#ffffff; cursor:pointer; }
+        .output-cols-slider { width:100%; max-width:140px; height:4px; cursor:pointer; }
         .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
         .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
         .output-grid-cell { position:relative; aspect-ratio:1; border-radius:6px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); transition:opacity .2s var(--easing), border-color .2s var(--easing), background .2s var(--easing); }
         .output-grid-cell:hover { border-color:rgba(255,255,255,.1); background:#181818; }
-        .output-grid-cell.is-pinned { box-shadow:none; }
-        .output-grid-cell.is-pinned:hover { box-shadow:none; }
+        .output-grid-cell.is-pinned,
+        .output-grid-cell.is-pinned:hover { border:none !important; outline:none !important; box-shadow:none !important; }
+        .output-grid-cell.is-pinned:not(.is-favorite)::after { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#ff4d94; z-index:4; pointer-events:none; border:none; box-shadow:none; }
         .output-grid-cell.is-favorite::before { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#f59e0b; z-index:4; box-shadow:0 0 0 2px rgba(255,255,255,.92); pointer-events:none; }
+        .output-grid-cell.is-pinned.is-favorite::before { background:#f59e0b; box-shadow:0 0 0 1px rgba(255,77,148,.55); }
+        .output-grid-cell.is-pinned.is-favorite::after { content:none; display:none; }
         .output-grid-cell.is-dragging { opacity:.45; }
         .output-grid-cell.drop-before::before,
         .output-grid-cell.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
@@ -126,9 +132,10 @@
         .control-panel { background:transparent; border:none; padding:0; display:flex; flex-direction:column; gap:var(--panel-gap,10px); box-shadow:none; }
         .control-label { display:flex; align-items:center; gap:0; color:#fff; font-size:11px; font-weight:600; letter-spacing:0; text-transform:none; }
         .mg-studio .options-panel .control-label { color:#fff !important; }
-        .size-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--panel-gap,10px); align-items:start; }
-        .size-field { min-width:0; display:flex; flex-direction:column; gap:var(--panel-label-gap,4px); }
-        .size-select,.size-custom { width:100%; height:30px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; outline:none; padding:0 8px; font-size:10px; font-weight:700; }
+        .size-row { display:flex; flex-direction:column; gap:var(--panel-gap,10px); width:100%; align-items:stretch; }
+        .size-field { width:100%; min-width:0; display:flex; flex-direction:column; gap:var(--panel-label-gap,4px); }
+        select.size-select { width:100%; height:30px; border:none; background:#262626; color:#f5f5f5; outline:none; padding:0 8px; font-size:10px; font-weight:700; transition:background-color .22s var(--easing); }
+        .size-custom { width:100%; height:30px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; outline:none; padding:0 8px; font-size:10px; font-weight:700; }
         .model-picker-section { display:flex; flex-direction:column; gap:var(--panel-gap,10px); }
         .size-select:disabled { opacity:.55; cursor:not-allowed; }
         .size-custom { display:none; background:#262626; }
@@ -136,107 +143,19 @@
         .size-pair { display:none; grid-template-columns:1fr 1fr; gap:var(--panel-gap,10px); margin-top:0; }
         .size-field.custom .size-pair { display:grid; }
         .size-pair .size-custom { display:block; }
-        .size-pair.with-fit { grid-template-columns:1fr 1fr auto; align-items:center; }
-        .size-fit-btn { height:30px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; padding:0 8px; font-size:10px; font-weight:800; white-space:nowrap; }
-        .size-fit-btn:disabled { opacity:.45; cursor:not-allowed; }
         .ratio-select-wrap { position:relative; width:100%; }
-        .ratio-select-trigger { width:100%; height:30px; border:1px solid rgba(255,255,255,.08); background:#262626; color:#f5f5f5; padding:0 8px 0 6px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:6px; cursor:pointer; outline:none; }
+        .ratio-select-trigger { width:100%; height:30px; border:none; background:#262626; color:#f5f5f5; padding:0 8px 0 6px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:6px; cursor:pointer; outline:none; transition:background-color .22s var(--easing); -webkit-tap-highlight-color:transparent; }
         .ratio-select-trigger:disabled { opacity:.55; cursor:not-allowed; }
         .ratio-select-current { display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; }
         .ratio-select-chevron { width:12px !important; height:12px !important; stroke-width:2.25; opacity:.55; flex-shrink:0; }
-        .ratio-select-menu { position:absolute; left:0; right:0; bottom:calc(100% + 4px); top:auto; z-index:30; background:#1a1a1a; border:1px solid rgba(255,255,255,.08); max-height:220px; overflow-y:auto; padding:4px; box-shadow:0 -8px 24px rgba(0,0,0,.32); }
+        .ratio-select-menu { position:absolute; left:0; right:0; bottom:calc(100% + 4px); top:auto; z-index:30; background:#1a1a1a; border:none; max-height:220px; overflow-y:auto; padding:4px; box-shadow:0 -8px 24px rgba(0,0,0,.32); }
         .ratio-select-menu.hidden { display:none; }
-        .ratio-select-item { width:100%; height:28px; border:none; background:transparent; color:#a3a3a3; font-size:10px; font-weight:700; display:flex; align-items:center; gap:6px; padding:0 8px 0 6px; cursor:pointer; text-align:left; transition:background .12s, color .12s; }
-        .ratio-select-item:hover, .ratio-select-item.active { background:#3a3a3a; color:#f5f5f5; }
+        .ratio-select-item { width:100%; height:28px; border:none; background:transparent; color:#a3a3a3; font-size:10px; font-weight:700; display:flex; align-items:center; gap:6px; padding:0 8px 0 6px; cursor:pointer; text-align:left; outline:none; -webkit-tap-highlight-color:transparent; transition:background-color .18s var(--easing), color .18s var(--easing); }
+        .ratio-select-item:hover { background:#333333; color:#f5f5f5; }
+        .ratio-select-item.active { background:#3a3a3a; color:#f5f5f5; }
         .ratio-icon { width:16px; height:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .ratio-icon-inner { display:block; border:1.5px solid currentColor; border-radius:2px; box-sizing:border-box; opacity:.9; }
         .ratio-icon-inner.is-auto { width:12px; height:12px; border-style:dashed; border-radius:3px; }
-        @media (max-width:640px){ .size-row{ grid-template-columns:1fr; } }
-        .gallery-lightbox { background:rgba(16,16,16,.96); }
-        .viewer-overlay { position:fixed; inset:0; z-index:100; background:rgba(16,16,16,.96); display:none; }
-        .viewer-overlay.open { display:flex; }
-        .viewer-layout { display:flex; width:100%; height:100%; min-height:0; }
-        .viewer-main { flex:1; min-width:0; position:relative; display:flex; align-items:center; justify-content:center; background:#101010; padding:24px 72px; box-sizing:border-box; }
-        .viewer-canvas { width:100%; height:100%; display:flex; align-items:center; justify-content:center; min-height:0; }
-        .viewer-nav { position:absolute; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius: 4px; border:1px solid rgba(255,255,255,.08); background:#1a1a1a; color:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.24); z-index:5; transition:background .2s, border-color .2s; padding:0; }
-        .viewer-nav i, .viewer-nav svg { width:16px !important; height:16px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-nav:hover { background:#333; border-color:rgba(255,255,255,.12); }
-        .viewer-nav.prev { left:20px; }
-        .viewer-nav.next { right:20px; }
-        .viewer-nav:disabled { opacity:.25; cursor:not-allowed; }
-        .viewer-toolbar { position:absolute; top:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:6; }
-        .viewer-tool-btn { width:36px; height:36px; border-radius:6px; border:1px solid rgba(255,255,255,.08); background:#1a1a1a; color:#f5f5f5; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.24); transition:background .2s, border-color .2s; padding:0; }
-        .viewer-tool-btn i, .viewer-tool-btn svg { width:14px !important; height:14px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-tool-btn:hover { background:#333; border-color:rgba(255,255,255,.12); }
-        .viewer-sidebar { width:min(360px,34vw); flex-shrink:0; background:#1a1a1a; border-left:1px solid rgba(255,255,255,.08); border-radius:10px 0 0 10px; display:flex; flex-direction:column; min-height:0; overflow:hidden; box-shadow:-4px 0 24px rgba(0,0,0,.24); }
-        .viewer-sidebar-head { display:flex; align-items:center; justify-content:flex-end; gap:4px; padding:10px 12px 4px; }
-        .viewer-head-btn { width:28px; height:28px; border:none; border-radius:4px; background:transparent; color:#737373; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s, color .15s; padding:0; }
-        .viewer-head-btn i, .viewer-head-btn svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-head-btn:hover { background:#333; color:#f5f5f5; }
-        .viewer-head-btn.active { color:#ffaa00; }
-        .viewer-head-btn.pin-active { color:#ff4d94; }
-        .viewer-tabs { padding:0 12px 8px; border-bottom:1px solid rgba(255,255,255,.08); }
-        .viewer-tab { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:#f5f5f5; padding-bottom:6px; border-bottom:2px solid #ff4d94; }
-        .viewer-sidebar-scroll { flex:1; min-height:0; overflow-y:auto; padding:10px 12px 12px; display:flex; flex-direction:column; gap:10px; }
-        .viewer-block-title { font-size:11px; font-weight:600; color:#f5f5f5; margin-bottom:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
-        .viewer-block-title .copy-mini { width:24px; height:24px; border:none; border-radius:3px; background:#313131; color:#737373; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
-        .viewer-block-title .copy-mini:hover { color:#f5f5f5; background:#3a3a3a; }
-        .viewer-block-title .copy-mini i, .viewer-block-title .copy-mini svg { width:10px !important; height:10px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-ref-section { margin-bottom:0; }
-        .viewer-ref-thumbs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
-        .viewer-ref-thumb { width:56px; height:56px; border-radius:4px; overflow:hidden; border:1px solid rgba(255,255,255,.08); background:#313131; display:block; flex-shrink:0; transition:border-color .15s, transform .15s; }
-        .viewer-ref-thumb:hover { border-color:rgba(255,77,148,.45); transform:translateY(-1px); }
-        .viewer-ref-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-        .viewer-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-        .viewer-meta-cell { background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:4px; padding:6px 8px; min-width:0; }
-        .viewer-meta-label { font-size:9px; color:#737373; text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
-        .viewer-meta-value { font-size:11px; color:#f5f5f5; font-weight:500; word-break:break-all; line-height:1.35; }
-        .viewer-prompt { background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:5px; padding:8px 10px; font-size:11px; line-height:1.45; color:#a3a3a3; max-height:120px; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
-        .viewer-prompt.empty { color:#737373; font-style:italic; }
-        .viewer-edit-tools { display:flex; flex-direction:column; gap:6px; }
-        .viewer-edit-mode-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-        .viewer-edit-tab { height:30px; border:1px solid rgba(255,255,255,.08); border-radius:4px; background:#313131; color:#a3a3a3; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; transition:background .15s, color .15s, border-color .15s; padding:0 8px; }
-        .viewer-edit-tab i, .viewer-edit-tab svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-edit-tab.active { background:#3a3a3a; color:#f5f5f5; border-color:rgba(255,77,148,.35); }
-        .viewer-edit-panel { display:flex; flex-direction:column; gap:6px; background:#313131; border:1px solid rgba(255,255,255,.08); border-radius:5px; padding:8px; }
-        .viewer-edit-panel.hidden { display:none; }
-        .viewer-edit-row { display:flex; align-items:center; gap:8px; min-width:0; }
-        .viewer-edit-label { font-size:10px; font-weight:600; color:#737373; min-width:2rem; flex-shrink:0; }
-        .viewer-edit-row input[type="range"] { flex:1; accent-color:#ff4d94; height:4px; }
-        .viewer-hue-row { align-items:center; }
-        .viewer-hue-bar-wrap { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
-        .viewer-hue-bar { flex:1; height:16px; border-radius: 4px; position:relative; cursor:pointer; border:1px solid rgba(255,255,255,.12); box-shadow:inset 0 1px 3px rgba(0,0,0,.28); touch-action:none; background:linear-gradient(to right,#ff0000 0%,#ff8000 8%,#ffff00 17%,#80ff00 25%,#00ff00 33%,#00ff80 42%,#00ffff 50%,#0080ff 58%,#0000ff 67%,#8000ff 75%,#ff00ff 83%,#ff0080 92%,#ff0000 100%); }
-        .viewer-hue-thumb { position:absolute; top:50%; width:18px; height:18px; border-radius: 4px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.4); transform:translate(-50%,-50%); pointer-events:none; }
-        .viewer-hue-swatch { width:24px; height:24px; border-radius:4px; border:1px solid rgba(255,255,255,.12); flex-shrink:0; box-shadow:0 1px 4px rgba(0,0,0,.24); }
-        .viewer-edit-val { font-size:10px; font-weight:700; color:#f5f5f5; min-width:1.25rem; text-align:right; }
-        .viewer-edit-hint { font-size:10px; line-height:1.4; color:#737373; margin:0; }
-        .viewer-edit-actions { display:flex; gap:6px; }
-        .viewer-edit-action { height:30px; border:1px solid rgba(255,255,255,.08); border-radius: 4px; background:#1a1a1a; color:#f5f5f5; font-size:10px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; padding:0 12px; transition:background .15s, border-color .15s; }
-        .viewer-edit-action i, .viewer-edit-action svg { width:12px !important; height:12px !important; stroke-width:2.25; flex-shrink:0; }
-        .viewer-edit-action:hover { background:#333; }
-        .viewer-edit-action.primary { background:#ff4d94; border-color:#ff4d94; }
-        .viewer-edit-action.primary:hover { background:#e8437f; border-color:#e8437f; }
-        .viewer-stage { position:relative; display:inline-flex; max-width:100%; max-height:100%; line-height:0; }
-        .viewer-stage img { max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; user-select:none; box-shadow:0 8px 32px rgba(0,0,0,.08); display:block; }
-        .viewer-draw-canvas { position:absolute; left:0; top:0; border-radius:8px; pointer-events:none; touch-action:none; box-sizing:border-box; }
-        .viewer-draw-canvas.viewer-draw-active { pointer-events:auto; cursor:none; }
-        .viewer-brush-cursor { position:absolute; border:2px solid rgba(255,255,255,.9); border-radius: 4px; pointer-events:none; transform:translate(-50%,-50%); box-shadow:0 0 0 1px rgba(0,0,0,.35); z-index:8; opacity:0; transition:opacity .12s; }
-        .viewer-brush-cursor.visible { opacity:1; }
-        .viewer-crop-ratios { display:flex; flex-wrap:wrap; gap:6px; }
-        .viewer-crop-ratio { height:28px; padding:0 10px; border:1px solid rgba(255,255,255,.08); border-radius: 4px; background:#1a1a1a; color:#a3a3a3; font-size:10px; font-weight:700; cursor:pointer; transition:background .15s, color .15s, border-color .15s; }
-        .viewer-crop-ratio.active { background:#3a3a3a; color:#f5f5f5; border-color:rgba(255,77,148,.35); }
-        .viewer-edit-confirm { width:100%; margin-top:4px; }
-        .viewer-crop-layer { position:absolute; inset:0; border-radius:8px; overflow:hidden; pointer-events:none; }
-        .viewer-crop-layer:not(.hidden) { pointer-events:auto; }
-        .viewer-crop-box { position:absolute; left:10%; top:10%; width:80%; height:80%; border:2px solid #fff; border-radius:5px; box-shadow:0 0 0 9999px rgba(0,0,0,.45); cursor:move; }
-        .viewer-crop-handle { position:absolute; width:14px; height:14px; border-radius: 4px; background:#fff; border:2px solid #1a1a1a; z-index:2; touch-action:none; }
-        .viewer-crop-handle.nw { left:-6px; top:-6px; cursor:nwse-resize; }
-        .viewer-crop-handle.ne { right:-6px; top:-6px; cursor:nesw-resize; }
-        .viewer-crop-handle.sw { left:-6px; bottom:-6px; cursor:nesw-resize; }
-        .viewer-crop-handle.se { right:-6px; bottom:-6px; cursor:nwse-resize; }
-        .viewer-reedit { width:100%; height:44px; border:none; border-radius: 4px; background:#ff4d94; color:#fff; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s; box-shadow:0 4px 14px rgba(255,77,148,.25); }
-        .viewer-reedit:hover { background:#e8437f; }
-        .viewer-reedit i, .viewer-reedit svg { width:14px !important; height:14px !important; stroke-width:2.25; flex-shrink:0; }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
         html.embed-panel { --bg:#161616; }
         html.embed-panel body { background:#161616 !important; }
@@ -245,13 +164,21 @@
         html.embed-panel .studio-panel-col { grid-column:1 / -1 !important; max-width:none !important; }
         html.embed-panel .page-main { grid-template-columns:minmax(0,1fr) !important; }
     </style>
+    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260530-viewer-ui">
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
     <link rel="stylesheet" href="/static/theme.css?v=20260530-panel-radius">
-    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-borderless">
+    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
+    <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
             color:#fff !important;
         }
+        select.size-select option[data-no-key="1"] { color: #737373; }
     </style>
 </head>
 <body class="mg-studio">
@@ -278,7 +205,7 @@
                         <div class="control-label mb-1">
                             <span data-i18n="online.promptLabel">提示词</span>
                         </div>
-                        <textarea id="promptInput" rows="3" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder"></textarea>
+                        <textarea id="promptInput" rows="3" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                     </div>
                     <div>
                         <div class="control-label mb-1">
@@ -307,24 +234,18 @@
                                 <option value="1k" selected>1K</option>
                                 <option value="2k">2K</option>
                                 <option value="4k">4K</option>
-                                <option value="custom" data-i18n="online.customSize">自定义尺寸</option>
                             </select>
-                            <span class="size-pair with-fit">
-                                <input id="sizeCustomWidth" class="size-custom" type="number" min="64" step="64" placeholder="宽度" data-i18n-placeholder="online.width" oninput="setCustomSize()">
-                                <input id="sizeCustomHeight" class="size-custom" type="number" min="64" step="64" placeholder="高度" data-i18n-placeholder="online.height" oninput="setCustomSize()">
-                                <button id="fitImageSizeBtn" class="size-fit-btn" type="button" onclick="fitCustomSizeToImage(event)">适配图片</button>
-                            </span>
                         </label>
                         <label id="ratioField" class="size-field">
                             <div class="control-label mb-1">
                                 <span data-i18n="online.aspect">Aspect</span>
                             </div>
-                            <div id="ratioSelectWrap" class="ratio-select-wrap">
-                                <button type="button" id="ratioSelectTrigger" class="ratio-select-trigger" onclick="toggleRatioDropdown(event)">
+                            <div id="ratioSelectWrap" class="ratio-select-wrap pullup-select-wrap">
+                                <button type="button" id="ratioSelectTrigger" class="ratio-select-trigger pullup-select-trigger" onclick="toggleRatioDropdown(event)">
                                     <span id="ratioSelectCurrent" class="ratio-select-current"></span>
                                     <i data-lucide="chevron-up" class="ratio-select-chevron"></i>
                                 </button>
-                                <div id="ratioSelectMenu" class="ratio-select-menu hidden"></div>
+                                <div id="ratioSelectMenu" class="ratio-select-menu pullup-select-menu hidden"></div>
                             </div>
                             <span class="size-pair">
                                 <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="宽" data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
@@ -334,10 +255,12 @@
                     </div>
                 </section>
 
-                <button id="genBtn" onclick="submitImage()" class="glass-btn w-full py-3 text-white rounded-md font-bold flex items-center justify-center gap-2 shadow-lg">
-                    <i data-lucide="crown" class="w-3.5 h-3.5 text-white"></i>
-                    <span class="tracking-[0.3em] text-[11px] uppercase" data-i18n="online.generate">Generate</span>
-                </button>
+                <span id="genBtnWrap" class="generate-btn-wrap">
+                    <button id="genBtn" onclick="submitImage()" class="glass-btn generate-btn" type="button" disabled>
+                        <span class="generate-btn-label" data-i18n="online.generate">Generate</span>
+                        <i data-lucide="sparkles" class="generate-btn-icon"></i>
+                    </button>
+                </span>
             </div>
 
             <div class="lg:col-span-9 flex flex-col gap-2 min-h-0 h-full studio-output-col">
@@ -433,14 +356,18 @@
                                     <input type="range" id="viewerBrushSize" min="2" max="80" value="16" oninput="document.getElementById('viewerBrushSizeVal').textContent=this.value">
                                     <span id="viewerBrushSizeVal" class="viewer-edit-val">16</span>
                                 </div>
-                                <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
-                                <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                <div class="viewer-edit-actions">
+                                    <button type="button" id="viewerBrushUndo" class="viewer-edit-action" onclick="undoViewerDraw()"><i data-lucide="undo-2"></i><span data-i18n="online.viewerUndo">撤回</span></button>
+                                    <button type="button" class="viewer-edit-action primary" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                </div>
                             </div>
                             <div id="viewerCropPanel" class="viewer-edit-panel hidden">
                                 <p class="viewer-edit-hint" data-i18n="canvas.cropHint">拖动裁剪框移动，拖右下角调整大小</p>
                                 <div id="viewerCropRatios" class="viewer-crop-ratios"></div>
-                                <button type="button" class="viewer-edit-action primary viewer-edit-confirm" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
-                                <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                <div class="viewer-edit-actions">
+                                    <button type="button" class="viewer-edit-action" onclick="setViewerEditMode('brush')"><span data-i18n="common.cancel">取消</span></button>
+                                    <button type="button" class="viewer-edit-action primary" onclick="confirmViewerEdit()"><i data-lucide="check"></i><span data-i18n="online.viewerApplyEdit">确认应用</span></button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -459,28 +386,23 @@
         function applyLanguage(lang){
             if(lang && window.StudioI18n) StudioI18n.set(lang);
             document.title = tr('online.title');
+            syncGenBtnState();
         }
         window.addEventListener('message', event => {
             if(event.data?.type === 'studio-lang') applyLanguage(event.data.lang);
         });
         window.addEventListener('studio-lang-change', () => {
             document.title = tr('online.title');
+            syncGenBtnState();
         });
-        const MAX_REF_SLOTS = 13;
-        const REF_REORDER_MIME = 'application/x-online-ref-reorder';
-        let refSlots = [];
-        let refReorderDragId = '';
-        let boardPickSlotId = '';
         let batchCount = 1;
-        let provider = 'custom-api';
+        let provider = 'apimart';
         let selectedModel = 'gpt-image-2';
         let apiProviders = [];
         let ratio = '1:1';
         let resolution = '1k';
         let customRatioWidth = '';
         let customRatioHeight = '';
-        let customWidth = '';
-        let customHeight = '';
         let models = {gpt:'gpt-image-2', nano:'nano-banana-pro'};
         let allHistory = [], currentResult = null, currentLightboxData = null, historyLoading = false;
         let outputCols = 2;
@@ -489,6 +411,7 @@
         let displayOrder = [];
         let pendingJobs = [];
         let reorderDragKey = '';
+        const META_SCOPE = 'online';
         const META_PIN_KEY = 'online_pinned';
         const META_FAV_KEY = 'online_favorites';
         const META_ORDER_KEY = 'online_display_order';
@@ -595,7 +518,6 @@
         }
         function toggleRatioDropdown(event){
             event?.stopPropagation();
-            if(resolution === 'custom') return;
             ratioDropdownOpen = !ratioDropdownOpen;
             document.getElementById('ratioSelectMenu')?.classList.toggle('hidden', !ratioDropdownOpen);
             if(ratioDropdownOpen) lucide.createIcons();
@@ -614,14 +536,12 @@
             const activePreset = getRatioPreset(ratio, selectedModel) || (ratio === 'custom' ? { id: 'custom' } : presets[0]);
             menu.innerHTML = presets.map(item => {
                 const active = ratio === item.id ? ' active' : '';
-                return `<button type="button" class="ratio-select-item${active}" data-ratio="${escapeHtml(item.id)}" onclick="selectRatioOption('${escapeHtml(item.id)}')">${ratioIconMarkup(item)}<span>${escapeHtml(item.id)}</span></button>`;
+                return `<button type="button" class="ratio-select-item pullup-select-item${active}" data-ratio="${escapeHtml(item.id)}" onclick="selectRatioOption('${escapeHtml(item.id)}')">${ratioIconMarkup(item)}<span>${escapeHtml(item.id)}</span></button>`;
             }).join('');
             current.innerHTML = `${ratioIconMarkup(activePreset)}<span>${escapeHtml(activePreset?.id || ratio || '1:1')}</span>`;
-            trigger.disabled = resolution === 'custom';
             lucide.createIcons();
         }
         function syncRatioForModel(){
-            if(resolution === 'custom' || ratio === '') return;
             const presets = getRatioPresetsForModel(selectedModel);
             const ids = presets.map(item => item.id);
             const mapped = LEGACY_RATIO_MAP[ratio] || ratio;
@@ -689,16 +609,16 @@
             const seen = new Set();
             return (list || []).map(item => String(item || '').trim()).filter(item => item && !seen.has(item) && seen.add(item));
         }
-        function resolveDefaultProviderId(list){
-            const providers = list || imageProviders();
-            const primary = providers.find(p => p.primary);
-            if(primary) return primary.id;
-            const apimart = providers.find(p => p.id === 'custom-api' || p.id === 'apimart' || String(p.name || '').toLowerCase() === 'apimart');
-            return apimart?.id || providers.find(p => p.enabled !== false)?.id || providers[0]?.id || 'custom-api';
+        function panelProviders(){
+            const list = StudioApiProviders.enabledProviders(apiProviders);
+            if(list.length) return list;
+            return [{ id:'apimart', name:'🐻', has_key:false, enabled:true, image_models:[models.gpt, models.nano] }];
+        }
+        function resolveDefaultProviderId(list, deletedId){
+            return StudioApiProviders.resolveProviderId(provider, list || panelProviders(), { deletedId, preferApimart: true });
         }
         function imageProviders(){
-            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.image_models || []).length);
-            return list.length ? list : [{id:'custom-api', name:'apimart', image_models:[models.gpt, models.nano]}];
+            return panelProviders();
         }
         function providerById(id){
             return imageProviders().find(p => p.id === id) || imageProviders()[0];
@@ -706,18 +626,32 @@
         function providerModels(id){
             return uniqueModels(providerById(id)?.image_models || [models.gpt]);
         }
-        function renderProviderControls(){
+        function renderProviderControls(deletedId){
             const providerSelect = document.getElementById('providerSelect');
             const modelSelect = document.getElementById('modelSelect');
             if(!providerSelect || !modelSelect) return;
-            const providers = imageProviders();
-            if(!providers.some(p => p.id === provider)) provider = resolveDefaultProviderId(providers);
+            const providers = panelProviders();
+            if(!providers.length) return;
+            provider = resolveDefaultProviderId(providers, deletedId);
             const modelsForProvider = providerModels(provider);
             if(!modelsForProvider.includes(selectedModel)) selectedModel = modelsForProvider[0] || models.gpt;
-            providerSelect.innerHTML = providers.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === provider ? 'selected' : ''}>${escapeHtml(p.name || p.id)}</option>`).join('');
+            providerSelect.innerHTML = StudioApiProviders.buildProviderOptionsHtml(providers, provider, escapeHtml);
             modelSelect.innerHTML = modelsForProvider.map(m => `<option value="${escapeHtml(m)}" ${m === selectedModel ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
             syncRatioForModel();
             renderRatioSelect();
+        }
+
+        async function refreshApiProviders(payload){
+            try {
+                const cfg = await fetch('/api/config').then(r => r.json());
+                const imageModels = cfg.image_models || [];
+                models.nano = imageModels.find(m => m.toLowerCase().includes('nano')) || 'nano-banana-pro';
+                models.gpt = imageModels.find(m => !m.toLowerCase().includes('nano')) || cfg.image_model || 'gpt-image-2';
+                apiProviders = await StudioApiProviders.fetchProviderList();
+            } catch(e) {
+                try { apiProviders = await StudioApiProviders.fetchProviderList(); } catch(err) {}
+            }
+            renderProviderControls(payload && payload.deletedId);
         }
 
         async function initModels(){
@@ -726,14 +660,22 @@
                 const imageModels = cfg.image_models || [];
                 models.nano = imageModels.find(m => m.toLowerCase().includes('nano')) || 'nano-banana-pro';
                 models.gpt = imageModels.find(m => !m.toLowerCase().includes('nano')) || cfg.image_model || 'gpt-image-2';
-                apiProviders = Array.isArray(cfg.api_providers) ? cfg.api_providers : [];
-                provider = cfg.primary_provider_id || resolveDefaultProviderId(apiProviders.filter(p => p.enabled !== false && (p.image_models || []).length));
+                apiProviders = await StudioApiProviders.fetchProviderList();
+                provider = StudioApiProviders.resolveProviderId(
+                    cfg.primary_provider_id || provider,
+                    panelProviders(),
+                    { preferApimart: true }
+                );
                 selectedModel = providerModels(provider)[0] || models.gpt;
             } catch(e) {}
             renderProviderControls();
         }
 
         function setProvider(next){
+            const item = panelProviders().find(p => p.id === next);
+            if(item && !StudioApiProviders.providerHasKey(item)){
+                StudioApiProviders.promptMissingKey(item);
+            }
             provider = next;
             selectedModel = providerModels(provider)[0] || selectedModel;
             renderProviderControls();
@@ -755,31 +697,6 @@
             const h = Number(customRatioHeight);
             return w > 0 && h > 0 ? w / h : null;
         }
-        function customSizeValue(){
-            const w = Number(customWidth);
-            const h = Number(customHeight);
-            return w > 0 && h > 0 ? `${Math.round(w)}x${Math.round(h)}` : '';
-        }
-        function getImageDimensions(src){
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve({width:img.naturalWidth, height:img.naturalHeight});
-                img.onerror = reject;
-                img.src = src;
-            });
-        }
-        function firstReferenceDimension(){
-            return refSlots.map(s => s.dim).find(dim => dim?.width && dim?.height) || null;
-        }
-        function newRefSlot(ref=null, dim=null){
-            return { id:`ref_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, ref, dim };
-        }
-        function getReferenceList(){
-            return refSlots.map(s => s.ref).filter(Boolean);
-        }
-        function filledRefCount(){
-            return refSlots.filter(s => s.ref).length;
-        }
         function setBatchCount(n){
             batchCount = Math.min(4, Math.max(1, Number(n) || 1));
             const label = document.getElementById('batchValue');
@@ -794,177 +711,6 @@
                 if(saved >= 1 && saved <= 4) batchCount = saved;
             } catch(e) {}
         }
-        function ensureTrailingEmptySlot(){
-            const hasEmpty = refSlots.some(s => !s.ref);
-            if(!hasEmpty && refSlots.length < MAX_REF_SLOTS) refSlots.push(newRefSlot());
-            if(!refSlots.length) refSlots.push(newRefSlot());
-        }
-        function clearRefDropHints(){
-            document.querySelectorAll('#refGrid .upload-item.drop-before,#refGrid .upload-item.drop-after').forEach(el => {
-                el.classList.remove('drop-before', 'drop-after');
-            });
-        }
-        function reorderRefSlots(sourceId, targetId, placeBefore){
-            if(!sourceId || !targetId || sourceId === targetId) return;
-            const list = [...refSlots];
-            const from = list.findIndex(s => s.id === sourceId);
-            const to = list.findIndex(s => s.id === targetId);
-            if(from < 0 || to < 0) return;
-            const [item] = list.splice(from, 1);
-            let insertAt = list.findIndex(s => s.id === targetId);
-            if(insertAt < 0) insertAt = list.length;
-            if(!placeBefore) insertAt += 1;
-            list.splice(insertAt, 0, item);
-            refSlots = list;
-            renderRefGrid();
-        }
-        function updateBoardPickUI(){
-            document.body.classList.toggle('board-pick-active', !!boardPickSlotId);
-            document.querySelectorAll('#refGrid .upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
-            if(boardPickSlotId){
-                document.querySelector(`#refGrid [data-ref-id="${boardPickSlotId}"]`)?.classList.add('is-board-target');
-            }
-        }
-        function startBoardPick(slotId, ev){
-            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-            if(boardPickSlotId === slotId){
-                cancelBoardPick();
-                return;
-            }
-            boardPickSlotId = slotId;
-            window.boardPickSlotId = slotId;
-            updateBoardPickUI();
-            if(window.StudioPanelBridge){
-                StudioPanelBridge.notifyBoardPick(slotId);
-            } else {
-                renderOutputGrid();
-                document.getElementById('resultBox')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
-            }
-        }
-        function cancelBoardPick(){
-            if(!boardPickSlotId) return;
-            boardPickSlotId = '';
-            window.boardPickSlotId = '';
-            updateBoardPickUI();
-            if(window.StudioPanelBridge){
-                StudioPanelBridge.notifyBoardPick('');
-            } else {
-                renderOutputGrid();
-            }
-        }
-        function pickOutputForRef(data){
-            const url = data?.images?.[0];
-            if(!url || !boardPickSlotId) return;
-            const slot = refSlots.find(s => s.id === boardPickSlotId);
-            if(!slot) return;
-            const normalized = normalizeImageUrl(url);
-            if(!normalized) return;
-            cancelBoardPick();
-            slot.ref = { url: normalized, name: normalized.split('/').pop() || 'image.png', role: '' };
-            getImageDimensions(normalized).then(dim => {
-                slot.dim = dim;
-                updateSizeUI();
-                renderRefGrid();
-            }).catch(() => renderRefGrid());
-            ensureTrailingEmptySlot();
-            renderRefGrid();
-        }
-        function bindRefSlotEvents(cell, slot){
-            const input = cell.querySelector('input[type="file"]');
-            const delBtn = cell.querySelector('[data-ref-del]');
-            const handle = cell.querySelector('[data-ref-reorder]');
-            const boardBtn = cell.querySelector('[data-ref-board]');
-            cell.onclick = e => {
-                if(e.target.closest('[data-ref-del],[data-ref-reorder],[data-ref-board]')) return;
-                if(!slot.ref) input?.click();
-            };
-            input.onchange = () => handleFile(input.files[0], slot.id);
-            delBtn?.addEventListener('click', e => removeRefSlot(slot.id, e));
-            boardBtn?.addEventListener('click', e => startBoardPick(slot.id, e));
-            cell.ondragover = e => {
-                const types = [...(e.dataTransfer?.types || [])];
-                if(types.includes(REF_REORDER_MIME)){
-                    if(refReorderDragId && refReorderDragId !== slot.id){
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                        clearRefDropHints();
-                        const rect = cell.getBoundingClientRect();
-                        cell.classList.add((e.clientX - rect.left) < rect.width / 2 ? 'drop-before' : 'drop-after');
-                    }
-                    return;
-                }
-                if(!hasSlotDropData(e.dataTransfer)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
-                cell.classList.add('drag-over');
-            };
-            cell.ondragleave = e => {
-                if(e.currentTarget.contains(e.relatedTarget)) return;
-                cell.classList.remove('drag-over', 'drop-before', 'drop-after');
-            };
-            cell.ondrop = e => {
-                e.preventDefault();
-                e.stopPropagation();
-                cell.classList.remove('drag-over');
-                const types = [...(e.dataTransfer?.types || [])];
-                if(types.includes(REF_REORDER_MIME)){
-                    const dragId = refReorderDragId || e.dataTransfer.getData(REF_REORDER_MIME);
-                    if(dragId && dragId !== slot.id){
-                        const rect = cell.getBoundingClientRect();
-                        reorderRefSlots(dragId, slot.id, (e.clientX - rect.left) < rect.width / 2);
-                    }
-                    clearRefDropHints();
-                    return;
-                }
-                const file = e.dataTransfer.files?.[0];
-                if(file && file.type.startsWith('image/')) {
-                    handleFile(file, slot.id);
-                    return;
-                }
-                const url = imageUrlFromSlotDrop(e.dataTransfer);
-                if(url) handleImageUrl(url, slot.id);
-            };
-            if(handle && slot.ref){
-                handle.draggable = true;
-                handle.ondragstart = e => {
-                    e.stopPropagation();
-                    refReorderDragId = slot.id;
-                    cell.classList.add('is-dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData(REF_REORDER_MIME, slot.id);
-                };
-                handle.ondragend = () => {
-                    refReorderDragId = '';
-                    cell.classList.remove('is-dragging');
-                    clearRefDropHints();
-                };
-            }
-        }
-        function renderRefGrid(){
-            const grid = document.getElementById('refGrid');
-            if(!grid) return;
-            ensureTrailingEmptySlot();
-            grid.innerHTML = refSlots.map((slot, idx) => {
-                const filled = !!slot.ref;
-                const preview = filled ? slot.ref.url : '';
-                return `<div class="upload-item group aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
-                    <input type="file" accept="image/*" class="hidden">
-                    ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
-                    <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2,'0')}</span>
-                    <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeHtml(preview)}"` : ''} draggable="false">
-                    <button type="button" data-ref-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${tr('online.boardPickTitle')}">board</button>
-                    <button type="button" data-ref-reorder class="cell-action-btn ref-slot-btn ref-reorder-btn" title="${tr('online.reorder')}"><i data-lucide="grip-vertical"></i></button>
-                    <button type="button" data-ref-del class="cell-action-btn ref-slot-btn ref-del-btn" title="${tr('online.delete')}"><i data-lucide="trash-2"></i></button>
-                </div>`;
-            }).join('');
-            refSlots.forEach(slot => {
-                const cell = grid.querySelector(`[data-ref-id="${slot.id}"]`);
-                if(cell) bindRefSlotEvents(cell, slot);
-            });
-            lucide.createIcons();
-            updateSizeUI();
-        }
-
         function setRatio(next){
             ratio = next;
             if(next !== 'custom'){
@@ -982,66 +728,26 @@
             updateSizeUI();
         }
 
-        function setCustomSize(){
-            customWidth = document.getElementById('sizeCustomWidth').value;
-            customHeight = document.getElementById('sizeCustomHeight').value;
-            resolution = 'custom';
-            ratio = '';
-            updateSizeUI();
-        }
-
         function setResolution(next){
-            resolution = next;
-            if(next === 'custom'){
-                ratio = '';
-            } else {
-                customWidth = '';
-                customHeight = '';
-                if(ratio === '') ratio = '1:1';
-            }
+            resolution = (next === '2k' || next === '4k') ? next : '1k';
             updateSizeUI();
         }
 
         function updateSizeUI(){
             const ratioField = document.getElementById('ratioField');
-            const ratioSelectWrap = document.getElementById('ratioSelectWrap');
             const ratioCustomWidthInput = document.getElementById('ratioCustomWidth');
             const ratioCustomHeightInput = document.getElementById('ratioCustomHeight');
             const resolutionSelect = document.getElementById('resolutionSelect');
-            const resolutionField = document.getElementById('resolutionField');
-            const sizeCustomWidthInput = document.getElementById('sizeCustomWidth');
-            const sizeCustomHeightInput = document.getElementById('sizeCustomHeight');
-            const fitImageSizeBtn = document.getElementById('fitImageSizeBtn');
             renderRatioSelect();
             ratioField?.classList.toggle('custom', ratio === 'custom');
-            if(ratioSelectWrap){
-                ratioSelectWrap.style.opacity = resolution === 'custom' ? '0.45' : '';
-                ratioSelectWrap.style.pointerEvents = resolution === 'custom' ? 'none' : '';
-            }
             ratioCustomWidthInput.value = customRatioWidth;
             ratioCustomHeightInput.value = customRatioHeight;
             resolutionSelect.value = resolution;
-            resolutionField.classList.toggle('custom', resolution === 'custom');
-            sizeCustomWidthInput.value = customWidth;
-            sizeCustomHeightInput.value = customHeight;
-            if(fitImageSizeBtn) fitImageSizeBtn.disabled = !firstReferenceDimension();
             updateResolutionUI();
         }
 
         function updateResolutionUI(){}
-        function fitCustomSizeToImage(event){
-            if(event) event.preventDefault();
-            const dim = firstReferenceDimension();
-            if(!dim) return;
-            resolution = 'custom';
-            ratio = '';
-            customWidth = dim.width;
-            customHeight = dim.height;
-            updateSizeUI();
-        }
-
         function currentSize(){
-            if(resolution === 'custom') return customSizeValue();
             if(ratio === 'auto') return `auto:${resolution || '1k'}`;
             if(ratio === 'custom'){
                 const w = Number(customRatioWidth);
@@ -1057,45 +763,11 @@
         }
 
         function normalizeImageUrl(url){
-            const raw = String(url || '').trim();
-            if(!raw) return '';
-            try {
-                if(/^https?:\/\//i.test(raw)){
-                    const parsed = new URL(raw);
-                    if(parsed.pathname.startsWith('/assets/') || parsed.pathname.startsWith('/output/')) return parsed.pathname;
-                }
-            } catch(e) {}
-            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
-            return raw;
-        }
-        function imageUrlFromSlotDrop(dataTransfer){
-            if(!dataTransfer) return '';
-            const custom = dataTransfer.getData('application/x-online-output-image');
-            if(custom) return normalizeImageUrl(custom);
-            const values = [
-                dataTransfer.getData('text/uri-list') || '',
-                dataTransfer.getData('text/plain') || ''
-            ].join('\n').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-            for(const value of values){
-                const normalized = normalizeImageUrl(value);
-                if(normalized.startsWith('/assets/') || normalized.startsWith('/output/')) return normalized;
-            }
-            return '';
-        }
-        function hasSlotDropData(dataTransfer){
-            if(!dataTransfer) return false;
-            const types = [...(dataTransfer.types || [])];
-            if(types.includes('application/x-online-output-image')) return true;
-            if(types.includes('Files') && [...(dataTransfer.items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/'))) return true;
-            return types.includes('text/uri-list') || types.includes('text/plain');
+            return StudioRefUpload.normalizeImageUrl(url);
         }
         function setImageDragData(e, url, keepEffect){
-            const normalized = normalizeImageUrl(url);
-            if(!normalized) return;
             if(!keepEffect) e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('application/x-online-output-image', normalized);
-            e.dataTransfer.setData('text/uri-list', normalized);
-            e.dataTransfer.setData('text/plain', normalized);
+            StudioRefUpload.setImageDragData(e, url);
         }
         function isImageImportFile(file){
             if(!file) return false;
@@ -1122,10 +794,11 @@
             const img = cell.querySelector('img');
             const key = historyKey(data);
             if(!img || !data?.images?.[0]) return;
-            img.draggable = !boardPickSlotId;
+            const pickId = StudioRefUpload.getBoardPickSlotId();
+            img.draggable = !pickId;
             img.classList.add('draggable-output');
             img.ondragstart = e => {
-                if(boardPickSlotId) { e.preventDefault(); return; }
+                if(pickId) { e.preventDefault(); return; }
                 e.stopPropagation();
                 img.dataset.dragging = '1';
                 reorderDragKey = key;
@@ -1143,7 +816,7 @@
             img.onclick = e => {
                 if(img.dataset.dragging) return;
                 e.stopPropagation();
-                if(boardPickSlotId){
+                if(pickId){
                     pickOutputForRef(data);
                     return;
                 }
@@ -1151,7 +824,7 @@
                 openLightbox(data);
             };
             cell.onclick = e => {
-                if(!boardPickSlotId) return;
+                if(!StudioRefUpload.getBoardPickSlotId()) return;
                 if(e.target.closest('.cell-actions')) return;
                 e.stopPropagation();
                 pickOutputForRef(data);
@@ -1245,7 +918,7 @@
                 el.addEventListener('drop', onDrop);
             });
         }
-        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
         let highlightOutputKey = null;
         let highlightOutputTimer = null;
 
@@ -1268,9 +941,9 @@
                 const pins = JSON.parse(localStorage.getItem(META_PIN_KEY) || '[]');
                 const favs = JSON.parse(localStorage.getItem(META_FAV_KEY) || '[]');
                 const order = JSON.parse(localStorage.getItem(META_ORDER_KEY) || '[]');
-                pinnedIds = Array.isArray(pins) ? pins.map(String) : [];
-                favoriteIds = Array.isArray(favs) ? favs.map(String) : [];
-                displayOrder = Array.isArray(order) ? order.map(String) : [];
+                pinnedIds = StudioHistoryMeta.normalizeIdList(pins);
+                favoriteIds = StudioHistoryMeta.normalizeIdList(favs);
+                displayOrder = StudioHistoryMeta.normalizeIdList(order);
             } catch(e) {
                 pinnedIds = [];
                 favoriteIds = [];
@@ -1279,28 +952,57 @@
         }
         function saveOnlineMeta(){
             try {
+                pinnedIds = StudioHistoryMeta.normalizeIdList(pinnedIds);
+                favoriteIds = StudioHistoryMeta.normalizeIdList(favoriteIds);
+                displayOrder = StudioHistoryMeta.normalizeIdList(displayOrder);
                 localStorage.setItem(META_PIN_KEY, JSON.stringify(pinnedIds));
                 localStorage.setItem(META_FAV_KEY, JSON.stringify(favoriteIds));
                 localStorage.setItem(META_ORDER_KEY, JSON.stringify(displayOrder));
+                StudioHistoryMeta.saveUserMeta(META_SCOPE, { pinnedIds, favoriteIds, displayOrder });
             } catch(e) {}
         }
-        function syncDisplayOrder(){
-            const keys = new Set(allHistory.map(historyKey));
-            displayOrder = displayOrder.filter(id => keys.has(id));
-            allHistory.forEach(item => {
-                const key = historyKey(item);
-                if(key && !displayOrder.includes(key)) displayOrder.unshift(key);
-            });
+        async function loadOnlineMetaFromServer(){
+            loadOnlineMeta();
+            const remote = await StudioHistoryMeta.loadUserMeta(META_SCOPE);
+            const merged = StudioHistoryMeta.mergeMetaSources(
+                { pinnedIds, favoriteIds, displayOrder },
+                remote,
+            );
+            pinnedIds = merged.pinnedIds;
+            favoriteIds = merged.favoriteIds;
+            displayOrder = merged.displayOrder;
             saveOnlineMeta();
         }
-        function isPinned(item){ return pinnedIds.includes(historyKey(item)); }
-        function isFavorite(item){ return favoriteIds.includes(historyKey(item)); }
+        function syncDisplayOrder(opts){
+            const persist = !!(opts && opts.persist);
+            const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, displayOrder }, allHistory);
+            pinnedIds = synced.pinnedIds;
+            favoriteIds = synced.favoriteIds;
+            displayOrder = synced.displayOrder;
+            if(persist) saveOnlineMeta();
+        }
+        function isPinned(item){ return StudioHistoryMeta.includesKey(pinnedIds, historyKey(item)); }
+        function isFavorite(item){ return StudioHistoryMeta.includesKey(favoriteIds, historyKey(item)); }
         function sortedHistory(){
             syncDisplayOrder();
-            const pinSet = new Set(pinnedIds);
-            const pinned = displayOrder.filter(id => pinSet.has(id)).map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
-            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h) === id)).filter(Boolean);
-            return [...pinned, ...rest];
+            const findByKey = (id) => allHistory.find(h => StudioHistoryMeta.keysEqual(historyKey(h), id));
+            const seen = new Set();
+            const out = [];
+            displayOrder.forEach(id => {
+                const item = findByKey(id);
+                if(!item) return;
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            allHistory.forEach(item => {
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            return out;
         }
         function moveInOrderList(list, sourceKey, targetKey, placeBefore){
             const from = list.indexOf(sourceKey);
@@ -1347,14 +1049,14 @@
             if(ev) { ev.preventDefault(); ev.stopPropagation(); }
             const key = historyKey(item);
             if(!key) return;
-            if(pinnedIds.includes(key)){
-                pinnedIds = pinnedIds.filter(id => id !== key);
+            if(StudioHistoryMeta.includesKey(pinnedIds, key)){
+                pinnedIds = pinnedIds.filter(id => !StudioHistoryMeta.keysEqual(id, key));
                 const pinnedList = pinnedIds.slice();
-                const restList = [key, ...displayOrder.filter(id => !pinnedIds.includes(id) && id !== key)];
+                const restList = [key, ...displayOrder.filter(id => !StudioHistoryMeta.includesKey(pinnedIds, id) && !StudioHistoryMeta.keysEqual(id, key))];
                 displayOrder = [...pinnedList, ...restList];
             } else {
-                pinnedIds = [...pinnedIds.filter(id => id !== key), key];
-                const restList = displayOrder.filter(id => !pinnedIds.includes(id));
+                pinnedIds = [...pinnedIds.filter(id => !StudioHistoryMeta.keysEqual(id, key)), key];
+                const restList = displayOrder.filter(id => !StudioHistoryMeta.includesKey(pinnedIds, id));
                 displayOrder = [...pinnedIds, ...restList];
             }
             saveOnlineMeta();
@@ -1364,8 +1066,8 @@
             if(ev) { ev.preventDefault(); ev.stopPropagation(); }
             const key = historyKey(item);
             if(!key) return;
-            if(favoriteIds.includes(key)) favoriteIds = favoriteIds.filter(id => id !== key);
-            else favoriteIds = [key, ...favoriteIds.filter(id => id !== key)];
+            if(StudioHistoryMeta.includesKey(favoriteIds, key)) favoriteIds = favoriteIds.filter(id => !StudioHistoryMeta.keysEqual(id, key));
+            else favoriteIds = [key, ...favoriteIds.filter(id => !StudioHistoryMeta.keysEqual(id, key))];
             saveOnlineMeta();
             renderOutputGrid();
         }
@@ -1443,10 +1145,11 @@
             try {
                 allHistory = await fetch('/api/history?type=online').then(r => r.json());
                 if(!Array.isArray(allHistory)) allHistory = [];
-                const keys = new Set(allHistory.map(historyKey));
-                pinnedIds = pinnedIds.filter(id => keys.has(id));
-                favoriteIds = favoriteIds.filter(id => keys.has(id));
-                syncDisplayOrder();
+                const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, displayOrder }, allHistory);
+                pinnedIds = synced.pinnedIds;
+                favoriteIds = synced.favoriteIds;
+                displayOrder = synced.displayOrder;
+                saveOnlineMeta();
                 renderOutputGrid();
             } catch(e) {
                 console.error(e);
@@ -1455,66 +1158,6 @@
             }
         }
 
-        function firstEmptyRefSlot(){
-            return refSlots.find(s => !s.ref)?.id || refSlots[refSlots.length - 1]?.id;
-        }
-        async function handleFile(file, slotId){
-            if(!file) return;
-            const slot = refSlots.find(s => s.id === slotId);
-            if(!slot) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                getImageDimensions(e.target.result).then(dim => {
-                    slot.dim = dim;
-                    updateSizeUI();
-                    renderRefGrid();
-                }).catch(() => renderRefGrid());
-            };
-            reader.readAsDataURL(file);
-            const form = new FormData();
-            form.append('files', file);
-            const data = await fetch('/api/ai/upload', {method:'POST', body:form}).then(r=>r.json());
-            slot.ref = data.files[0];
-            ensureTrailingEmptySlot();
-            renderRefGrid();
-        }
-        async function handleImageUrl(url, slotId){
-            const normalized = normalizeImageUrl(url);
-            if(!normalized) return;
-            let slot = refSlots.find(s => s.id === slotId);
-            if(!slot){
-                if(filledRefCount() >= MAX_REF_SLOTS) return;
-                slot = newRefSlot();
-                refSlots.push(slot);
-            }
-            if(slot.ref && filledRefCount() >= MAX_REF_SLOTS) return;
-            if(slot.ref && filledRefCount() < MAX_REF_SLOTS){
-                const idx = refSlots.indexOf(slot);
-                slot = newRefSlot();
-                refSlots.splice(idx + 1, 0, slot);
-            }
-            slot.ref = { url: normalized, name: normalized.split('/').pop() || 'image.png', role: '' };
-            getImageDimensions(normalized).then(dim => {
-                slot.dim = dim;
-                updateSizeUI();
-                renderRefGrid();
-            }).catch(() => renderRefGrid());
-            ensureTrailingEmptySlot();
-            renderRefGrid();
-        }
-        window.handleImageUrl = handleImageUrl;
-        window.cancelBoardPick = cancelBoardPick;
-        function removeRefSlot(slotId, ev){
-            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-            refSlots = refSlots.filter(s => s.id !== slotId);
-            if(!refSlots.length) refSlots = [newRefSlot()];
-            ensureTrailingEmptySlot();
-            renderRefGrid();
-        }
-        window.addEventListener('paste', e => {
-            const item = [...(e.clipboardData?.items || [])].find(x => x.kind === 'file' && x.type.startsWith('image/'));
-            if(item) handleFile(item.getAsFile(), firstEmptyRefSlot());
-        });
         async function runGenerateJob(jobId, payload){
             try {
                 const result = await fetch('/api/online-image', {
@@ -1539,16 +1182,32 @@
                 }, 2800);
             }
         }
+        function syncGenBtnTip(showTip){
+            const wrap = document.getElementById('genBtnWrap');
+            if(!wrap) return;
+            if(showTip) wrap.setAttribute('data-tip', tr('studio.genPromptTip'));
+            else wrap.removeAttribute('data-tip');
+        }
+        function syncGenBtnState(){
+            const btn = document.getElementById('genBtn');
+            if(!btn) return;
+            const prompt = document.getElementById('promptInput')?.value?.trim() || '';
+            const promptMissing = !prompt;
+            btn.disabled = promptMissing;
+            syncGenBtnTip(promptMissing);
+        }
+
         async function submitImage(){
             const prompt = document.getElementById('promptInput').value.trim();
             if(!prompt){ alert(tr('online.promptRequired')); return; }
+            if(!StudioApiProviders.guardProviderKey(provider, panelProviders())) return;
             const placeholder = document.getElementById('placeholder');
             const payload = {
                 prompt,
                 provider_id: provider,
                 model: selectedModel,
                 size: currentSize(),
-                reference_images: getReferenceList()
+                reference_images: StudioRefUpload.getReferenceList()
             };
             const jobs = [];
             for(let i = 0; i < batchCount; i++){
@@ -1580,10 +1239,29 @@
             const editType = data?.params?.edit_type;
             return editType === 'brush' || editType === 'crop';
         }
+        function viewerProviderSource(data){
+            const type = String(data?.type || '').trim().toLowerCase();
+            const model = String(data.params?.model || data.model || '').trim();
+            if(type === 'local-comfy') return 'comfyui';
+            if(type === 'runninghub') return 'runninghub';
+            const onlineTypes = new Set(['online', 'online-video', 'online-audio', 'online-image']);
+            if(onlineTypes.has(type)){
+                if(model) return model;
+                return data.provider_name
+                    || providerById(data.params?.provider_id || data.provider_id)?.name
+                    || data.provider_id
+                    || '—';
+            }
+            if(model) return model;
+            return data.provider_name
+                || providerById(data.params?.provider_id || data.provider_id)?.name
+                || data.provider_id
+                || '—';
+        }
         function viewerMetaRows(data){
             const rows = [];
             const edited = isViewerEditedImage(data);
-            const providerName = data.provider_name || providerById(data.params?.provider_id || data.provider_id)?.name || data.provider_id || '—';
+            const providerName = viewerProviderSource(data);
             const modelName = data.params?.model || data.model || '—';
             const size = data.params?.size || '—';
             if(data._displaySize) rows.unshift({ label: tr('online.viewerResolution') || 'Resolution', value: data._displaySize });
@@ -2435,21 +2113,13 @@
         function applyRecordParams(data){
             if(!data) return;
             document.getElementById('promptInput').value = data.prompt || '';
+            syncGenBtnState();
             const pid = data.params?.provider_id || data.provider_id;
             const mid = data.params?.model || data.model;
             if(pid && imageProviders().some(p => p.id === pid)) setProvider(pid);
             if(mid && providerModels(provider).includes(mid)) setModel(mid);
-            refSlots = [];
-            (data.params?.reference_images || []).slice(0, MAX_REF_SLOTS).forEach(ref => {
-                refSlots.push(newRefSlot(ref, null));
-                getImageDimensions(ref.url).then(dim => {
-                    const slot = refSlots.find(s => s.ref?.url === ref.url);
-                    if(slot) slot.dim = dim;
-                    updateSizeUI();
-                }).catch(() => {});
-            });
-            ensureTrailingEmptySlot();
-            renderRefGrid();
+            StudioRefUpload.setReferenceImages(data.params?.reference_images || []);
+            updateSizeUI();
             const size = data.params?.size || '1024x1024';
             if(String(size).trim() === 'auto' || /^auto:(1k|2k|4k)$/i.test(String(size).trim())){
                 setRatio('auto');
@@ -2460,10 +2130,8 @@
                     setRatio(inferRatioFromSize(size, selectedModel));
                     setResolution(inferResolutionFromSize(size));
                 } else {
-                    setResolution('custom');
-                    customWidth = '';
-                    customHeight = '';
-                    updateSizeUI();
+                    setRatio('1:1');
+                    setResolution('1k');
                 }
             }
         }
@@ -2490,21 +2158,28 @@
             setRatio('1:1');
             setResolution('1k');
             loadOutputCols();
-            loadOnlineMeta();
+            await loadOnlineMetaFromServer();
             setOutputCols(outputCols);
             const colsSlider = document.getElementById('outputColsSlider');
             if(colsSlider) colsSlider.oninput = e => setOutputCols(e.target.value);
             loadBatchCount();
             setBatchCount(batchCount);
-            refSlots = [newRefSlot()];
-            renderRefGrid();
+            StudioRefUpload.init({
+                tr,
+                escapeHtml,
+                onChange: () => updateSizeUI(),
+                onBoardPickChange: (slotId) => {
+                    if(!window.StudioPanelBridge){
+                        renderOutputGrid();
+                        if(slotId) document.getElementById('resultBox')?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+                    }
+                }
+            });
             bindOutputAreaDrop();
             document.addEventListener('click', closeRatioDropdown);
-            document.addEventListener('keydown', e => {
-                if(e.key === 'Escape') cancelBoardPick();
-            });
             await initModels();
             await loadAllHistory();
+            syncGenBtnState();
             if(window.StudioPanelBridge){
                 const bridge = StudioPanelBridge;
                 renderOutputGrid = function(){
@@ -2519,6 +2194,7 @@
                     bridge.notifyAddItem(item);
                 };
             }
+            StudioApiProviders.onProvidersChanged(refreshApiProviders);
         };
     </script>
 </body>

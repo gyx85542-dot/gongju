@@ -66,20 +66,33 @@ body.mg-studio.embed-panel {
 
 .mg-studio textarea.nano-input {
     border: 1px solid var(--mg-border) !important;
+    transition: border-color 0.22s var(--mg-ease), box-shadow 0.22s var(--mg-ease) !important;
 }
 
 .mg-studio .wf-textarea {
     border: none !important;
+    transition: box-shadow 0.22s var(--mg-ease) !important;
+}
+
+.mg-studio textarea.nano-input:hover:not(:focus) {
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    box-shadow: none !important;
 }
 
 .mg-studio textarea.nano-input:focus {
-    border-color: rgba(255, 77, 148, 0.35) !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    border-color: #ffffff !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.mg-studio .wf-textarea:hover:not(:focus) {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38) !important;
 }
 
 .mg-studio .wf-textarea:focus {
     border: none !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    box-shadow: inset 0 0 0 1px #ffffff !important;
+    outline: none !important;
 }
 
 .mg-studio .tool-panel {
@@ -153,7 +166,7 @@ body.mg-studio.embed-panel {
 
 .mg-studio .upload-item:hover,
 .mg-studio .upload-item.drag-over {
-    border-color: rgba(255, 77, 148, 0.4) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
     transform: none !important;
 }
 
@@ -210,15 +223,27 @@ body.mg-studio.embed-panel {
     flex-shrink: 0;
 }
 
-.mg-studio .cell-action-btn:hover,
-.mg-studio .cell-action-btn.active {
-    background: var(--mg-accent) !important;
-    color: #fff !important;
+.mg-studio .cell-action-btn:hover:not([data-action="pin"]):not([data-action="favorite"]),
+.mg-studio .cell-action-btn.active:not(.fav-active):not([data-action="pin"]) {
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: #1a1a1a !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.28) !important;
 }
 
-.mg-studio .cell-action-btn.fav-active {
+.mg-studio .cell-action-btn[data-action="pin"]:hover,
+.mg-studio .cell-action-btn[data-action="pin"].active {
+    background: var(--mg-accent) !important;
+    color: #fff !important;
+    box-shadow: 0 1px 6px rgba(255, 77, 148, 0.35) !important;
+}
+
+.mg-studio .cell-action-btn[data-action="favorite"]:hover,
+.mg-studio .cell-action-btn.fav-active,
+.mg-studio .cell-action-btn.fav-active:hover,
+.mg-studio .cell-action-btn.fav-active.active {
     background: var(--mg-orange) !important;
     color: #fff !important;
+    box-shadow: 0 1px 6px rgba(255, 170, 0, 0.35) !important;
 }
 
 .mg-studio .viewer-overlay {
@@ -246,9 +271,48 @@ body.mg-studio.embed-panel {
 
 .mg-studio .viewer-meta-cell,
 .mg-studio .viewer-prompt,
+.mg-studio .viewer-edit-panel,
+.mg-studio .viewer-edit-tab,
 .mg-studio .viewer-edit-cell {
     background: var(--mg-surface-2) !important;
     border-color: var(--mg-border) !important;
+}
+
+.mg-studio .viewer-meta-cell,
+.mg-studio .viewer-prompt,
+.mg-studio .viewer-edit-panel,
+.mg-studio .viewer-edit-tab,
+.mg-studio .viewer-edit-action:not(.primary),
+.mg-studio .viewer-crop-ratio,
+.mg-studio .viewer-block-title .copy-mini,
+.mg-studio .grid-preset-btn,
+.mg-studio .viewer-grid-num-input {
+    border-radius: var(--mg-radius) !important;
+}
+
+.mg-studio .viewer-edit-tab:hover:not(.active),
+.mg-studio .viewer-crop-ratio:hover:not(.active),
+.mg-studio .grid-preset-btn:hover:not(.active) {
+    background: var(--mg-surface-hover) !important;
+    border-color: var(--mg-border-strong) !important;
+    color: var(--mg-text) !important;
+}
+
+.mg-studio .viewer-prompt:hover {
+    border-color: rgba(255, 255, 255, 0.38) !important;
+}
+
+.mg-studio .viewer-edit-tab.active,
+.mg-studio .viewer-crop-ratio.active,
+.mg-studio .grid-preset-btn.active {
+    background: #3a3a3a !important;
+    border-color: rgba(255, 77, 148, 0.35) !important;
+    color: var(--mg-text) !important;
+}
+
+.mg-studio .viewer-edit-action:hover:not(.primary) {
+    background: var(--mg-surface-hover) !important;
+    border-color: var(--mg-border-strong) !important;
 }
 
 .mg-studio .viewer-meta-value {
@@ -362,23 +426,41 @@ body.mg-studio.embed-panel {
 
 /* 参数面板 Generate 按钮 */
 .mg-studio .options-panel .glass-btn,
-.options-panel .glass-btn {
-    background: #4e6aef !important;
+.options-panel .glass-btn,
+.generate-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 0 16px !important;
+    background: #5865f2 !important;
     color: #fff !important;
     border: none !important;
-    box-shadow: 0 4px 14px rgba(78, 106, 239, 0.32) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    transition: background-color 0.2s var(--mg-ease) !important;
 }
 
 .mg-studio .options-panel .glass-btn:hover:not(:disabled),
-.options-panel .glass-btn:hover:not(:disabled) {
-    background: #4358d4 !important;
-    box-shadow: 0 6px 20px rgba(78, 106, 239, 0.38) !important;
+.options-panel .glass-btn:hover:not(:disabled),
+.generate-btn:hover:not(:disabled) {
+    background: #4752c4 !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 .mg-studio .options-panel .glass-btn:disabled,
-.options-panel .glass-btn:disabled {
+.options-panel .glass-btn:disabled,
+.generate-btn:disabled {
     opacity: 0.45;
     box-shadow: none !important;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* 参数面板：下拉框、参考图格等控件填充 */

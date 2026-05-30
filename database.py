@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import sqlite3
@@ -53,6 +54,12 @@ CREATE TABLE IF NOT EXISTS pending_jobs (
     error TEXT,
     timestamp REAL NOT NULL,
     expires_at REAL
+);
+
+CREATE TABLE IF NOT EXISTS history_user_meta (
+    scope TEXT PRIMARY KEY,
+    meta_json TEXT NOT NULL,
+    updated_at REAL NOT NULL
 );
 """
 
@@ -355,6 +362,129 @@ def delete_history_batch(timestamps: List[Any]) -> List[Dict[str, Any]]:
             conn.executemany("DELETE FROM history_records WHERE id = ?", [(i,) for i in delete_ids])
             conn.commit()
     return deleted
+
+
+# --- History user meta (pin / favorite / order) ---
+
+def _default_history_user_meta() -> Dict[str, Any]:
+    return {"pinned": [], "favorites": [], "order": []}
+
+
+def _sanitize_history_meta_id(raw: Any) -> str:
+    if raw is None:
+        return ""
+    text = str(raw).strip()
+    if not text or text in ("Infinity", "-Infinity", "NaN"):
+        return ""
+    if "e" in text.lower():
+        return ""
+    try:
+        n = float(text)
+    except (TypeError, ValueError):
+        return ""
+    if not math.isfinite(n):
+        return ""
+    if n >= 1e12:
+        key = str(int(round(n)))
+    elif n >= 1e9:
+        key = str(int(round(n * 1000)))
+    else:
+        return ""
+    if not (10 <= len(key) <= 16):
+        return ""
+    return key
+
+
+def _sanitize_history_meta_list(ids: Any) -> List[str]:
+    if not isinstance(ids, list):
+        return []
+    seen = set()
+    out: List[str] = []
+    for raw in ids:
+        key = _sanitize_history_meta_id(raw)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _sanitize_history_user_meta(data: Dict[str, Any]) -> Dict[str, Any]:
+    base = _default_history_user_meta()
+    if not isinstance(data, dict):
+        return base
+    return {
+        "pinned": _sanitize_history_meta_list(data.get("pinned")),
+        "favorites": _sanitize_history_meta_list(data.get("favorites")),
+        "order": _sanitize_history_meta_list(data.get("order")),
+    }
+
+
+def _history_meta_needs_heal(data: Dict[str, Any]) -> bool:
+    if not isinstance(data, dict):
+        return True
+    for key in ("pinned", "favorites", "order"):
+        raw = data.get(key)
+        if not isinstance(raw, list):
+            return True
+        for item in raw:
+            sid = _sanitize_history_meta_id(item)
+            if not sid or sid != str(item).strip():
+                return True
+    return False
+
+
+def _persist_history_user_meta(scope: str, payload: Dict[str, Any]) -> None:
+    with DB_LOCK:
+        conn = _connect()
+        conn.execute(
+            "INSERT INTO history_user_meta(scope, meta_json, updated_at) VALUES (?, ?, ?)"
+            " ON CONFLICT(scope) DO UPDATE SET meta_json = excluded.meta_json, updated_at = excluded.updated_at",
+            (scope, json.dumps(payload, ensure_ascii=False), time.time()),
+        )
+        conn.commit()
+
+
+def load_history_user_meta(scope: str) -> Dict[str, Any]:
+    scope = str(scope or "studio").strip() or "studio"
+    with DB_LOCK:
+        conn = _connect()
+        row = conn.execute(
+            "SELECT meta_json FROM history_user_meta WHERE scope = ?",
+            (scope,),
+        ).fetchone()
+    if not row:
+        return {**_default_history_user_meta(), "scope": scope}
+    try:
+        data = json.loads(row["meta_json"])
+    except Exception:
+        data = _default_history_user_meta()
+    if not isinstance(data, dict):
+        data = _default_history_user_meta()
+    clean = _sanitize_history_user_meta(data)
+    if _history_meta_needs_heal(data):
+        _persist_history_user_meta(scope, clean)
+    return {
+        "scope": scope,
+        "pinned": clean["pinned"],
+        "favorites": clean["favorites"],
+        "order": clean["order"],
+    }
+
+
+def save_history_user_meta(scope: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+    scope = str(scope or "studio").strip() or "studio"
+    clean = _sanitize_history_user_meta(meta if isinstance(meta, dict) else {})
+    payload = {
+        "pinned": clean["pinned"],
+        "favorites": clean["favorites"],
+        "order": clean["order"],
+    }
+    _persist_history_user_meta(scope, payload)
+    return {
+        "scope": scope,
+        **payload,
+    }
 
 
 # --- API providers ---

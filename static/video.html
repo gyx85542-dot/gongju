@@ -10,10 +10,16 @@
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
     <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
-    <script src="/static/studio-ref-upload.js?v=20260523-board-ref"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-radius">
+    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
-    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-borderless">
+    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
+    <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         :root { --accent:#ff4d94; --bg:#161616; --easing:cubic-bezier(0.22,1,0.36,1); }
         html, body { height:100%; overflow:hidden; }
@@ -22,15 +28,6 @@
         html.embed-panel .container-box { max-width:none; padding:0; height:100%; box-sizing:border-box; }
         .container-box { max-width:1680px; margin:0 auto; padding:8px 14px 10px; height:100%; box-sizing:border-box; }
         .control-label { display:flex; align-items:center; gap:0; color:#737373; font-size:11px; font-weight:600; }
-        .size-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-        .upload-item.drop-before::before,
-        .upload-item.drop-after::after { content:''; position:absolute; top:6px; bottom:6px; width:3px; background:#ff4d94; border-radius:2px; z-index:8; pointer-events:none; }
-        .upload-item.drop-before::before { left:-5px; }
-        .upload-item.drop-after::after { right:-5px; }
-        .upload-item.is-dragging { opacity:.45; }
-        .ref-reorder-btn { top:6px; left:6px; cursor:grab; display:none; }
-        .upload-item.has-image .ref-reorder-btn { display:flex; }
-        .ref-reorder-btn:active { cursor:grabbing; }
         .preview-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
     </style>
 </head>
@@ -50,25 +47,23 @@
             <section class="tool-panel">
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.prompt">提示词</span></div>
-                    <textarea id="promptInput" rows="3" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder"></textarea>
+                    <textarea id="promptInput" rows="3" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                 </div>
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.referenceImages">参考图</span></div>
                     <div id="refGrid" class="ref-grid"></div>
                 </div>
             </section>
-            <section class="tool-panel">
-                <div class="size-row">
-                    <label>
-                        <div class="control-label mb-1" data-i18n="canvas.videoDuration">时长</div>
-                        <select id="durationSelect" class="size-select"></select>
-                    </label>
-                    <label>
-                        <div class="control-label mb-1" data-i18n="canvas.videoAspect">比例</div>
-                        <select id="aspectSelect" class="size-select"></select>
-                    </label>
-                </div>
-                <label>
+            <section class="tool-panel panel-field-stack">
+                <label class="block">
+                    <div class="control-label mb-1" data-i18n="canvas.videoDuration">时长</div>
+                    <select id="durationSelect" class="size-select"></select>
+                </label>
+                <label class="block">
+                    <div class="control-label mb-1" data-i18n="canvas.videoAspect">比例</div>
+                    <select id="aspectSelect" class="size-select"></select>
+                </label>
+                <label class="block">
                     <div class="control-label mb-1" data-i18n="canvas.videoResolution">分辨率</div>
                     <select id="resolutionSelect" class="size-select">
                         <option value="480p">480p</option>
@@ -77,10 +72,12 @@
                     </select>
                 </label>
             </section>
-            <button id="genBtn" onclick="submitVideo()" class="glass-btn w-full py-3 font-bold flex items-center justify-center gap-2">
-                <i data-lucide="clapperboard" class="w-4 h-4"></i>
-                <span class="tracking-[0.2em] text-[11px] uppercase" data-i18n="video.generate">生成视频</span>
-            </button>
+            <span id="genBtnWrap" class="generate-btn-wrap">
+                <button id="genBtn" onclick="submitVideo()" class="glass-btn generate-btn" type="button" disabled>
+                    <span class="generate-btn-label" data-i18n="video.generate">生成视频</span>
+                    <i data-lucide="sparkles" class="generate-btn-icon"></i>
+                </button>
+            </span>
         </main>
     </div>
     <script>
@@ -91,13 +88,32 @@
         let provider = 'comfly', selectedModel = 'veo3-fast', apiProviders = [];
         let pendingJobs = [];
 
+        function syncGenBtnTip(showTip){
+            const wrap = document.getElementById('genBtnWrap');
+            if(!wrap) return;
+            if(showTip) wrap.setAttribute('data-tip', tr('studio.genPromptTip'));
+            else wrap.removeAttribute('data-tip');
+        }
+        function syncGenBtnState(){
+            const btn = document.getElementById('genBtn');
+            if(!btn) return;
+            const prompt = document.getElementById('promptInput')?.value?.trim() || '';
+            const promptMissing = !prompt;
+            btn.disabled = promptMissing;
+            syncGenBtnTip(promptMissing);
+        }
+
         function getReferenceList(){
             return StudioRefUpload.getReferenceList();
         }
 
+        function panelProviders(){
+            const list = StudioApiProviders.enabledProviders(apiProviders);
+            if(list.length) return list;
+            return [{ id:'apimart', name:'🐻', has_key:false, enabled:true, video_models:['veo3.1-fast'] }];
+        }
         function videoProviders(){
-            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.video_models || []).length);
-            return list.length ? list : [{ id:'comfly', name:'API', video_models:['veo3-fast'] }];
+            return panelProviders();
         }
         function isDoubaoSeedance20Model(model){
             const id = String(model || '').toLowerCase();
@@ -169,21 +185,36 @@
             durationSelect.value = String(nextDuration);
             aspectSelect.value = nextAspect;
         }
-        function renderProviderControls(){
+        function renderProviderControls(deletedId){
             const providers = videoProviders();
-            if(!providers.some(p => p.id === provider)) provider = providers[0]?.id || 'comfly';
-            const models = providers.find(p => p.id === provider)?.video_models || ['veo3-fast'];
-            if(!models.includes(selectedModel)) selectedModel = models[0];
-            document.getElementById('providerSelect').innerHTML = providers.map(p => `<option value="${escapeHtml(p.id)}" ${p.id===provider?'selected':''}>${escapeHtml(p.name||p.id)}</option>`).join('');
+            if(!providers.length) return;
+            provider = StudioApiProviders.resolveProviderId(provider, providers, { deletedId, preferApimart: true });
+            const models = providers.find(p => p.id === provider)?.video_models || [];
+            if(!models.includes(selectedModel)) selectedModel = models[0] || '';
+            document.getElementById('providerSelect').innerHTML = StudioApiProviders.buildProviderOptionsHtml(providers, provider, escapeHtml);
             document.getElementById('modelSelect').innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m===selectedModel?'selected':''}>${escapeHtml(m)}</option>`).join('');
             syncVideoParams();
         }
-        function setProvider(v){ provider = v; renderProviderControls(); }
+        function setProvider(v){
+            const item = panelProviders().find(p => p.id === v);
+            if(item && !StudioApiProviders.providerHasKey(item)){
+                StudioApiProviders.promptMissingKey(item);
+            }
+            provider = v;
+            renderProviderControls();
+        }
+
+        async function refreshApiProviders(payload){
+            try {
+                apiProviders = await StudioApiProviders.fetchProviderList();
+            } catch(e) {}
+            renderProviderControls(payload && payload.deletedId);
+        }
 
         async function loadConfig(){
             try {
-                const cfg = await fetch('/api/config').then(r=>r.json());
-                apiProviders = cfg.api_providers || [];
+                apiProviders = await StudioApiProviders.fetchProviderList();
+                provider = StudioApiProviders.resolveProviderId(provider, panelProviders(), { preferApimart: true });
                 renderProviderControls();
             } catch(e){}
         }
@@ -219,6 +250,7 @@
         async function submitVideo(){
             const prompt = document.getElementById('promptInput').value.trim();
             if(!prompt){ alert(tr('video.promptRequired')); return; }
+            if(!StudioApiProviders.guardProviderKey(provider, panelProviders())) return;
             const payload = {
                 prompt,
                 provider_id: provider,
@@ -238,12 +270,13 @@
             notifyGallery();
             document.getElementById('genBtn').disabled = true;
             await runJob(jobId, { ...payload, job_id: jobId });
-            document.getElementById('genBtn').disabled = false;
+            syncGenBtnState();
         }
 
         window.applyRecordParams = function(data){
             if(!data) return;
             if(data.prompt) document.getElementById('promptInput').value = data.prompt;
+            syncGenBtnState();
             const p = data.params || {};
             if(p.provider_id) setProvider(p.provider_id);
             if(p.model){ selectedModel = p.model; renderProviderControls(); }
@@ -254,14 +287,17 @@
             if(Array.isArray(p.reference_images)) StudioRefUpload.setReferenceImages(p.reference_images);
         };
 
-        window.addEventListener('message', e => { if(e.data?.type === 'studio-lang' && window.StudioI18n) StudioI18n.set(e.data.lang); });
+        window.addEventListener('message', e => {
+            if(e.data?.type === 'studio-lang' && window.StudioI18n){
+                StudioI18n.set(e.data.lang);
+                syncGenBtnState();
+            }
+        });
         if(window.StudioI18n) document.title = tr('video.title');
         StudioRefUpload.init({ tr, escapeHtml, referenceFormat: 'video' });
+        syncGenBtnState();
         loadConfig();
-        try {
-            const ch = new BroadcastChannel('studio-api');
-            ch.onmessage = e => { if(e.data?.type === 'providers-changed') loadConfig(); };
-        } catch(e){}
+        StudioApiProviders.onProvidersChanged(refreshApiProviders);
     </script>
 </body>
 </html>

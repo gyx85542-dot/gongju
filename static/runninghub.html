@@ -16,10 +16,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
-    <script src="/static/i18n.js?v=20260529-runninghub-page"></script>
+    <script src="/static/i18n.js?v=20260530-rh-options"></script>
     <script src="/static/studio-panel-bridge.js?v=20260529-runninghub"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
+    <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -36,7 +38,7 @@
         .result-frame { background:#1a1a1a; border-radius:10px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
         .result-frame.has-outputs { justify-content:flex-start; }
         .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
-        .output-cols-slider { width:100%; max-width:140px; height:4px; accent-color:#ffffff; }
+        .output-cols-slider { width:100%; max-width:140px; height:4px; }
         .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; }
         .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
         .output-grid-cell { position:relative; aspect-ratio:1; border-radius:6px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); }
@@ -58,9 +60,18 @@
         html.embed-panel .studio-panel-col { grid-column:1 / -1 !important; max-width:none !important; }
         html.embed-panel .page-main { grid-template-columns:minmax(0,1fr) !important; }
     </style>
-    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-bg-1a">
-    <link rel="stylesheet" href="/static/theme.css?v=20260520-bg-1a">
-    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-borderless">
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/theme.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
+    <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
+    <style>
+        html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
+            color:#fff !important;
+        }
+    </style>
 </head>
 <body class="mg-studio">
     <div class="container-box">
@@ -80,10 +91,12 @@
                     </div>
                 </section>
                 <div id="dynamicPanel"></div>
-                <button id="genBtn" onclick="submitGenerate()" class="glass-btn w-full py-3 text-white rounded-md font-bold flex items-center justify-center gap-2 shadow-lg" disabled>
-                    <i data-lucide="crown" class="w-3.5 h-3.5 text-white"></i>
-                    <span class="tracking-[0.2em] text-[11px] uppercase" data-i18n="rhPage.generate">生成</span>
-                </button>
+                <span id="genBtnWrap" class="generate-btn-wrap">
+                    <button id="genBtn" onclick="submitGenerate()" class="glass-btn generate-btn" type="button" disabled>
+                        <span class="generate-btn-label" data-i18n="rhPage.generate">生成</span>
+                        <i data-lucide="sparkles" class="generate-btn-icon"></i>
+                    </button>
+                </span>
             </div>
             <div class="lg:col-span-9 flex flex-col gap-2 min-h-0 h-full studio-output-col">
                 <div class="output-toolbar shrink-0">
@@ -124,6 +137,7 @@
 
         const HISTORY_TYPE = 'runninghub';
         const CLIENT_ID = localStorage.getItem('client_id') || (()=>{ const id=crypto.randomUUID?.()||String(Date.now()); localStorage.setItem('client_id',id); return id; })();
+        const META_SCOPE = 'runninghub';
         const META_PIN = 'rh_pinned', META_FAV = 'rh_favorites', META_ORDER = 'rh_display_order';
 
         let workflows = [], selectedId = '', currentWorkflow = null;
@@ -163,7 +177,6 @@
             }));
         }
         let fieldValues = {}, fieldImageUrls = {}, batchCount = 1, outputCols = 2;
-        let boardPickFieldId = '';
         let allHistory = [], pendingJobs = [], historyLoading = false, currentLightboxData = null;
         let pinnedIds = [], favoriteIds = [], displayOrder = [];
 
@@ -172,12 +185,38 @@
         }
         window.openRhSettings = openRhSettings;
 
+        function rhEffectiveFieldType(f){
+            const im = String(f?.inputMethod || '').toLowerCase();
+            if(im === 'dropdown') return 'select';
+            const legacy = String(f?.type || '').toLowerCase();
+            if(legacy === 'select') return 'select';
+            const dt = String(f?.dataType || f?.type || 'text').toLowerCase();
+            return dt || 'text';
+        }
+        function rhNormalizeFieldSchema(f){
+            if(!f) return f;
+            const legacy = String(f.type || 'text').toLowerCase();
+            let dt = String(f.dataType || '').toLowerCase();
+            let im = String(f.inputMethod || '').toLowerCase();
+            if(!dt || !im){
+                if(legacy === 'select'){ dt = dt || 'text'; im = im || 'dropdown'; }
+                else if(legacy === 'textarea'){ dt = 'textarea'; im = 'manual'; }
+                else if(['text','number','image','textarea'].includes(legacy)){ dt = legacy; im = 'manual'; }
+                else { dt = 'text'; im = 'manual'; }
+            }
+            f.dataType = dt;
+            f.inputMethod = im === 'dropdown' ? 'dropdown' : 'manual';
+            f.type = f.inputMethod === 'dropdown' ? 'select' : f.dataType;
+            return f;
+        }
         function rhFieldKind(f){
-            const t = String(f.type||'text').toLowerCase();
+            if(String(f?.inputMethod || '').toLowerCase() === 'dropdown') return 'setting';
+            if(rhEffectiveFieldType(f) === 'select') return 'setting';
+            const t = rhEffectiveFieldType(f);
             if(t === 'image') return 'image';
             if(t === 'text' || t === 'textarea') return 'prompt';
             const key = `${f.fieldName||''} ${f.name||''}`.toLowerCase();
-            if(/prompt|text|提示|正向|负向|caption|value/.test(key)) return 'prompt';
+            if(/prompt|text|description|caption|提示|正向|负向/.test(key)) return 'prompt';
             return 'setting';
         }
         function promptFields(){ return effectiveFields().filter(f => rhFieldKind(f) === 'prompt'); }
@@ -196,6 +235,21 @@
         function onGlobalPromptInput(){
             const v = document.getElementById('globalPromptInput')?.value || '';
             promptFields().forEach(f => { fieldValues[f.id] = v; });
+            syncGenBtnState();
+        }
+        function syncGenBtnTip(showTip){
+            const wrap = document.getElementById('genBtnWrap');
+            if(!wrap) return;
+            if(showTip) wrap.setAttribute('data-tip', tr('studio.genPromptTip'));
+            else wrap.removeAttribute('data-tip');
+        }
+        function syncGenBtnState(){
+            const btn = document.getElementById('genBtn');
+            if(!btn) return;
+            const wfReady = workflows.length > 0 && selectedId && String(currentWorkflow?.workflow_id || '').trim();
+            const promptMissing = !collectPrimaryPrompt();
+            btn.disabled = !wfReady || promptMissing;
+            syncGenBtnTip(wfReady && promptMissing);
         }
         function effectiveFields(){ return currentWorkflow?.fields || []; }
         function rhEnsureOptions(options, value){
@@ -205,7 +259,7 @@
             return opts.includes(canonical) ? opts : [String(canonical), ...opts];
         }
         function hydrateRhFieldOptions(field){
-            if(!field || String(field.type || '').toLowerCase() !== 'select') return;
+            if(!field || rhEffectiveFieldType(field) !== 'select') return;
             const fn = String(field.fieldName || '').toLowerCase();
             const presets = RH_SELECT_PRESETS[fn];
             const existing = field.options || [];
@@ -222,7 +276,10 @@
             }
         }
         function hydrateWorkflowFields(wf){
-            (wf?.fields || []).forEach(hydrateRhFieldOptions);
+            (wf?.fields || []).forEach(f => {
+                rhNormalizeFieldSchema(f);
+                hydrateRhFieldOptions(f);
+            });
         }
 
         async function loadWorkflowList(){
@@ -251,8 +308,10 @@
                 hydrateWorkflowFields(currentWorkflow);
                 fieldValues = {}; fieldImageUrls = {};
                 (currentWorkflow?.fields||[]).forEach(f => {
+                    rhNormalizeFieldSchema(f);
                     if(f.default === undefined || f.default === null || f.default === '') return;
-                    if(String(f.type||'').toLowerCase() === 'select' && (f.options||[]).length){
+                    const eff = rhEffectiveFieldType(f);
+                    if(eff === 'select' && (f.options||[]).length){
                         fieldValues[f.id] = rhCanonicalOption(f.options, f.default);
                     } else {
                         fieldValues[f.id] = f.default;
@@ -260,7 +319,7 @@
                 });
                 renderDynamicPanel();
                 syncPromptSectionVisibility();
-                document.getElementById('genBtn').disabled = !String(currentWorkflow?.workflow_id||'').trim();
+                syncGenBtnState();
             } catch(e){
                 alert(tr('rhPage.loadFailed'));
             }
@@ -271,6 +330,7 @@
             const fields = effectiveFields();
             if(!fields.length){
                 panel.innerHTML = `<div class="empty-hint">${tr('rhPage.noFieldsHint')}</div>`;
+                syncGenBtnState();
                 return;
             }
             const prompts = fields.filter(f => rhFieldKind(f) === 'prompt');
@@ -283,13 +343,13 @@
                     const rows = prompts.length === 1 ? 4 : (f.type === 'textarea' ? 4 : 2);
                     html += `<div>
                         <div class="control-label mb-1"><span>${escapeHtml(promptFieldLabel(f, prompts))}</span></div>
-                        <textarea class="nano-input w-full outline-none resize-none" rows="${rows}" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value)">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
+                        <textarea class="nano-input w-full outline-none resize-none" rows="${rows}" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value);syncGenBtnState()">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
                     </div>`;
                 });
                 if(images.length){
                     html += `<div>
                         <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图片</span></div>
-                        <div class="ref-grid">${images.map((f,i) => renderImageSlot(f, i)).join('')}</div>
+                        <div id="rhRefGrid" class="ref-grid"></div>
                     </div>`;
                 }
                 html += `</section>`;
@@ -309,14 +369,44 @@
                 </div>
             </section>`;
             panel.innerHTML = html;
-            bindImageSlots();
+            if(images.length){
+                mountWorkflowRefGrid(images);
+            }
             lucide.createIcons();
-            updateBoardPickUI();
+            syncOutputDragState();
             syncPromptSectionVisibility();
+            syncGenBtnState();
+        }
+
+        function mountWorkflowRefGrid(images){
+            StudioRefUpload.mountFixed('rhRefGrid', images.map(f => ({
+                id: f.id,
+                ref: fieldImageUrls[f.id] ? {
+                    url: fieldImageUrls[f.id],
+                    name: String(fieldValues[f.id] || f.name || f.fieldName || '')
+                } : null
+            })), {
+                tr,
+                escapeHtml,
+                onFileUpload: uploadImageFile,
+                onUrlAssign: assignImageFromUrl,
+                onRemove: (fieldId) => {
+                    delete fieldValues[fieldId];
+                    if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
+                    delete fieldImageUrls[fieldId];
+                },
+                onBoardPickUI: syncOutputDragState
+            });
+        }
+        function syncOutputDragState(){
+            const pickId = StudioRefUpload.getBoardPickSlotId();
+            document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => {
+                img.draggable = !pickId;
+            });
         }
 
         function renderSettingField(f){
-            const t = String(f.type||'text').toLowerCase();
+            const t = rhEffectiveFieldType(f);
             const v = fieldValues[f.id] ?? f.default ?? (t==='boolean'?false:'');
             const label = `<div class="control-label mb-1"><span>${escapeHtml(f.name || f.fieldName)}</span></div>`;
             if(t === 'number'){
@@ -333,24 +423,17 @@
                 const opts = rhSelectMatch(options, v).map(o => `<option value="${escapeAttr(o.value)}" ${o.selected?'selected':''}>${escapeHtml(o.value)}</option>`).join('');
                 return `<label class="block">${label}<select class="size-select" onchange="setFieldValue('${escapeAttr(f.id)}', this.value)">${opts}</select></label>`;
             }
+            if(t === 'textarea'){
+                return `<label class="block">${label}<textarea class="size-select min-h-[72px] resize-y" oninput="setFieldValue('${escapeAttr(f.id)}', this.value)">${escapeHtml(v)}</textarea></label>`;
+            }
             return `<label class="block">${label}<input class="size-select" type="text" value="${escapeAttr(v)}" oninput="setFieldValue('${escapeAttr(f.id)}', this.value)"></label>`;
         }
 
-        function renderImageSlot(f, index){
-            const url = fieldImageUrls[f.id] || '';
-            const label = String(index + 1).padStart(2, '0');
-            const filled = !!url;
-            return `<div class="upload-item group${filled?' has-image':''}${boardPickFieldId===f.id?' is-board-target':''}" data-image-field-id="${escapeAttr(f.id)}">
-                <input type="file" accept="image/*" class="hidden">
-                ${filled?'':'<i data-lucide="plus" class="w-5 h-5 text-[#737373]"></i>'}
-                <span class="ref-slot-label mt-2 uppercase">${label}</span>
-                <img class="preview-img${filled?'':' hidden'}" ${filled?`src="${escapeAttr(url)}"`:''} alt="" draggable="false">
-                <button type="button" data-rh-board class="cell-action-btn ref-slot-btn ref-board-btn" title="board">board</button>
-                <button type="button" data-rh-del class="cell-action-btn ref-slot-btn ref-del-btn"><i data-lucide="trash-2"></i></button>
-            </div>`;
+        function setFieldValue(id, value){
+            fieldValues[id] = value;
+            const f = effectiveFields().find(x => x.id === id);
+            if(f && rhFieldKind(f) === 'prompt') syncGenBtnState();
         }
-
-        function setFieldValue(id, value){ fieldValues[id] = value; }
         function setBatchCount(n){
             batchCount = Math.min(4, Math.max(1, Number(n)||1));
             try { localStorage.setItem('rh_batch_count', String(batchCount)); } catch(e){}
@@ -360,58 +443,6 @@
             if(slider) slider.value = batchCount;
         }
 
-        function normalizeImageUrl(url){
-            const raw = String(url||'').trim();
-            if(!raw) return '';
-            try {
-                if(/^https?:\/\//i.test(raw)){
-                    const p = new URL(raw);
-                    if(p.pathname.startsWith('/assets/') || p.pathname.startsWith('/output/')) return p.pathname;
-                }
-            } catch(e){}
-            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
-            return raw;
-        }
-        function imageUrlFromSlotDrop(dt){
-            if(!dt) return '';
-            const custom = dt.getData('application/x-online-output-image');
-            if(custom) return normalizeImageUrl(custom);
-            const values = (dt.getData('text/uri-list')||dt.getData('text/plain')||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-            for(const v of values){
-                const n = normalizeImageUrl(v);
-                if(n.startsWith('/assets/') || n.startsWith('/output/')) return n;
-            }
-            return '';
-        }
-        function setImageDragData(e, url){
-            const n = normalizeImageUrl(url);
-            if(!n) return;
-            e.dataTransfer.setData('application/x-online-output-image', n);
-            e.dataTransfer.setData('text/uri-list', n);
-            e.dataTransfer.setData('text/plain', n);
-        }
-        function syncBoardPickWindow(){ window.boardPickSlotId = boardPickFieldId; }
-        function updateBoardPickUI(){
-            document.body.classList.toggle('board-pick-active', !!boardPickFieldId);
-            document.querySelectorAll('.upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
-            if(boardPickFieldId) document.querySelector(`[data-image-field-id="${boardPickFieldId}"]`)?.classList.add('is-board-target');
-            document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => { img.draggable = !boardPickFieldId; });
-        }
-        function cancelBoardPick(){
-            if(!boardPickFieldId) return;
-            boardPickFieldId = '';
-            syncBoardPickWindow();
-            updateBoardPickUI();
-            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick('');
-        }
-        function startBoardPick(fieldId, ev){
-            ev?.preventDefault(); ev?.stopPropagation();
-            if(boardPickFieldId === fieldId){ cancelBoardPick(); return; }
-            boardPickFieldId = fieldId;
-            syncBoardPickWindow();
-            updateBoardPickUI();
-            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick(fieldId);
-        }
         async function uploadImageFile(file, fieldId){
             if(!file || !fieldId) return;
             const preview = URL.createObjectURL(file);
@@ -420,7 +451,7 @@
             form.append('files', file);
             try {
                 const data = await fetch('/api/upload', { method:'POST', body:form }).then(r=>r.json());
-                const savedUrl = normalizeImageUrl(data.files?.[0]?.url || '');
+                const savedUrl = StudioRefUpload.normalizeImageUrl(data.files?.[0]?.url || '');
                 if(savedUrl){
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     fieldImageUrls[fieldId] = savedUrl;
@@ -435,7 +466,7 @@
             }
         }
         async function assignImageFromUrl(url, fieldId){
-            const normalized = normalizeImageUrl(url);
+            const normalized = StudioRefUpload.normalizeImageUrl(url);
             if(!normalized || !fieldId) return;
             fieldImageUrls[fieldId] = normalized;
             fieldValues[fieldId] = normalized;
@@ -451,42 +482,12 @@
             }
             cancelBoardPick();
         }
-        function bindImageSlots(){
-            document.querySelectorAll('[data-image-field-id]').forEach(cell => {
-                const fieldId = cell.dataset.imageFieldId;
-                const input = cell.querySelector('input[type="file"]');
-                cell.onclick = e => {
-                    if(e.target.closest('[data-rh-del],[data-rh-board]')) return;
-                    if(!fieldValues[fieldId]) input?.click();
-                };
-                input.onchange = () => { const f = input.files?.[0]; if(f) uploadImageFile(f, fieldId); input.value=''; };
-                cell.querySelector('[data-rh-del]')?.addEventListener('click', e => {
-                    e.stopPropagation();
-                    delete fieldValues[fieldId];
-                    if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(err){}
-                    delete fieldImageUrls[fieldId];
-                    if(boardPickFieldId === fieldId) cancelBoardPick();
-                    renderDynamicPanel();
-                });
-                cell.querySelector('[data-rh-board]')?.addEventListener('click', e => startBoardPick(fieldId, e));
-                cell.ondragover = e => { if(e.dataTransfer?.types?.length){ e.preventDefault(); cell.classList.add('drag-over'); } };
-                cell.ondragleave = () => cell.classList.remove('drag-over');
-                cell.ondrop = e => {
-                    e.preventDefault();
-                    cell.classList.remove('drag-over');
-                    const file = e.dataTransfer.files?.[0];
-                    if(file?.type?.startsWith('image/')){ uploadImageFile(file, fieldId); return; }
-                    const dropUrl = imageUrlFromSlotDrop(e.dataTransfer);
-                    if(dropUrl) assignImageFromUrl(dropUrl, fieldId);
-                };
-            });
-        }
 
         function collectRunFields(){
             if(!promptFields().length) onGlobalPromptInput();
             const out = { ...fieldValues };
             effectiveFields().forEach(f => {
-                const t = String(f.type || '').toLowerCase();
+                const t = rhEffectiveFieldType(f);
                 if(t === 'number' && out[f.id] !== undefined && out[f.id] !== ''){
                     out[f.id] = Number(out[f.id]);
                 } else if(t === 'select' && out[f.id] !== undefined && out[f.id] !== null){
@@ -508,7 +509,7 @@
         }
         function collectReferenceImages(){
             return effectiveFields().filter(f => rhFieldKind(f)==='image').map(f => {
-                const url = normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
+                const url = StudioRefUpload.normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
                 if(!url || url.startsWith('blob:')) return null;
                 return { url, name: f.name || f.fieldName || '', role: '' };
             }).filter(Boolean);
@@ -519,7 +520,7 @@
             if(!cfg.has_key){ alert(tr('rhPage.noApiKey')); openRhSettings(); return false; }
             if(!collectPrimaryPrompt()){ alert(tr('rhPage.promptRequired')); return false; }
             for(const f of effectiveFields().filter(x => rhFieldKind(x)==='image')){
-                const url = normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
+                const url = StudioRefUpload.normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
                 if(!url || url.startsWith('blob:')){ alert(tr('rhPage.imageRequired')); return false; }
             }
             return true;
@@ -587,33 +588,62 @@
             await Promise.allSettled(jobs);
         }
 
-        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
         function loadMeta(){
             try {
-                pinnedIds = JSON.parse(localStorage.getItem(META_PIN)||'[]').map(String);
-                favoriteIds = JSON.parse(localStorage.getItem(META_FAV)||'[]').map(String);
-                displayOrder = JSON.parse(localStorage.getItem(META_ORDER)||'[]').map(String);
+                pinnedIds = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_PIN)||'[]'));
+                favoriteIds = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_FAV)||'[]'));
+                displayOrder = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_ORDER)||'[]'));
             } catch(e){ pinnedIds=[]; favoriteIds=[]; displayOrder=[]; }
         }
         function saveMeta(){
             try {
+                pinnedIds = StudioHistoryMeta.normalizeIdList(pinnedIds);
+                favoriteIds = StudioHistoryMeta.normalizeIdList(favoriteIds);
+                displayOrder = StudioHistoryMeta.normalizeIdList(displayOrder);
                 localStorage.setItem(META_PIN, JSON.stringify(pinnedIds));
                 localStorage.setItem(META_FAV, JSON.stringify(favoriteIds));
                 localStorage.setItem(META_ORDER, JSON.stringify(displayOrder));
+                StudioHistoryMeta.saveUserMeta(META_SCOPE, { pinnedIds, favoriteIds, displayOrder });
             } catch(e){}
         }
-        function syncDisplayOrder(){
-            const keys = new Set(allHistory.map(historyKey));
-            displayOrder = displayOrder.filter(id => keys.has(id));
-            allHistory.forEach(item => { const k = historyKey(item); if(k && !displayOrder.includes(k)) displayOrder.unshift(k); });
+        async function loadMetaFromServer(){
+            loadMeta();
+            const remote = await StudioHistoryMeta.loadUserMeta(META_SCOPE);
+            const merged = StudioHistoryMeta.mergeMetaSources({ pinnedIds, favoriteIds, displayOrder }, remote);
+            pinnedIds = merged.pinnedIds;
+            favoriteIds = merged.favoriteIds;
+            displayOrder = merged.displayOrder;
             saveMeta();
         }
+        function syncDisplayOrder(opts){
+            const persist = !!(opts && opts.persist);
+            const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, displayOrder }, allHistory);
+            pinnedIds = synced.pinnedIds;
+            favoriteIds = synced.favoriteIds;
+            displayOrder = synced.displayOrder;
+            if(persist) saveMeta();
+        }
+        function findHistoryByKey(key){ return allHistory.find(h => StudioHistoryMeta.keysEqual(historyKey(h), key)); }
         function sortedHistory(){
             syncDisplayOrder();
-            const pinSet = new Set(pinnedIds);
-            const pinned = displayOrder.filter(id => pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
-            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
-            return [...pinned, ...rest];
+            const seen = new Set();
+            const out = [];
+            displayOrder.forEach(id => {
+                const item = findHistoryByKey(id);
+                if(!item) return;
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            allHistory.forEach(item => {
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            return out;
         }
         function upsertHistoryItem(item){
             if(!item?.images?.[0] && !(item?.videos?.[0])) return;
@@ -645,7 +675,7 @@
             grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0,1fr))`;
             grid.innerHTML = pendingJobs.map(j => `<div class="output-grid-cell is-pending"><div class="cell-pending">${j.error?`<p>${escapeHtml(j.error)}</p>`:`<div class="pending-spin"></div><p>${tr('online.generating')}</p>`}</div></div>`).join('')
                 + items.map(d => {
-                    const key = historyKey(d), pinned = pinnedIds.includes(key), fav = favoriteIds.includes(key);
+                    const key = historyKey(d), pinned = StudioHistoryMeta.includesKey(pinnedIds, key), fav = StudioHistoryMeta.includesKey(favoriteIds, key);
                     const media = mediaPreview(d);
                     const inner = media.kind === 'video'
                         ? `<video src="${escapeHtml(media.url)}" muted loop playsinline></video>`
@@ -661,7 +691,7 @@
                 }).join('');
             bindOutputGridCells(items);
             lucide.createIcons();
-            updateBoardPickUI();
+            syncOutputDragState();
         }
         function bindOutputGridCells(items){
             const itemMap = new Map(items.map(item => [historyKey(item), item]));
@@ -670,26 +700,37 @@
                 if(!data) return;
                 const media = mediaPreview(data);
                 const img = cell.querySelector('img.draggable-output');
+                const pickId = StudioRefUpload.getBoardPickSlotId();
                 if(img && media.kind === 'image'){
-                    img.draggable = !boardPickFieldId;
+                    img.draggable = !pickId;
                     img.ondragstart = e => {
-                        if(boardPickFieldId){ e.preventDefault(); return; }
+                        if(pickId){ e.preventDefault(); return; }
                         e.stopPropagation();
-                        setImageDragData(e, media.url);
+                        StudioRefUpload.setImageDragData(e, media.url);
                     };
                 }
                 cell.onclick = e => {
-                    if(boardPickFieldId && !e.target.closest('.cell-actions') && media.kind === 'image'){
-                        assignImageFromUrl(media.url, boardPickFieldId);
+                    if(pickId && !e.target.closest('.cell-actions') && media.kind === 'image'){
+                        assignImageFromUrl(media.url, pickId);
                         return;
                     }
                     if(!e.target.closest('.cell-actions')) openLightbox(data);
                 };
             });
         }
-        function historyItem(key){ return allHistory.find(h => historyKey(h) === key); }
-        function togglePin(key, ev){ ev?.stopPropagation(); pinnedIds = pinnedIds.includes(key) ? pinnedIds.filter(x=>x!==key) : [...pinnedIds,key]; saveMeta(); renderOutputGrid(); }
-        function toggleFavorite(key, ev){ ev?.stopPropagation(); favoriteIds = favoriteIds.includes(key) ? favoriteIds.filter(x=>x!==key) : [key,...favoriteIds]; saveMeta(); renderOutputGrid(); }
+        function historyItem(key){ return findHistoryByKey(key); }
+        function togglePin(key, ev){
+            ev?.stopPropagation();
+            if(StudioHistoryMeta.includesKey(pinnedIds, key)) pinnedIds = pinnedIds.filter(x => !StudioHistoryMeta.keysEqual(x, key));
+            else pinnedIds = [...pinnedIds.filter(x => !StudioHistoryMeta.keysEqual(x, key)), key];
+            saveMeta(); renderOutputGrid();
+        }
+        function toggleFavorite(key, ev){
+            ev?.stopPropagation();
+            if(StudioHistoryMeta.includesKey(favoriteIds, key)) favoriteIds = favoriteIds.filter(x => !StudioHistoryMeta.keysEqual(x, key));
+            else favoriteIds = [key, ...favoriteIds.filter(x => !StudioHistoryMeta.keysEqual(x, key))];
+            saveMeta(); renderOutputGrid();
+        }
         async function deleteHistoryItem(key, ev){
             ev?.stopPropagation();
             if(!confirm(tr('online.deleteConfirm'))) return;
@@ -702,26 +743,38 @@
         async function applyRecordParams(data, ev){
             ev?.stopPropagation();
             if(!data) return;
-            if(data.workflow_id && workflows.some(w => w.id === data.workflow_id)) await selectWorkflow(data.workflow_id);
+            const wfId = data.workflow_id || data.params?.workflow_id;
+            if(wfId) await selectWorkflow(wfId);
             const saved = data.params?.fields || {};
             Object.entries(saved).forEach(([fid, val]) => { fieldValues[fid] = val; });
+            const promptText = String(data.prompt || '').trim();
+            if(promptText){
+                const prompts = promptFields();
+                if(prompts.length) prompts.forEach((f, i) => { if(i === 0 || !String(fieldValues[f.id] ?? '').trim()) fieldValues[f.id] = promptText; });
+                else {
+                    const globalIn = document.getElementById('globalPromptInput');
+                    if(globalIn) globalIn.value = promptText;
+                    onGlobalPromptInput();
+                }
+            }
             const refs = data.params?.reference_images || [];
             effectiveFields().filter(f => rhFieldKind(f)==='image').forEach((f, i) => {
                 const ref = refs[i];
                 if(ref?.url){
-                    const url = normalizeImageUrl(ref.url);
+                    const url = StudioRefUpload.normalizeImageUrl(ref.url);
                     fieldImageUrls[f.id] = url;
                     fieldValues[f.id] = url;
                 }
             });
             renderDynamicPanel();
+            syncGenBtnState();
         }
         async function loadAllHistory(){
             if(historyLoading) return; historyLoading = true;
             try {
                 allHistory = await fetch(`/api/history?type=${HISTORY_TYPE}`).then(r=>r.json());
                 if(!Array.isArray(allHistory)) allHistory = [];
-                syncDisplayOrder(); renderOutputGrid();
+                syncDisplayOrder({ persist: true }); renderOutputGrid();
             } finally { historyLoading = false; }
         }
         function setOutputCols(n){
@@ -754,11 +807,12 @@
             document.getElementById('lightboxVideo').pause?.();
         }
 
-        window.handleImageUrl = assignImageFromUrl;
-        window.cancelBoardPick = cancelBoardPick;
-
-        window.addEventListener('message', e => { if(e.data?.type === 'studio-lang') window.StudioI18n?.set(e.data.lang); });
-        window.addEventListener('keydown', e => { if(e.key === 'Escape') cancelBoardPick(); });
+        window.addEventListener('message', e => {
+            if(e.data?.type === 'studio-lang'){
+                window.StudioI18n?.set(e.data.lang);
+                syncGenBtnState();
+            }
+        });
         try {
             new BroadcastChannel('studio-api').onmessage = e => { if(e.data?.type === 'runninghub-changed') loadWorkflowList(); };
         } catch(e){}
@@ -777,7 +831,7 @@
         window.onload = async () => {
             if(window.StudioI18n){ StudioI18n.apply(); document.title = tr('rhPage.title'); }
             lucide.createIcons();
-            loadMeta();
+            await loadMetaFromServer();
             try { const s = parseInt(localStorage.getItem('rh_batch_count')||'1',10); if(s>=1&&s<=4) batchCount=s; } catch(e){}
             try { const s = parseInt(localStorage.getItem('rh_output_cols')||'2',10); if(s>=1&&s<=6) outputCols=s; } catch(e){}
             setOutputCols(outputCols);

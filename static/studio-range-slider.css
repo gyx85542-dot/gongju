@@ -1,0 +1,112 @@
+/* Studio Range Slider — 统一轨道/滑块；已滑动段为白色（--studio-range-fill 由 studio-range-slider.js 同步） */
+
+:root {
+    --studio-range-fill: 0%;
+    --studio-range-track-h: 4px;
+    --studio-range-track-inactive: rgba(255, 255, 255, 0.16);
+    --studio-range-track-active: #ffffff;
+    --studio-range-thumb-size: 12px;
+}
+
+.batch-slider,
+.output-cols-slider,
+.wf-slider-row input[type="range"],
+.gallery-shell input[type="range"],
+.viewer-edit-row input[type="range"],
+.mg-studio .pfield-slider input[type="range"],
+.mg-studio input[type="range"]:not(.canvas-range),
+.ios-slider {
+    border: none !important;
+    accent-color: #ffffff !important;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.batch-slider::-webkit-slider-runnable-track,
+.output-cols-slider::-webkit-slider-runnable-track,
+.wf-slider-row input[type="range"]::-webkit-slider-runnable-track,
+.gallery-shell input[type="range"]::-webkit-slider-runnable-track,
+.viewer-edit-row input[type="range"]::-webkit-slider-runnable-track,
+.mg-studio .pfield-slider input[type="range"]::-webkit-slider-runnable-track,
+.mg-studio input[type="range"]:not(.canvas-range)::-webkit-slider-runnable-track,
+.ios-slider::-webkit-slider-runnable-track {
+    height: var(--studio-range-track-h);
+    border-radius: 999px;
+    background: linear-gradient(
+        to right,
+        var(--studio-range-track-active) 0%,
+        var(--studio-range-track-active) var(--studio-range-fill, 0%),
+        var(--studio-range-track-inactive) var(--studio-range-fill, 0%),
+        var(--studio-range-track-inactive) 100%
+    );
+}
+
+.batch-slider::-webkit-slider-thumb,
+.output-cols-slider::-webkit-slider-thumb,
+.wf-slider-row input[type="range"]::-webkit-slider-thumb,
+.gallery-shell input[type="range"]::-webkit-slider-thumb,
+.viewer-edit-row input[type="range"]::-webkit-slider-thumb,
+.mg-studio .pfield-slider input[type="range"]::-webkit-slider-thumb,
+.mg-studio input[type="range"]:not(.canvas-range)::-webkit-slider-thumb,
+.ios-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--studio-range-thumb-size);
+    height: var(--studio-range-thumb-size);
+    margin-top: calc((var(--studio-range-track-h) - var(--studio-range-thumb-size)) / 2);
+    border-radius: 50%;
+    background: #ffffff !important;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+.batch-slider::-moz-range-track,
+.output-cols-slider::-moz-range-track,
+.wf-slider-row input[type="range"]::-moz-range-track,
+.gallery-shell input[type="range"]::-moz-range-track,
+.viewer-edit-row input[type="range"]::-moz-range-track,
+.mg-studio .pfield-slider input[type="range"]::-moz-range-track,
+.mg-studio input[type="range"]:not(.canvas-range)::-moz-range-track,
+.ios-slider::-moz-range-track {
+    height: var(--studio-range-track-h);
+    border-radius: 999px;
+    background: var(--studio-range-track-inactive);
+}
+
+.batch-slider::-moz-range-progress,
+.output-cols-slider::-moz-range-progress,
+.wf-slider-row input[type="range"]::-moz-range-progress,
+.gallery-shell input[type="range"]::-moz-range-progress,
+.viewer-edit-row input[type="range"]::-moz-range-progress,
+.mg-studio .pfield-slider input[type="range"]::-moz-range-progress,
+.mg-studio input[type="range"]:not(.canvas-range)::-moz-range-progress,
+.ios-slider::-moz-range-progress {
+    height: var(--studio-range-track-h);
+    border-radius: 999px;
+    background: var(--studio-range-track-active);
+}
+
+.batch-slider::-moz-range-thumb,
+.output-cols-slider::-moz-range-thumb,
+.wf-slider-row input[type="range"]::-moz-range-thumb,
+.gallery-shell input[type="range"]::-moz-range-thumb,
+.viewer-edit-row input[type="range"]::-moz-range-thumb,
+.mg-studio .pfield-slider input[type="range"]::-moz-range-thumb,
+.mg-studio input[type="range"]:not(.canvas-range)::-moz-range-thumb,
+.ios-slider::-moz-range-thumb {
+    width: var(--studio-range-thumb-size);
+    height: var(--studio-range-thumb-size);
+    border-radius: 50%;
+    background: #ffffff;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+/* 画廊工具栏：更细的轨道 */
+.gallery-shell .output-cols-slider {
+    --studio-range-track-h: 3px;
+}

@@ -1,29 +1,198 @@
 /* AI CHAT — sync with AI Image Magnific dark theme */
 
-/* theme.css also styles .composer-wrap as a card — keep wrap invisible */
-.mg-studio .composer-wrap,
-html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .composer-wrap,
-body.mg-studio .composer-wrap {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
+
+
+:root {
+
+    --chat-radius: 12px;
+
+    --chat-bg: rgb(26, 26, 26);
+
 }
 
-.mg-studio .provider-select option {
-    background: #1a1a1a;
-    color: #f5f5f5;
+
+
+/* 主区域与顶栏统一 #1a1a1a（studio-magnific 默认 #101010 会偏黑） */
+
+body.mg-studio,
+
+.mg-studio .chat-shell,
+
+.mg-studio .messages {
+
+    background: var(--chat-bg) !important;
+
+    --mg-bg: #1a1a1a;
+
 }
+
+
+
+/* theme.css also styles .composer-wrap as a card — keep wrap invisible */
+
+.mg-studio .composer-wrap,
+
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .composer-wrap,
+
+body.mg-studio .composer-wrap {
+
+    background: transparent !important;
+
+    border: none !important;
+
+    box-shadow: none !important;
+
+    border-radius: 0 !important;
+
+}
+
+
+
+.mg-studio .composer-body {
+
+    background: transparent !important;
+
+    border: none !important;
+
+    box-shadow: none !important;
+
+}
+
+
+
+/* 与 AI 生图 prompt 框一致 */
+
+.mg-studio .composer-body textarea.nano-input,
+
+.mg-studio .chat-prompt-input {
+
+    background: rgb(38, 38, 38) !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+    border-radius: var(--chat-radius, 12px) !important;
+
+    color: #f5f5f5 !important;
+
+    padding: 12px 14px !important;
+
+    box-sizing: border-box !important;
+
+    transition: border-color 0.22s var(--mg-ease, cubic-bezier(0.22, 1, 0.36, 1)), box-shadow 0.22s var(--mg-ease, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+
+}
+
+
+
+.mg-studio .composer-body textarea.nano-input:hover:not(:focus),
+
+.mg-studio .chat-prompt-input:hover:not(:focus) {
+
+    border-color: rgba(255, 255, 255, 0.38) !important;
+
+    box-shadow: none !important;
+
+}
+
+
+
+.mg-studio .composer-body textarea.nano-input:focus,
+
+.mg-studio .chat-prompt-input:focus {
+
+    border-color: #ffffff !important;
+
+    box-shadow: none !important;
+
+    outline: none !important;
+
+}
+
+
+
+.mg-studio .composer-body .size-select option {
+
+    background: #313131;
+
+    color: #f5f5f5;
+
+}
+
+
 
 .mg-studio .history-popover .history-close,
+
 .mg-studio .history-popover .history-title {
+
     color: #737373;
+
 }
+
+
 
 .mg-studio .history-popover .history-close:hover {
+
     color: #f5f5f5;
+
 }
 
+
+
 .mg-studio .empty-history {
+
     color: #737373;
+
 }
+
+
+
+.mg-studio .topbar {
+
+    background: rgb(26, 26, 26) !important;
+
+    backdrop-filter: none !important;
+
+}
+
+
+
+/* AI Chat 圆角与参数面板标准一致（12px） */
+
+.mg-studio .action-btn,
+
+.mg-studio .history-popover,
+
+.mg-studio .thread-item,
+
+.mg-studio .thread-delete,
+
+.mg-studio .bubble,
+
+.mg-studio .bubble.user,
+
+.mg-studio .bubble.assistant,
+
+.mg-studio .bubble img.generated,
+
+.mg-studio .thumb,
+
+.mg-studio .composer-body .size-select,
+
+.mg-studio .send-btn,
+
+.mg-studio .ref-chip,
+
+.mg-studio .ms-badge {
+
+    border-radius: var(--chat-radius, 12px) !important;
+
+}
+
+
+
+.mg-studio .ref-chip button {
+
+    border-radius: 50% !important;
+
+}
+

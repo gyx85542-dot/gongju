@@ -14,9 +14,21 @@ function escapeHtml(s){
     if(opts.escapeHtml) return opts.escapeHtml(s);
     return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+function gridSelector(){
+    if(opts.gridSelector) return opts.gridSelector;
+    const id = opts.gridId || 'refGrid';
+    return `#${id}`;
+}
+function gridEl(){
+    if(opts.gridId) return document.getElementById(opts.gridId);
+    return document.getElementById('refGrid');
+}
+function isFixedMode(){
+    return opts.mode === 'fixed';
+}
 
-function newRefSlot(ref = null, dim = null){
-    return { id:`ref_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, ref, dim };
+function newRefSlot(ref = null, dim = null, id = null){
+    return { id: id || `ref_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, ref, dim };
 }
 function filledRefCount(){
     return refSlots.filter(s => s.ref).length;
@@ -25,12 +37,13 @@ function firstEmptyRefSlot(){
     return refSlots.find(s => !s.ref)?.id || refSlots[refSlots.length - 1]?.id;
 }
 function ensureTrailingEmptySlot(){
+    if(isFixedMode() && opts.enableTrailingEmpty === false) return;
     const hasEmpty = refSlots.some(s => !s.ref);
     if(!hasEmpty && refSlots.length < MAX_REF_SLOTS) refSlots.push(newRefSlot());
     if(!refSlots.length) refSlots.push(newRefSlot());
 }
 function clearRefDropHints(){
-    document.querySelectorAll('#refGrid .upload-item.drop-before,#refGrid .upload-item.drop-after').forEach(el => {
+    document.querySelectorAll(`${gridSelector()} .upload-item.drop-before,${gridSelector()} .upload-item.drop-after`).forEach(el => {
         el.classList.remove('drop-before', 'drop-after');
     });
 }
@@ -67,6 +80,13 @@ function hasSlotDropData(dataTransfer){
     if(types.includes('Files') && [...(dataTransfer.items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/'))) return true;
     return types.includes('text/uri-list') || types.includes('text/plain');
 }
+function setImageDragData(e, url){
+    const normalized = normalizeImageUrl(url);
+    if(!normalized) return;
+    e.dataTransfer.setData('application/x-online-output-image', normalized);
+    e.dataTransfer.setData('text/uri-list', normalized);
+    e.dataTransfer.setData('text/plain', normalized);
+}
 function getImageDimensions(src){
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -83,10 +103,11 @@ function syncBoardPickWindow(){
 }
 function updateBoardPickUI(){
     document.body.classList.toggle('board-pick-active', !!boardPickSlotId);
-    document.querySelectorAll('#refGrid .upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
+    document.querySelectorAll(`${gridSelector()} .upload-item.is-board-target`).forEach(el => el.classList.remove('is-board-target'));
     if(boardPickSlotId){
-        document.querySelector(`#refGrid [data-ref-id="${boardPickSlotId}"]`)?.classList.add('is-board-target');
+        document.querySelector(`${gridSelector()} [data-ref-id="${boardPickSlotId}"]`)?.classList.add('is-board-target');
     }
+    if(typeof opts.onBoardPickUI === 'function') opts.onBoardPickUI(boardPickSlotId);
 }
 function cancelBoardPick(){
     if(!boardPickSlotId) return;
@@ -120,11 +141,19 @@ function reorderRefSlots(sourceId, targetId, placeBefore){
     if(!placeBefore) insertAt += 1;
     list.splice(insertAt, 0, item);
     refSlots = list;
+    if(typeof opts.onReorder === 'function') opts.onReorder(refSlots.map(s => s.id));
     renderRefGrid();
 }
 async function handleImageUrl(url, slotId){
     const normalized = normalizeImageUrl(url);
     if(!normalized) return;
+    if(isFixedMode()){
+        if(typeof opts.onUrlAssign === 'function'){
+            await opts.onUrlAssign(slotId, normalized);
+        }
+        cancelBoardPick();
+        return;
+    }
     let slot = refSlots.find(s => s.id === slotId);
     if(!slot){
         if(filledRefCount() >= MAX_REF_SLOTS) return;
@@ -148,6 +177,12 @@ async function handleImageUrl(url, slotId){
 }
 async function handleFile(file, slotId){
     if(!file) return;
+    if(isFixedMode()){
+        if(typeof opts.onFileUpload === 'function'){
+            await opts.onFileUpload(slotId, file);
+        }
+        return;
+    }
     const slot = refSlots.find(s => s.id === slotId);
     if(!slot) return;
     const reader = new FileReader();
@@ -169,6 +204,15 @@ async function handleFile(file, slotId){
 }
 function removeRefSlot(slotId, ev){
     if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+    if(isFixedMode()){
+        const slot = refSlots.find(s => s.id === slotId);
+        if(slot){ slot.ref = null; slot.dim = null; }
+        if(typeof opts.onRemove === 'function') opts.onRemove(slotId);
+        renderRefGrid();
+        notifyChange(null);
+        if(boardPickSlotId === slotId) cancelBoardPick();
+        return;
+    }
     refSlots = refSlots.filter(s => s.id !== slotId);
     if(!refSlots.length) refSlots = [newRefSlot()];
     ensureTrailingEmptySlot();
@@ -180,16 +224,21 @@ function bindRefSlotEvents(cell, slot){
     const delBtn = cell.querySelector('[data-ref-del]');
     const handle = cell.querySelector('[data-ref-reorder]');
     const boardBtn = cell.querySelector('[data-ref-board]');
+    const canReorder = !isFixedMode() || typeof opts.onReorder === 'function';
     cell.onclick = e => {
         if(e.target.closest('[data-ref-del],[data-ref-reorder],[data-ref-board]')) return;
-        if(!slot.ref) input?.click();
+        const hasRef = isFixedMode() ? !!slot.ref : !!slot.ref;
+        if(!hasRef) input?.click();
     };
-    input.onchange = () => handleFile(input.files[0], slot.id);
+    input.onchange = () => {
+        handleFile(input.files[0], slot.id);
+        input.value = '';
+    };
     delBtn?.addEventListener('click', e => removeRefSlot(slot.id, e));
     boardBtn?.addEventListener('click', e => startBoardPick(slot.id, e));
     cell.ondragover = e => {
         const types = [...(e.dataTransfer?.types || [])];
-        if(types.includes(REF_REORDER_MIME)){
+        if(canReorder && types.includes(REF_REORDER_MIME)){
             if(refReorderDragId && refReorderDragId !== slot.id){
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
@@ -213,7 +262,7 @@ function bindRefSlotEvents(cell, slot){
         e.stopPropagation();
         cell.classList.remove('drag-over');
         const types = [...(e.dataTransfer?.types || [])];
-        if(types.includes(REF_REORDER_MIME)){
+        if(canReorder && types.includes(REF_REORDER_MIME)){
             const dragId = refReorderDragId || e.dataTransfer.getData(REF_REORDER_MIME);
             if(dragId && dragId !== slot.id){
                 const rect = cell.getBoundingClientRect();
@@ -230,7 +279,7 @@ function bindRefSlotEvents(cell, slot){
         const url = imageUrlFromSlotDrop(e.dataTransfer);
         if(url) handleImageUrl(url, slot.id);
     };
-    if(handle && slot.ref){
+    if(handle && slot.ref && canReorder){
         handle.draggable = true;
         handle.ondragstart = e => {
             e.stopPropagation();
@@ -244,25 +293,28 @@ function bindRefSlotEvents(cell, slot){
             cell.classList.remove('is-dragging');
             clearRefDropHints();
         };
+    } else if(handle){
+        handle.draggable = false;
     }
 }
+function renderSlotHtml(slot, idx){
+    const filled = !!slot.ref;
+    const preview = filled ? slot.ref.url : '';
+    return `<div class="upload-item group aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
+        <input type="file" accept="image/*" class="hidden">
+        ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
+        <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2, '0')}</span>
+        <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeHtml(preview)}"` : ''} draggable="false" alt="">
+        <button type="button" data-ref-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${escapeHtml(tr('online.boardPickTitle'))}">board</button>
+        <button type="button" data-ref-reorder class="cell-action-btn ref-slot-btn ref-reorder-btn" title="${escapeHtml(tr('online.reorder') || 'Reorder')}"><i data-lucide="grip-vertical"></i></button>
+        <button type="button" data-ref-del class="cell-action-btn ref-slot-btn ref-del-btn" title="${escapeHtml(tr('online.delete') || 'Delete')}"><i data-lucide="trash-2"></i></button>
+    </div>`;
+}
 function renderRefGrid(){
-    const grid = document.getElementById(opts.gridId || 'refGrid');
+    const grid = gridEl();
     if(!grid) return;
-    ensureTrailingEmptySlot();
-    grid.innerHTML = refSlots.map((slot, idx) => {
-        const filled = !!slot.ref;
-        const preview = filled ? slot.ref.url : '';
-        return `<div class="upload-item group aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
-            <input type="file" accept="image/*" class="hidden">
-            ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
-            <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2, '0')}</span>
-            <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeHtml(preview)}"` : ''} draggable="false">
-            <button type="button" data-ref-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${escapeHtml(tr('online.boardPickTitle'))}">board</button>
-            <button type="button" data-ref-reorder class="cell-action-btn ref-slot-btn ref-reorder-btn" title="${escapeHtml(tr('online.reorder') || 'Reorder')}"><i data-lucide="grip-vertical"></i></button>
-            <button type="button" data-ref-del class="cell-action-btn ref-slot-btn ref-del-btn" title="${escapeHtml(tr('online.delete') || 'Delete')}"><i data-lucide="trash-2"></i></button>
-        </div>`;
-    }).join('');
+    if(!isFixedMode()) ensureTrailingEmptySlot();
+    grid.innerHTML = refSlots.map((slot, idx) => renderSlotHtml(slot, idx)).join('');
     refSlots.forEach(slot => {
         const cell = grid.querySelector(`[data-ref-id="${slot.id}"]`);
         if(cell) bindRefSlotEvents(cell, slot);
@@ -277,18 +329,53 @@ function getReferenceList(){
     }
     return refSlots.map(s => s.ref).filter(Boolean);
 }
+function firstReferenceDimension(){
+    return refSlots.map(s => s.dim).find(dim => dim?.width && dim?.height) || null;
+}
 function setReferenceImages(refs){
     refSlots = (refs || []).slice(0, MAX_REF_SLOTS).map(ref => newRefSlot(ref, null));
     ensureTrailingEmptySlot();
     renderRefGrid();
+    (refs || []).forEach(ref => {
+        if(!ref?.url) return;
+        getImageDimensions(ref.url).then(dim => {
+            const slot = refSlots.find(s => s.ref?.url === ref.url);
+            if(slot) slot.dim = dim;
+            notifyChange(dim);
+            renderRefGrid();
+        }).catch(() => {});
+    });
+}
+function pickOutputForRef(data){
+    const url = data?.images?.[0];
+    if(!url || !boardPickSlotId) return;
+    handleImageUrl(url, boardPickSlotId);
+}
+function syncFixedSlots(slots){
+    refSlots = (slots || []).map(s => newRefSlot(s.ref || null, s.dim || null, s.id));
+    if(boardPickSlotId && !refSlots.some(s => s.id === boardPickSlotId)){
+        boardPickSlotId = '';
+        syncBoardPickWindow();
+    }
+    renderRefGrid();
+}
+function mountFixed(containerOrId, slots, handlers = {}){
+    Object.assign(opts, handlers, { mode: 'fixed', enableTrailingEmpty: false });
+    if(typeof containerOrId === 'string'){
+        opts.gridId = containerOrId.replace(/^#/, '');
+    } else if(containerOrId?.id){
+        opts.gridId = containerOrId.id;
+    }
+    syncFixedSlots(slots);
 }
 
 global.handleImageUrl = handleImageUrl;
 global.cancelBoardPick = cancelBoardPick;
+global.pickOutputForRef = pickOutputForRef;
 
 global.StudioRefUpload = {
     init(options = {}){
-        opts = options;
+        opts = { mode: 'dynamic', ...options };
         refSlots = options.initialSlots || [newRefSlot()];
         boardPickSlotId = '';
         syncBoardPickWindow();
@@ -296,17 +383,35 @@ global.StudioRefUpload = {
         if(!global._studioRefUploadKeyBound){
             global._studioRefUploadKeyBound = true;
             global.addEventListener('keydown', e => {
-                if(e.key === 'Escape') cancelBoardPick();
+                if(e.key === 'Escape' && boardPickSlotId) cancelBoardPick();
             });
             global.addEventListener('paste', e => {
+                if(isFixedMode()) return;
                 const item = [...(e.clipboardData?.items || [])].find(x => x.kind === 'file' && x.type.startsWith('image/'));
                 if(item) handleFile(item.getAsFile(), firstEmptyRefSlot());
             });
         }
+        if(!global._studioRefUploadClickBound){
+            global._studioRefUploadClickBound = true;
+            document.addEventListener('click', e => {
+                if(!boardPickSlotId) return;
+                if(e.target.closest('[data-ref-board]')) return;
+                cancelBoardPick();
+            });
+        }
     },
+    mountFixed,
+    syncFixedSlots,
     renderRefGrid,
+    renderSlotHtml,
     getReferenceList,
     setReferenceImages,
-    getBoardPickSlotId(){ return boardPickSlotId; }
+    firstReferenceDimension,
+    getBoardPickSlotId(){ return boardPickSlotId; },
+    pickOutputForRef,
+    normalizeImageUrl,
+    setImageDragData,
+    cancelBoardPick,
+    updateBoardPickUI
 };
 })(window);

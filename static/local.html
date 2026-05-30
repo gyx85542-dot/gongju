@@ -21,8 +21,10 @@
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260525-comfyui"></script>
     <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
+    <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --card:#1a1a1a; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -40,13 +42,17 @@
         .result-frame { background:#1a1a1a; border-radius:10px; border:1px solid rgba(255,255,255,.08); box-shadow:0 2px 16px rgba(0,0,0,.24); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
         .result-frame.has-outputs { justify-content:flex-start; }
         .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
-        .output-cols-slider { width:100%; max-width:140px; height:4px; accent-color:#ffffff; }
+        .output-cols-slider { width:100%; max-width:140px; height:4px; }
         .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; }
         .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
         .output-grid-cell { position:relative; aspect-ratio:1; border-radius:6px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); }
         .output-grid-cell:hover { border-color:rgba(255,255,255,.1); background:#181818; }
-        .output-grid-cell.is-pinned { box-shadow:none; }
+        .output-grid-cell.is-pinned,
+        .output-grid-cell.is-pinned:hover { border:none !important; outline:none !important; box-shadow:none !important; }
+        .output-grid-cell.is-pinned:not(.is-favorite)::after { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#ff4d94; z-index:4; pointer-events:none; border:none; box-shadow:none; }
         .output-grid-cell.is-favorite::before { content:''; position:absolute; top:8px; left:8px; width:7px; height:7px; border-radius:50%; background:#ffaa00; z-index:4; pointer-events:none; }
+        .output-grid-cell.is-pinned.is-favorite::before { background:#ffaa00; box-shadow:0 0 0 1px rgba(255,77,148,.55); }
+        .output-grid-cell.is-pinned.is-favorite::after { content:none; display:none; }
         .output-grid-cell img { width:100%; height:100%; object-fit:contain; padding:0; box-sizing:border-box; border-radius:6px; }
         .output-grid-cell .cell-actions { position:absolute; left:0; right:0; bottom:0; height:20%; min-height:36px; z-index:5; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 8px 5px; opacity:0; transition:opacity .18s; pointer-events:none; background:linear-gradient(to top,rgba(26,26,26,.92),transparent); }
         .output-grid-cell:hover .cell-actions { opacity:1; pointer-events:auto; }
@@ -67,9 +73,18 @@
         html.embed-panel .studio-panel-col { grid-column:1 / -1 !important; max-width:none !important; }
         html.embed-panel .page-main { grid-template-columns:minmax(0,1fr) !important; }
     </style>
-    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-bg-1a">
-    <link rel="stylesheet" href="/static/theme.css?v=20260520-bg-1a">
-    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-borderless">
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/theme.css?v=20260530-panel-radius">
+    <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
+    <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
+    <style>
+        html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
+            color:#fff !important;
+        }
+    </style>
 </head>
 <body class="mg-studio">
     <div class="container-box">
@@ -82,10 +97,12 @@
                     </label>
                 </section>
                 <div id="dynamicPanel"></div>
-                <button id="genBtn" onclick="submitGenerate()" class="glass-btn w-full py-3 text-white rounded-md font-bold flex items-center justify-center gap-2 shadow-lg" disabled>
-                    <i data-lucide="crown" class="w-3.5 h-3.5 text-white"></i>
-                    <span class="tracking-[0.2em] text-[11px] uppercase" data-i18n="local.generate">生成</span>
-                </button>
+                <span id="genBtnWrap" class="generate-btn-wrap">
+                    <button id="genBtn" onclick="submitGenerate()" class="glass-btn generate-btn" type="button" disabled>
+                        <span class="generate-btn-label" data-i18n="local.generate">生成</span>
+                        <i data-lucide="sparkles" class="generate-btn-icon"></i>
+                    </button>
+                </span>
             </div>
             <div class="lg:col-span-9 flex flex-col gap-2 min-h-0 h-full studio-output-col">
                 <div class="output-toolbar shrink-0">
@@ -126,11 +143,11 @@
 
         const HISTORY_TYPE = 'local-comfy';
         const CLIENT_ID = localStorage.getItem('client_id') || (()=>{ const id=crypto.randomUUID?.()||String(Date.now()); localStorage.setItem('client_id',id); return id; })();
+        const META_SCOPE = 'local';
         const META_PIN = 'local_pinned', META_FAV = 'local_favorites', META_ORDER = 'local_display_order';
 
         let workflows = [], selectedWorkflow = '', currentWorkflow = null, currentConfig = { fields:[] };
         let fieldValues = {}, fieldImageUrls = {}, batchCount = 1, outputCols = 2;
-        let boardPickFieldId = '';
         let allHistory = [], pendingJobs = [], historyLoading = false, currentLightboxData = null;
         let pinnedIds = [], favoriteIds = [], displayOrder = [];
 
@@ -220,7 +237,7 @@
                     if(f.default !== undefined && f.default !== null) fieldValues[f.id] = f.default;
                 });
                 renderDynamicPanel();
-                document.getElementById('genBtn').disabled = false;
+                syncGenBtnState();
             } catch(e){
                 alert(tr('local.loadFailed'));
                 console.error(e);
@@ -232,6 +249,7 @@
             const fields = effectiveFields();
             if(!fields.length){
                 panel.innerHTML = `<div class="empty-hint">${tr('local.noFieldsHint')}</div>`;
+                syncGenBtnState();
                 return;
             }
             const prompts = fields.filter(f => fieldKind(f) === 'prompt');
@@ -248,13 +266,13 @@
                 prompts.forEach(f => {
                     html += `<div>
                         <div class="control-label mb-1"><span>${escapeHtml(f.name || f.input)}</span></div>
-                        <textarea class="nano-input w-full outline-none resize-none" rows="3" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value)">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
+                        <textarea class="nano-input w-full outline-none resize-none" rows="3" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value);syncGenBtnState()">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
                     </div>`;
                 });
                 if(images.length){
                     html += `<div>
                         <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图片</span></div>
-                        <div class="ref-grid">${images.map((f,i) => renderImageSlot(f, i)).join('')}</div>
+                        <div id="localRefGrid" class="ref-grid"></div>
                     </div>`;
                 }
                 html += `</section>`;
@@ -274,23 +292,39 @@
             otherSettings.forEach(f => { html += renderSettingField(f); });
             html += `</section>`;
             panel.innerHTML = html;
-            bindWorkflowImageSlots();
+            if(images.length){
+                mountWorkflowRefGrid(images);
+            }
             lucide.createIcons();
-            updateBoardPickUI();
+            syncOutputDragState();
+            syncGenBtnState();
         }
 
-        function renderImageSlot(f, index){
-            const url = fieldImageUrls[f.id] || '';
-            const label = String(index + 1).padStart(2, '0');
-            const filled = !!url;
-            return `<div class="upload-item group${filled ? ' has-image' : ''}${boardPickFieldId === f.id ? ' is-board-target' : ''}" data-image-field-id="${escapeAttr(f.id)}">
-                <input type="file" accept="image/*" class="hidden">
-                ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
-                <span class="ref-slot-label mt-2 uppercase">${label}</span>
-                <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeAttr(url)}"` : ''} alt="" draggable="false">
-                <button type="button" data-wf-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${escapeAttr(tr('online.boardPickTitle'))}">board</button>
-                <button type="button" data-wf-del class="cell-action-btn ref-slot-btn ref-del-btn" title="${escapeAttr(tr('online.delete') || 'Delete')}"><i data-lucide="trash-2"></i></button>
-            </div>`;
+        function mountWorkflowRefGrid(images){
+            StudioRefUpload.mountFixed('localRefGrid', images.map(f => ({
+                id: f.id,
+                ref: fieldImageUrls[f.id] ? {
+                    url: fieldImageUrls[f.id],
+                    name: String(fieldValues[f.id] || f.name || f.input || '')
+                } : null
+            })), {
+                tr,
+                escapeHtml,
+                onFileUpload: uploadWorkflowFile,
+                onUrlAssign: assignWorkflowImageFromUrl,
+                onRemove: (fieldId) => {
+                    delete fieldValues[fieldId];
+                    if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
+                    delete fieldImageUrls[fieldId];
+                },
+                onBoardPickUI: syncOutputDragState
+            });
+        }
+        function syncOutputDragState(){
+            const pickId = StudioRefUpload.getBoardPickSlotId();
+            document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => {
+                img.draggable = !pickId;
+            });
         }
         function renderNumberInput(f){
             const v = fieldValues[f.id] ?? f.default ?? '';
@@ -323,6 +357,8 @@
             fieldValues[id] = value;
             const row = document.querySelector(`.wf-slider-row[data-field-id="${id}"]`);
             if(row) row.querySelector('.wf-slider-val').textContent = value;
+            const f = effectiveFields().find(x => x.id === id);
+            if(f && fieldKind(f) === 'prompt') syncGenBtnState();
         }
         function setBatchCount(n){
             batchCount = Math.min(4, Math.max(1, Number(n)||1));
@@ -336,77 +372,6 @@
             try { const s = parseInt(localStorage.getItem('local_batch_count')||'1',10); if(s>=1&&s<=4) batchCount = s; } catch(e){}
         }
 
-        function normalizeImageUrl(url){
-            const raw = String(url || '').trim();
-            if(!raw) return '';
-            try {
-                if(/^https?:\/\//i.test(raw)){
-                    const parsed = new URL(raw);
-                    if(parsed.pathname.startsWith('/assets/') || parsed.pathname.startsWith('/output/')) return parsed.pathname;
-                }
-            } catch(e){}
-            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
-            return raw;
-        }
-        function imageUrlFromSlotDrop(dataTransfer){
-            if(!dataTransfer) return '';
-            const custom = dataTransfer.getData('application/x-online-output-image');
-            if(custom) return normalizeImageUrl(custom);
-            const values = [
-                dataTransfer.getData('text/uri-list') || '',
-                dataTransfer.getData('text/plain') || ''
-            ].join('\n').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-            for(const value of values){
-                const normalized = normalizeImageUrl(value);
-                if(normalized.startsWith('/assets/') || normalized.startsWith('/output/')) return normalized;
-            }
-            return '';
-        }
-        function hasSlotDropData(dataTransfer){
-            if(!dataTransfer) return false;
-            const types = [...(dataTransfer.types || [])];
-            if(types.includes('application/x-online-output-image')) return true;
-            if(types.includes('Files') && [...(dataTransfer.items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/'))) return true;
-            return types.includes('text/uri-list') || types.includes('text/plain');
-        }
-        function setImageDragData(e, url){
-            const normalized = normalizeImageUrl(url);
-            if(!normalized) return;
-            e.dataTransfer.setData('application/x-online-output-image', normalized);
-            e.dataTransfer.setData('text/uri-list', normalized);
-            e.dataTransfer.setData('text/plain', normalized);
-        }
-        function syncBoardPickWindow(){
-            window.boardPickSlotId = boardPickFieldId;
-        }
-        function updateBoardPickUI(){
-            document.body.classList.toggle('board-pick-active', !!boardPickFieldId);
-            document.querySelectorAll('.upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
-            if(boardPickFieldId){
-                document.querySelector(`[data-image-field-id="${boardPickFieldId}"]`)?.classList.add('is-board-target');
-            }
-            document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => {
-                img.draggable = !boardPickFieldId;
-            });
-        }
-        function cancelBoardPick(){
-            if(!boardPickFieldId) return;
-            boardPickFieldId = '';
-            syncBoardPickWindow();
-            updateBoardPickUI();
-            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick('');
-        }
-        function startBoardPick(fieldId, ev){
-            if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-            if(boardPickFieldId === fieldId){
-                cancelBoardPick();
-                return;
-            }
-            boardPickFieldId = fieldId;
-            syncBoardPickWindow();
-            updateBoardPickUI();
-            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick(fieldId);
-        }
         async function uploadWorkflowFile(file, fieldId){
             if(!file || !fieldId) return;
             const preview = URL.createObjectURL(file);
@@ -417,7 +382,7 @@
             try {
                 const data = await fetch('/api/upload', { method:'POST', body:form }).then(r=>r.json());
                 fieldValues[fieldId] = data.files?.[0]?.comfy_name || file.name;
-                const savedUrl = normalizeImageUrl(data.files?.[0]?.url || '');
+                const savedUrl = StudioRefUpload.normalizeImageUrl(data.files?.[0]?.url || '');
                 if(savedUrl){
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     fieldImageUrls[fieldId] = savedUrl;
@@ -431,7 +396,7 @@
             }
         }
         async function assignWorkflowImageFromUrl(url, fieldId){
-            const normalized = normalizeImageUrl(url);
+            const normalized = StudioRefUpload.normalizeImageUrl(url);
             if(!normalized || !fieldId) return;
             fieldImageUrls[fieldId] = normalized;
             try {
@@ -448,61 +413,6 @@
                 renderDynamicPanel();
             }
             cancelBoardPick();
-        }
-        async function handleImageUrl(url, fieldId){
-            await assignWorkflowImageFromUrl(url, fieldId);
-        }
-        function bindWorkflowImageSlots(){
-            document.querySelectorAll('[data-image-field-id]').forEach(cell => {
-                const fieldId = cell.dataset.imageFieldId;
-                const input = cell.querySelector('input[type="file"]');
-                const delBtn = cell.querySelector('[data-wf-del]');
-                const boardBtn = cell.querySelector('[data-wf-board]');
-                cell.onclick = e => {
-                    if(e.target.closest('[data-wf-del],[data-wf-board]')) return;
-                    if(!fieldValues[fieldId]) input?.click();
-                };
-                input.onchange = () => {
-                    const file = input.files?.[0];
-                    if(file) uploadWorkflowFile(file, fieldId);
-                    input.value = '';
-                };
-                delBtn?.addEventListener('click', e => clearWorkflowImage(fieldId, e));
-                boardBtn?.addEventListener('click', e => startBoardPick(fieldId, e));
-                cell.ondragover = e => {
-                    if(!hasSlotDropData(e.dataTransfer)) return;
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'copy';
-                    cell.classList.add('drag-over');
-                };
-                cell.ondragleave = e => {
-                    if(e.currentTarget.contains(e.relatedTarget)) return;
-                    cell.classList.remove('drag-over');
-                };
-                cell.ondrop = e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    cell.classList.remove('drag-over');
-                    const file = e.dataTransfer.files?.[0];
-                    if(file && file.type.startsWith('image/')){
-                        uploadWorkflowFile(file, fieldId);
-                        return;
-                    }
-                    const dropUrl = imageUrlFromSlotDrop(e.dataTransfer);
-                    if(dropUrl) assignWorkflowImageFromUrl(dropUrl, fieldId);
-                };
-            });
-        }
-        function pickWorkflowImage(fieldId){
-            document.querySelector(`[data-image-field-id="${fieldId}"] input[type="file"]`)?.click();
-        }
-        function clearWorkflowImage(fieldId, ev){
-            ev?.stopPropagation();
-            delete fieldValues[fieldId];
-            if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
-            delete fieldImageUrls[fieldId];
-            if(boardPickFieldId === fieldId) cancelBoardPick();
-            renderDynamicPanel();
         }
 
         function collectRunFields(){
@@ -522,11 +432,26 @@
             }
             return '';
         }
+        function syncGenBtnTip(showTip){
+            const wrap = document.getElementById('genBtnWrap');
+            if(!wrap) return;
+            if(showTip) wrap.setAttribute('data-tip', tr('studio.genPromptTip'));
+            else wrap.removeAttribute('data-tip');
+        }
+        function syncGenBtnState(){
+            const btn = document.getElementById('genBtn');
+            if(!btn) return;
+            const wfReady = workflows.length > 0 && selectedWorkflow && currentWorkflow;
+            const prompts = effectiveFields().filter(f => fieldKind(f) === 'prompt');
+            const promptMissing = prompts.length > 0 && !collectPrimaryPrompt();
+            btn.disabled = !wfReady || promptMissing;
+            syncGenBtnTip(wfReady && promptMissing);
+        }
         function collectReferenceImages(){
             return effectiveFields()
                 .filter(f => fieldKind(f) === 'image')
                 .map(f => {
-                    const url = normalizeImageUrl(fieldImageUrls[f.id] || '');
+                    const url = StudioRefUpload.normalizeImageUrl(fieldImageUrls[f.id] || '');
                     if(!url || url.startsWith('blob:')) return null;
                     return {
                         url,
@@ -597,33 +522,62 @@
         }
 
         // —— output grid (same pattern as online.html) ——
-        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
         function loadMeta(){
             try {
-                pinnedIds = JSON.parse(localStorage.getItem(META_PIN)||'[]').map(String);
-                favoriteIds = JSON.parse(localStorage.getItem(META_FAV)||'[]').map(String);
-                displayOrder = JSON.parse(localStorage.getItem(META_ORDER)||'[]').map(String);
+                pinnedIds = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_PIN)||'[]'));
+                favoriteIds = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_FAV)||'[]'));
+                displayOrder = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_ORDER)||'[]'));
             } catch(e){ pinnedIds=[]; favoriteIds=[]; displayOrder=[]; }
         }
         function saveMeta(){
             try {
+                pinnedIds = StudioHistoryMeta.normalizeIdList(pinnedIds);
+                favoriteIds = StudioHistoryMeta.normalizeIdList(favoriteIds);
+                displayOrder = StudioHistoryMeta.normalizeIdList(displayOrder);
                 localStorage.setItem(META_PIN, JSON.stringify(pinnedIds));
                 localStorage.setItem(META_FAV, JSON.stringify(favoriteIds));
                 localStorage.setItem(META_ORDER, JSON.stringify(displayOrder));
+                StudioHistoryMeta.saveUserMeta(META_SCOPE, { pinnedIds, favoriteIds, displayOrder });
             } catch(e){}
         }
-        function syncDisplayOrder(){
-            const keys = new Set(allHistory.map(historyKey));
-            displayOrder = displayOrder.filter(id => keys.has(id));
-            allHistory.forEach(item => { const k = historyKey(item); if(k && !displayOrder.includes(k)) displayOrder.unshift(k); });
+        async function loadMetaFromServer(){
+            loadMeta();
+            const remote = await StudioHistoryMeta.loadUserMeta(META_SCOPE);
+            const merged = StudioHistoryMeta.mergeMetaSources({ pinnedIds, favoriteIds, displayOrder }, remote);
+            pinnedIds = merged.pinnedIds;
+            favoriteIds = merged.favoriteIds;
+            displayOrder = merged.displayOrder;
             saveMeta();
         }
+        function syncDisplayOrder(opts){
+            const persist = !!(opts && opts.persist);
+            const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, displayOrder }, allHistory);
+            pinnedIds = synced.pinnedIds;
+            favoriteIds = synced.favoriteIds;
+            displayOrder = synced.displayOrder;
+            if(persist) saveMeta();
+        }
+        function findHistoryByKey(key){ return allHistory.find(h => StudioHistoryMeta.keysEqual(historyKey(h), key)); }
         function sortedHistory(){
             syncDisplayOrder();
-            const pinSet = new Set(pinnedIds);
-            const pinned = displayOrder.filter(id => pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
-            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
-            return [...pinned, ...rest];
+            const seen = new Set();
+            const out = [];
+            displayOrder.forEach(id => {
+                const item = findHistoryByKey(id);
+                if(!item) return;
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            allHistory.forEach(item => {
+                const k = historyKey(item);
+                if(!k || seen.has(k)) return;
+                seen.add(k);
+                out.push(item);
+            });
+            return out;
         }
         function upsertHistoryItem(item){
             if(!item?.images?.[0]) return;
@@ -651,7 +605,7 @@
             grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0,1fr))`;
             grid.innerHTML = pendingJobs.map(j => `<div class="output-grid-cell is-pending"><div class="cell-pending">${j.error?`<p>${escapeHtml(j.error)}</p>`:`<div class="pending-spin"></div><p>${tr('online.generating')}</p>`}</div></div>`).join('')
                 + items.map(d => {
-                    const key = historyKey(d), pinned = pinnedIds.includes(key), fav = favoriteIds.includes(key);
+                    const key = historyKey(d), pinned = StudioHistoryMeta.includesKey(pinnedIds, key), fav = StudioHistoryMeta.includesKey(favoriteIds, key);
                     const imgUrl = d.images[0];
                     return `<div class="output-grid-cell${pinned?' is-pinned':''}${fav?' is-favorite':''}" data-ts="${escapeHtml(key)}" data-img-url="${escapeAttr(imgUrl)}">
                         <img src="${escapeHtml(imgUrl)}" alt="" class="draggable-output" draggable="true" loading="lazy">
@@ -665,7 +619,7 @@
                 }).join('');
             bindOutputGridCells(items);
             lucide.createIcons();
-            updateBoardPickUI();
+            syncOutputDragState();
         }
         function bindOutputGridCells(items){
             const itemMap = new Map(items.map(item => [historyKey(item), item]));
@@ -674,30 +628,41 @@
                 if(!data?.images?.[0]) return;
                 const img = cell.querySelector('img.draggable-output');
                 const url = data.images[0];
+                const pickId = StudioRefUpload.getBoardPickSlotId();
                 if(img){
-                    img.draggable = !boardPickFieldId;
+                    img.draggable = !pickId;
                     img.ondragstart = e => {
-                        if(boardPickFieldId) { e.preventDefault(); return; }
+                        if(pickId) { e.preventDefault(); return; }
                         e.stopPropagation();
                         img.dataset.dragging = '1';
-                        setImageDragData(e, url);
+                        StudioRefUpload.setImageDragData(e, url);
                         e.dataTransfer.effectAllowed = 'copy';
                     };
                     img.ondragend = () => { delete img.dataset.dragging; };
                 }
                 cell.onclick = e => {
                     if(img?.dataset.dragging) return;
-                    if(boardPickFieldId && !e.target.closest('.cell-actions')){
-                        handleImageUrl(url, boardPickFieldId);
+                    if(pickId && !e.target.closest('.cell-actions')){
+                        handleImageUrl(url, pickId);
                         return;
                     }
                     if(!e.target.closest('.cell-actions')) openLightbox(data);
                 };
             });
         }
-        function historyItem(key){ return allHistory.find(h => historyKey(h) === key); }
-        function togglePin(key, ev){ ev?.stopPropagation(); pinnedIds = pinnedIds.includes(key) ? pinnedIds.filter(x=>x!==key) : [...pinnedIds,key]; saveMeta(); renderOutputGrid(); }
-        function toggleFavorite(key, ev){ ev?.stopPropagation(); favoriteIds = favoriteIds.includes(key) ? favoriteIds.filter(x=>x!==key) : [key,...favoriteIds]; saveMeta(); renderOutputGrid(); }
+        function historyItem(key){ return findHistoryByKey(key); }
+        function togglePin(key, ev){
+            ev?.stopPropagation();
+            if(StudioHistoryMeta.includesKey(pinnedIds, key)) pinnedIds = pinnedIds.filter(x => !StudioHistoryMeta.keysEqual(x, key));
+            else pinnedIds = [...pinnedIds.filter(x => !StudioHistoryMeta.keysEqual(x, key)), key];
+            saveMeta(); renderOutputGrid();
+        }
+        function toggleFavorite(key, ev){
+            ev?.stopPropagation();
+            if(StudioHistoryMeta.includesKey(favoriteIds, key)) favoriteIds = favoriteIds.filter(x => !StudioHistoryMeta.keysEqual(x, key));
+            else favoriteIds = [key, ...favoriteIds.filter(x => !StudioHistoryMeta.keysEqual(x, key))];
+            saveMeta(); renderOutputGrid();
+        }
         async function deleteHistoryItem(key, ev){
             ev?.stopPropagation();
             if(!confirm(tr('online.deleteConfirm'))) return;
@@ -724,7 +689,7 @@
             const refs = Array.isArray(saved.reference_images) ? saved.reference_images : [];
             imageFields.forEach((f, i) => {
                 const ref = refs[i];
-                if(ref?.url) fieldImageUrls[f.id] = normalizeImageUrl(ref.url);
+                if(ref?.url) fieldImageUrls[f.id] = StudioRefUpload.normalizeImageUrl(ref.url);
             });
             renderDynamicPanel();
         }
@@ -733,7 +698,7 @@
             try {
                 allHistory = await fetch(`/api/history?type=${HISTORY_TYPE}`).then(r=>r.json());
                 if(!Array.isArray(allHistory)) allHistory = [];
-                syncDisplayOrder(); renderOutputGrid();
+                syncDisplayOrder({ persist: true }); renderOutputGrid();
             } finally { historyLoading = false; }
         }
         function setOutputCols(n){
@@ -754,11 +719,12 @@
         }
         function closeLightbox(){ document.getElementById('lightbox').classList.replace('flex','hidden'); }
 
-        window.handleImageUrl = handleImageUrl;
-        window.cancelBoardPick = cancelBoardPick;
-
-        window.addEventListener('message', e => { if(e.data?.type === 'studio-lang') window.StudioI18n?.set(e.data.lang); });
-        window.addEventListener('keydown', e => { if(e.key === 'Escape') cancelBoardPick(); });
+        window.addEventListener('message', e => {
+            if(e.data?.type === 'studio-lang'){
+                window.StudioI18n?.set(e.data.lang);
+                syncGenBtnState();
+            }
+        });
         try {
             new BroadcastChannel('studio-api').onmessage = e => { if(e.data?.type === 'workflows-changed') loadWorkflowList(); };
         } catch(e){}
@@ -777,6 +743,7 @@
         window.onload = async () => {
             if(window.StudioI18n) document.title = tr('local.title');
             loadMeta(); loadBatchCount(); loadOutputCols();
+            await loadMetaFromServer();
             setOutputCols(outputCols);
             document.getElementById('outputColsSlider').oninput = e => setOutputCols(e.target.value);
             await loadWorkflowList();

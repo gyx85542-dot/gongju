@@ -356,17 +356,108 @@ def provider_key_env(provider_id):
         return "COMFLY_API_KEY"
     return f"API_PROVIDER_{re.sub(r'[^A-Za-z0-9]', '_', provider_id).upper()}_KEY"
 
+def migrate_apimart_provider_key():
+    new_env = provider_key_env(BUILTIN_APIMART_ID)
+    legacy_env = "API_PROVIDER_CUSTOM_API_KEY"
+    if not os.getenv(new_env) and os.getenv(legacy_env):
+        os.environ[new_env] = os.getenv(legacy_env)
+
 def mask_secret(value):
     if not value:
         return ""
     tail = value[-4:] if len(value) > 4 else value
     return f"••••••••{tail}"
 
+BUILTIN_APIMART_ID = "apimart"
+BUILTIN_APIMART_LOCKED_IMAGE_MODELS = [
+    "gpt-image-2",
+    "gemini-3-pro-image-preview",
+    "gemini-3.1-flash-image-preview",
+]
+BUILTIN_APIMART_LOCKED_CHAT_MODELS = [
+    "gemini-3-flash-preview",
+    "gemini-3-flash-preview-nothinking",
+    "gemini-3-pro-preview",
+]
+BUILTIN_APIMART_LOCKED_VIDEO_MODELS = [
+    "doubao-seedance-2.0",
+    "kling-v2-6",
+    "veo3.1-fast",
+]
+
+migrate_apimart_provider_key()
+
+def merge_locked_apimart_models(saved_values, locked_values):
+    locked = []
+    for value in locked_values or []:
+        item = str(value or "").strip()
+        if item and item not in locked:
+            locked.append(item)
+    locked_set = set(locked)
+    extras = []
+    for value in saved_values or []:
+        item = str(value or "").strip()
+        if item and item not in locked_set and item not in extras:
+            extras.append(item)
+    return locked + extras
+
+def builtin_apimart_provider():
+    return {
+        "id": BUILTIN_APIMART_ID,
+        "name": "APIMart",
+        "base_url": "https://api.apimart.ai",
+        "protocol": "apimart",
+        "image_generation_endpoint": "",
+        "image_edit_endpoint": "",
+        "enabled": True,
+        "primary": True,
+        "image_models": list(BUILTIN_APIMART_LOCKED_IMAGE_MODELS),
+        "chat_models": list(BUILTIN_APIMART_LOCKED_CHAT_MODELS),
+        "video_models": list(BUILTIN_APIMART_LOCKED_VIDEO_MODELS),
+    }
+
+def is_builtin_apimart_id(provider_id):
+    return str(provider_id or "").strip().lower() in {BUILTIN_APIMART_ID, "custom-api"}
+
+def apply_builtin_apimart_lock(provider):
+    if not is_builtin_apimart_id((provider or {}).get("id")):
+        return dict(provider or {})
+    locked = builtin_apimart_provider()
+    merged = dict(provider or {})
+    merged.update({
+        "id": locked["id"],
+        "name": locked["name"],
+        "base_url": locked["base_url"],
+        "protocol": locked["protocol"],
+        "image_generation_endpoint": locked["image_generation_endpoint"],
+        "image_edit_endpoint": locked["image_edit_endpoint"],
+        "image_models": merge_locked_apimart_models(merged.get("image_models"), locked["image_models"]),
+        "chat_models": merge_locked_apimart_models(merged.get("chat_models"), locked["chat_models"]),
+        "video_models": merge_locked_apimart_models(merged.get("video_models"), locked["video_models"]),
+        "primary": True,
+    })
+    return merged
+
 def default_api_providers():
-    return []
+    return [builtin_apimart_provider()]
 
 def merge_default_api_providers(providers):
-    return [dict(item) for item in providers]
+    if not providers:
+        return [builtin_apimart_provider()]
+    result = []
+    apimart_added = False
+    for item in providers:
+        item = dict(item)
+        if is_builtin_apimart_id(item.get("id")):
+            if apimart_added:
+                continue
+            result.append(apply_builtin_apimart_lock(item))
+            apimart_added = True
+        else:
+            result.append(item)
+    if not apimart_added:
+        result.insert(0, builtin_apimart_provider())
+    return result
 
 def normalize_model_list(values):
     return model_list_from_values(values)
@@ -419,7 +510,7 @@ def normalize_provider(item):
         protocol = "openai"
     image_generation_endpoint = normalize_endpoint_override(item.get("image_generation_endpoint"), "文生图端口")
     image_edit_endpoint = normalize_endpoint_override(item.get("image_edit_endpoint"), "图生图/编辑端口")
-    return {
+    provider = {
         "id": provider_id,
         "name": name,
         "base_url": base_url,
@@ -432,6 +523,7 @@ def normalize_provider(item):
         "chat_models": model_list_from_values(item.get("chat_models") or []),
         "video_models": model_list_from_values(item.get("video_models") or []),
     }
+    return apply_builtin_apimart_lock(provider)
 
 def load_api_providers():
     defaults = default_api_providers()
@@ -477,7 +569,7 @@ def get_primary_provider_id(providers=None):
     enabled = next((p for p in providers if p.get("enabled", True)), None)
     if enabled:
         return enabled["id"]
-    return providers[0]["id"] if providers else "comfly"
+    return providers[0]["id"] if providers else BUILTIN_APIMART_ID
 
 def get_api_provider(provider_id="comfly"):
     providers = load_api_providers()
@@ -700,6 +792,12 @@ class DeleteHistoryRequest(BaseModel):
 
 class DeleteHistoryBatchRequest(BaseModel):
     timestamps: List[float]
+
+class HistoryUserMetaPayload(BaseModel):
+    scope: str = "studio"
+    pinned: List[str] = Field(default_factory=list)
+    favorites: List[str] = Field(default_factory=list)
+    order: List[str] = Field(default_factory=list)
 
 class OnlinePendingJob(BaseModel):
     id: str
@@ -3123,6 +3221,21 @@ async def get_history_api(history_type: str = Query(None, alias="type")):
         print(f"读取历史记录失败: {e}")
         return []
 
+@app.get("/api/history/user-meta")
+async def get_history_user_meta(scope: str = Query("studio")):
+    return db.load_history_user_meta(scope)
+
+@app.put("/api/history/user-meta")
+async def put_history_user_meta(payload: HistoryUserMetaPayload):
+    return db.save_history_user_meta(
+        payload.scope,
+        {
+            "pinned": payload.pinned or [],
+            "favorites": payload.favorites or [],
+            "order": payload.order or [],
+        },
+    )
+
 @app.get("/api/queue_status")
 async def get_queue_status(client_id: str):
     with QUEUE_LOCK:
@@ -3687,6 +3800,8 @@ RUNNINGHUB_API_KEY_ENV = "RUNNINGHUB_API_KEY"
 RUNNINGHUB_CONFIG_FILE = os.path.join(DATA_DIR, "runninghub.json")
 RUNNINGHUB_LOCK = Lock()
 RUNNINGHUB_FIELD_TYPES = {"text", "textarea", "number", "image", "boolean", "select"}
+RUNNINGHUB_DATA_TYPES = {"text", "textarea", "number", "image"}
+RUNNINGHUB_INPUT_METHODS = {"manual", "dropdown"}
 
 class RunningHubField(BaseModel):
     id: str = ""
@@ -3694,6 +3809,8 @@ class RunningHubField(BaseModel):
     nodeId: str = ""
     fieldName: str = ""
     type: str = "text"
+    dataType: str = "text"
+    inputMethod: str = "manual"
     default: Any = ""
     options: List[str] = []
     apiValue: Any = None  # 工作流 JSON 中的原始值（COMBO 须原样提交，如 dimensions 的空格）
@@ -3714,6 +3831,54 @@ class RunningHubRunRequest(BaseModel):
     prompt: str = ""
     reference_images: List[Dict[str, Any]] = []
     client_id: str = ""
+
+def runninghub_sync_field_schema(field: dict) -> dict:
+    if not isinstance(field, dict):
+        return field
+    legacy = str(field.get("type") or "text").strip().lower()
+    dt = str(field.get("dataType") or "").strip().lower()
+    im = str(field.get("inputMethod") or "").strip().lower()
+    if not dt or not im:
+        if legacy == "select":
+            dt = dt or "text"
+            im = im or "dropdown"
+        elif legacy == "textarea":
+            dt, im = "textarea", "manual"
+        elif legacy in ("number", "image", "text", "boolean"):
+            dt = dt or ("text" if legacy == "boolean" else legacy)
+            im = im or "manual"
+        else:
+            dt, im = "text", "manual"
+    if dt not in RUNNINGHUB_DATA_TYPES:
+        dt = "text"
+    if im not in RUNNINGHUB_INPUT_METHODS:
+        im = "manual"
+    field["dataType"] = dt
+    field["inputMethod"] = im
+    field["type"] = "select" if im == "dropdown" else dt
+    return field
+
+def runninghub_build_field_item(field: dict) -> dict:
+    item = runninghub_sync_field_schema(dict(field))
+    ftype = str(item.get("type") or "text").strip().lower()
+    if ftype not in RUNNINGHUB_FIELD_TYPES:
+        ftype = "text"
+        item["type"] = ftype
+    options = [str(o) for o in (item.get("options") or []) if str(o).strip()]
+    field_item = {
+        "id": str(item.get("id") or "").strip() or f"f-{uuid.uuid4().hex[:6]}",
+        "name": str(item.get("name") or "").strip(),
+        "nodeId": str(item.get("nodeId") or "").strip(),
+        "fieldName": str(item.get("fieldName") or "").strip(),
+        "type": ftype,
+        "dataType": str(item.get("dataType") or "text").strip().lower(),
+        "inputMethod": str(item.get("inputMethod") or "manual").strip().lower(),
+        "default": item.get("default", ""),
+        "options": options,
+    }
+    if item.get("apiValue") is not None:
+        field_item["apiValue"] = item.get("apiValue")
+    return field_item
 
 class RunningHubFetchJsonRequest(BaseModel):
     workflow_id: str = ""
@@ -3739,22 +3904,7 @@ def load_runninghub_config():
         for field in wf_item.get("fields") or []:
             if not isinstance(field, dict):
                 continue
-            ftype = str(field.get("type") or "text").strip().lower()
-            if ftype not in RUNNINGHUB_FIELD_TYPES:
-                ftype = "text"
-            options = [str(o) for o in (field.get("options") or []) if str(o).strip()]
-            field_item = {
-                "id": str(field.get("id") or "").strip() or f"f-{uuid.uuid4().hex[:6]}",
-                "name": str(field.get("name") or "").strip(),
-                "nodeId": str(field.get("nodeId") or "").strip(),
-                "fieldName": str(field.get("fieldName") or "").strip(),
-                "type": ftype,
-                "default": field.get("default", ""),
-                "options": options,
-            }
-            if field.get("apiValue") is not None:
-                field_item["apiValue"] = field.get("apiValue")
-            fields.append(field_item)
+            fields.append(runninghub_build_field_item(field))
         workflows.append({
             "id": wf_id,
             "name": str(wf_item.get("name") or "").strip() or wf_id,
@@ -3769,30 +3919,21 @@ def save_runninghub_config(payload: RunningHubConfigPayload):
         workflows = data.get("workflows") or []
     else:
         workflows = []
-    for item in payload.workflows or []:
-        wf_id = str(item.id or "").strip() or f"rh-{uuid.uuid4().hex[:8]}"
+    for wf in payload.workflows or []:
+        wf_id = str(wf.id or "").strip() or f"rh-{uuid.uuid4().hex[:8]}"
         fields = []
-        for field in item.fields or []:
-            ftype = str(field.type or "text").strip().lower()
-            if ftype not in RUNNINGHUB_FIELD_TYPES:
-                ftype = "text"
-            options = [str(o) for o in (field.options or []) if str(o).strip()]
-            item = {
-                "id": str(field.id or "").strip() or f"f-{uuid.uuid4().hex[:6]}",
-                "name": str(field.name or "").strip(),
-                "nodeId": str(field.nodeId or "").strip(),
-                "fieldName": str(field.fieldName or "").strip(),
-                "type": ftype,
-                "default": field.default if field.default is not None else "",
-                "options": options,
-            }
-            if field.apiValue is not None:
-                item["apiValue"] = field.apiValue
-            fields.append(item)
+        for field in wf.fields or []:
+            if hasattr(field, "model_dump"):
+                raw = field.model_dump()
+            elif hasattr(field, "dict"):
+                raw = field.dict()
+            else:
+                raw = dict(field)
+            fields.append(runninghub_build_field_item(raw))
         workflows.append({
             "id": wf_id,
-            "name": str(item.name or "").strip() or wf_id,
-            "workflow_id": str(item.workflow_id or "").strip(),
+            "name": str(wf.name or "").strip() or wf_id,
+            "workflow_id": str(wf.workflow_id or "").strip(),
             "fields": runninghub_normalize_workflow_fields(fields),
         })
     data["workflows"] = workflows
@@ -3823,7 +3964,10 @@ def runninghub_public_config():
 def runninghub_post(path: str, payload: dict, timeout=120):
     url = f"{RUNNINGHUB_BASE_URL}{path}"
     headers = {"Content-Type": "application/json", "Host": "www.runninghub.cn"}
-    resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"RunningHub 请求失败：{exc}") from exc
     try:
         data = resp.json()
     except Exception:
@@ -3870,6 +4014,78 @@ def runninghub_is_link_input(value: Any) -> bool:
 
 def runninghub_norm_spaces(text: Any) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip())
+
+def runninghub_parse_dimension_combo(text: Any) -> Optional[tuple]:
+    s = str(text or "").strip()
+    m = re.search(r"(\d+)\s*x\s*(\d+)(?:\s*\(([^)]+)\))?", s, re.I)
+    if not m:
+        return None
+    return int(m.group(1)), int(m.group(2)), str(m.group(3) or "").strip().lower()
+
+def runninghub_combo_format_reference(reference: str, selected: str) -> str:
+    """将选中的分辨率/COMBO 值按工作流 JSON 原值的空格与后缀格式重写后提交。"""
+    ref = str(reference or "")
+    sel = str(selected or "")
+    if not ref or not sel:
+        return sel or ref
+    if runninghub_norm_spaces(ref) == runninghub_norm_spaces(sel):
+        return ref
+    parsed = runninghub_parse_dimension_combo(sel)
+    if not parsed:
+        return sel
+    w, h, orient = parsed
+    m = re.search(r"(\d+)(.*?)[xX](.*?)(\d+)", ref)
+    if not m:
+        return sel
+    core = f"{w}{m.group(2)}x{m.group(3)}{h}"
+    if re.search(r"\([^)]+\)\s*$", ref):
+        if orient:
+            return f"{core} ({orient})"
+        sel_suffix = re.search(r"\(([^)]+)\)\s*$", sel)
+        if sel_suffix:
+            return f"{core} ({sel_suffix.group(1)})"
+    return core
+
+def runninghub_get_select_reference(
+    field: dict,
+    node_id: str,
+    field_name: str,
+    workflow_prompt: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    api_value = field.get("apiValue")
+    if isinstance(api_value, str) and api_value.strip():
+        return api_value
+    if workflow_prompt:
+        node = workflow_prompt.get(str(node_id))
+        if isinstance(node, dict):
+            inputs = node.get("inputs") or {}
+            if isinstance(inputs, dict):
+                original = inputs.get(field_name)
+                if isinstance(original, str) and original.strip():
+                    return original
+    default = field.get("default")
+    if isinstance(default, str) and default.strip():
+        return default
+    return None
+
+def runninghub_finalize_select_value(
+    field: dict,
+    value: Any,
+    node_id: str,
+    field_name: str,
+    workflow_prompt: Optional[Dict[str, Any]] = None,
+) -> Any:
+    ftype = str(field.get("type") or "text").strip().lower()
+    if ftype != "select" or not isinstance(value, str):
+        return value
+    reference = runninghub_get_select_reference(field, node_id, field_name, workflow_prompt)
+    if not reference:
+        return value
+    if runninghub_norm_spaces(value) == runninghub_norm_spaces(reference):
+        return reference
+    if runninghub_parse_dimension_combo(value) and runninghub_parse_dimension_combo(reference):
+        return runninghub_combo_format_reference(reference, value)
+    return value
 
 RUNNINGHUB_SDXL_DIMENSIONS = [
     "1536 x 640 (landscape)",
@@ -4103,7 +4319,7 @@ def runninghub_normalize_workflow_fields(fields: list) -> list:
     for field in fields or []:
         if not isinstance(field, dict):
             continue
-        item = dict(field)
+        item = runninghub_sync_field_schema(dict(field))
         item["fieldName"] = runninghub_normalize_field_name(item)
         ftype = str(item.get("type") or "text").strip().lower()
         if ftype == "select":
@@ -4124,7 +4340,7 @@ def runninghub_value_is_empty(field_type: str, value: Any) -> bool:
     return not str(value if value is not None else "").strip()
 
 def runninghub_resolve_select_raw(field: dict, incoming_value: Any) -> Any:
-    """select/COMBO 字段：优先使用工作流原始 apiValue，用户改选后用其选项字符串。"""
+    """select/COMBO 字段：空值回退 default/apiValue；非空值保留用户选择（格式对齐在 finalize 阶段）。"""
     ftype = str(field.get("type") or "text").strip().lower()
     if ftype != "select":
         return incoming_value
@@ -4134,12 +4350,7 @@ def runninghub_resolve_select_raw(field: dict, incoming_value: Any) -> Any:
             api_value = field.get("default")
     if incoming_value is None or incoming_value == "":
         return api_value if api_value is not None else ""
-    inc = incoming_value
-    default = field.get("default", "")
-    if api_value is not None and isinstance(inc, str) and isinstance(default, str):
-        if runninghub_norm_spaces(inc) == runninghub_norm_spaces(default):
-            return api_value
-    return inc
+    return incoming_value
 
 def runninghub_align_field_value(
     node_id: str,
@@ -4160,6 +4371,8 @@ def runninghub_align_field_value(
     if isinstance(value, str) and isinstance(original, str):
         if runninghub_norm_spaces(value) == runninghub_norm_spaces(original):
             return original
+        if runninghub_parse_dimension_combo(value) and runninghub_parse_dimension_combo(original):
+            return runninghub_combo_format_reference(original, value)
     if isinstance(value, (int, float)) and isinstance(original, (int, float)) and not isinstance(original, bool):
         try:
             if float(value) == float(original):
@@ -4200,6 +4413,7 @@ def build_runninghub_node_info_list(
             "field_name": field_name,
             "ftype": ftype,
             "raw": raw_value,
+            "field": field,
         })
     text_items = [item for item in resolved if runninghub_is_text_field(item["ftype"])]
     if global_prompt:
@@ -4227,6 +4441,14 @@ def build_runninghub_node_info_list(
             value,
             workflow_prompt,
         )
+        if item["ftype"] == "select":
+            field_value = runninghub_finalize_select_value(
+                item["field"],
+                field_value,
+                item["node_id"],
+                item["field_name"],
+                workflow_prompt,
+            )
         if item["ftype"] in ("select", "text", "textarea"):
             field_value = str(field_value if field_value is not None else "")
         node_info_list.append({
@@ -4308,74 +4530,151 @@ def runninghub_format_task_failure(data: Any) -> str:
 def runninghub_collect_output_urls(outputs_body: dict) -> List[str]:
     data = outputs_body.get("data")
     urls: List[str] = []
+    seen = set()
+
+    def add_url(raw: Any):
+        u = str(raw or "").strip()
+        if u and u not in seen:
+            seen.add(u)
+            urls.append(u)
+
     if isinstance(data, list):
         for item in data:
             if not isinstance(item, dict):
                 continue
-            file_url = str(item.get("fileUrl") or item.get("url") or "").strip()
-            if file_url:
-                urls.append(file_url)
+            add_url(item.get("fileUrl") or item.get("url"))
     elif isinstance(data, dict):
-        file_url = str(data.get("fileUrl") or data.get("url") or "").strip()
-        if file_url:
-            urls.append(file_url)
+        add_url(data.get("fileUrl") or data.get("url"))
+        for item in data.get("results") or data.get("outputs") or []:
+            if isinstance(item, dict):
+                add_url(item.get("fileUrl") or item.get("url"))
+    for item in outputs_body.get("results") or []:
+        if isinstance(item, dict):
+            add_url(item.get("url") or item.get("fileUrl"))
     return urls
 
+def runninghub_query_v2_task(api_key: str, task_id: str) -> dict:
+    url = f"{RUNNINGHUB_BASE_URL}/openapi/v2/query"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    try:
+        resp = requests.post(url, json={"taskId": task_id}, headers=headers, timeout=120)
+    except requests.RequestException as exc:
+        print(f"RunningHub v2 query 失败: {exc}")
+        return {}
+    try:
+        return resp.json() or {}
+    except Exception:
+        print(f"RunningHub v2 query 非 JSON：{resp.text[:200]}")
+        return {}
+
+def runninghub_v2_task_status(body: dict) -> str:
+    return str(body.get("status") or "").strip().upper()
+
+def runninghub_v2_is_terminal_success(body: dict) -> bool:
+    status = runninghub_v2_task_status(body)
+    return status in {"SUCCESS", "SUCCEED", "FINISHED", "COMPLETE", "COMPLETED"}
+
+def runninghub_v2_is_failed(body: dict) -> bool:
+    status = runninghub_v2_task_status(body)
+    if status in {"FAILED", "FAIL", "ERROR", "CANCELLED", "CANCELED"}:
+        return True
+    error_code = str(body.get("errorCode") or "").strip()
+    return bool(error_code and error_code not in {"0", "200"})
+
+def runninghub_download_outputs(urls: List[str]) -> List[str]:
+    local_urls = []
+    for remote in urls:
+        try:
+            local_urls.append(runninghub_download_output(remote))
+        except Exception as e:
+            print(f"RunningHub 下载输出失败: {e}")
+            local_urls.append(remote)
+    return local_urls
+
 def runninghub_wait_outputs(api_key: str, task_id: str, timeout_sec=600):
-    """轮询 outputs 接口直至拿到 fileUrl；勿在 status=SUCCESS 时提前退出（官方推荐只查 outputs）。"""
+    """轮询 openapi/outputs，并在必要时回退到 v2/query 获取 results.url。"""
     deadline = time.time() + timeout_sec
     last_code = None
     last_msg = ""
     poll_interval = 3
     empty_success_hits = 0
+    max_empty_success_hits = 20
     while time.time() < deadline:
         outputs_body = runninghub_post("/task/openapi/outputs", {"apiKey": api_key, "taskId": task_id})
         code = outputs_body.get("code")
         last_code = code
         last_msg = str(outputs_body.get("msg") or "")
-        if code == 0:
-            urls = runninghub_collect_output_urls(outputs_body)
-            if urls:
-                local_urls = []
-                for remote in urls:
-                    try:
-                        local_urls.append(runninghub_download_output(remote))
-                    except Exception as e:
-                        print(f"RunningHub 下载输出失败: {e}")
-                        local_urls.append(remote)
-                return {"status": "SUCCESS", "outputs": local_urls, "remote_outputs": urls}
-            try:
-                status_body = runninghub_post("/task/openapi/status", {"apiKey": api_key, "taskId": task_id})
-                if status_body.get("code") == 0 and str(status_body.get("data") or "") == "SUCCESS":
-                    empty_success_hits += 1
-                    if empty_success_hits >= 2:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=(
-                                "RunningHub 任务已结束但未返回图片，通常是 nodeInfoList 参数与工作流不匹配。"
-                                "请检查暴露参数的值是否与 RunningHub 工作流 JSON 中完全一致"
-                                "（例如 dimensions 的空格格式），并避免覆盖 Seed/Int 等内部节点。"
-                                f"（taskId={task_id}）"
-                            ),
-                        )
-            except HTTPException:
-                raise
-            except Exception:
-                pass
-        elif code in (804, 813):
+
+        v2_body = runninghub_query_v2_task(api_key, task_id)
+        urls = runninghub_collect_output_urls(outputs_body)
+        if not urls:
+            urls = runninghub_collect_output_urls(v2_body)
+
+        if runninghub_v2_is_failed(v2_body):
+            detail = runninghub_format_task_failure(v2_body)
+            if not detail:
+                detail = str(v2_body.get("errorMessage") or last_msg or "RunningHub 任务执行失败")
+            raise HTTPException(status_code=400, detail=f"{detail}（taskId={task_id}）")
+
+        if urls:
+            return {
+                "status": "SUCCESS",
+                "outputs": runninghub_download_outputs(urls),
+                "remote_outputs": urls,
+            }
+
+        v2_status = runninghub_v2_task_status(v2_body)
+        still_running = (
+            code in (804, 813)
+            or v2_status in {"RUNNING", "QUEUED", "PENDING", "WAITING", "PROCESSING"}
+        )
+        if still_running:
             empty_success_hits = 0
             time.sleep(poll_interval)
             continue
-        elif code == 805:
+
+        if code == 805:
             detail = runninghub_format_task_failure(outputs_body.get("data"))
             if not detail:
-                detail = last_msg or "RunningHub 任务执行失败"
+                detail = runninghub_format_task_failure(outputs_body)
+            if not detail:
+                detail = str(v2_body.get("errorMessage") or last_msg or "RunningHub 任务执行失败")
             raise HTTPException(status_code=400, detail=f"{detail}（taskId={task_id}）")
-        else:
+
+        if code == 0 or runninghub_v2_is_terminal_success(v2_body):
+            empty_success_hits += 1
+            if empty_success_hits >= max_empty_success_hits:
+                if runninghub_v2_is_terminal_success(v2_body):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "RunningHub 任务显示成功，但未返回任何图片/视频文件。"
+                            "通常原因是工作流缺少 SaveImage / PreviewImage 等输出节点，"
+                            "或该工作流需要上传参考图/视频作为输入但未提供。"
+                            "请在 RunningHub 网页端用相同参数运行一次，确认能产出文件后再暴露参数。"
+                            f"（taskId={task_id}）"
+                        ),
+                    )
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "RunningHub 任务已结束但未返回图片，通常是 nodeInfoList 参数与工作流不匹配，"
+                        "或输出文件尚未就绪。请检查 dimensions 等参数是否与工作流 JSON 完全一致。"
+                        f"（taskId={task_id}）"
+                    ),
+                )
+            time.sleep(poll_interval)
+            continue
+
+        if code not in (None, 0, 804, 813, 805):
             raise HTTPException(
                 status_code=400,
                 detail=f"RunningHub 查询失败（code={code}，{last_msg or 'unknown'}，taskId={task_id}）",
             )
+
         time.sleep(poll_interval)
     raise HTTPException(
         status_code=408,
@@ -4415,6 +4714,15 @@ async def get_runninghub_workflow(workflow_key: str):
 
 @app.post("/api/runninghub/run")
 async def run_runninghub_workflow(payload: RunningHubRunRequest):
+    try:
+        return _run_runninghub_workflow(payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"RunningHub run 未捕获异常: {exc}")
+        raise HTTPException(status_code=500, detail=f"RunningHub 生成失败：{exc}") from exc
+
+def _run_runninghub_workflow(payload: RunningHubRunRequest):
     api_key = runninghub_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先在 RunningHub 设置中配置 API Key")

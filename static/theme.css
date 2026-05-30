@@ -662,24 +662,70 @@ html:not(.studio-theme-dark):not(.theme-dark) body .upload-item.drag-over {
     outline: none !important;
 }
 
-html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input:focus {
-    border: 1px solid rgba(255, 77, 148, 0.35) !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input:hover:not(:focus) {
+    border-color: rgba(255, 255, 255, 0.38) !important;
+    box-shadow: none !important;
 }
 
-html:not(.studio-theme-dark):not(.theme-dark) body .size-select:focus,
-html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea:focus,
-html:not(.studio-theme-dark):not(.theme-dark) body textarea:focus:not(.nano-input),
-html:not(.studio-theme-dark):not(.theme-dark) body input:focus,
-html:not(.studio-theme-dark):not(.theme-dark) body select:focus {
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input:focus {
+    border: 1px solid #ffffff !important;
+    box-shadow: none !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body .size-custom:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-input:hover:not(:focus) {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38) !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body select.size-select:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .ratio-select-trigger:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-select:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .provider-select:hover:not(:focus),
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel select:hover:not(:focus) {
     border: none !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    box-shadow: none !important;
+    background: #333333 !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body .ratio-select-wrap:has(.ratio-select-menu:not(.hidden)) .ratio-select-trigger,
+html:not(.studio-theme-dark):not(.theme-dark) body .ratio-select-wrap:focus-within .ratio-select-trigger {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #3a3a3a !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body select.size-select:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body select.size-select:active,
+html:not(.studio-theme-dark):not(.theme-dark) body .ratio-select-trigger:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .ratio-select-trigger:active,
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-select:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-select:active,
+html:not(.studio-theme-dark):not(.theme-dark) body .provider-select:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .provider-select:active,
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel select:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel select:active {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: #3a3a3a !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body .size-custom:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-input:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body textarea:focus:not(.nano-input),
+html:not(.studio-theme-dark):not(.theme-dark) body input.size-select:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body input:focus:not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
+    border: none !important;
+    box-shadow: inset 0 0 0 1px #ffffff !important;
     outline: none !important;
 }
 
 html:not(.studio-theme-dark):not(.theme-dark) body .upload-item:hover,
 html:not(.studio-theme-dark):not(.theme-dark) body .upload-item.drag-over {
-    border-color: rgba(255, 77, 148, 0.4) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
 }
 
 html:not(.studio-theme-dark):not(.theme-dark) body input[type="range"],
@@ -730,17 +776,25 @@ html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .wf-
 
 /* 参数面板 Generate 按钮 */
 html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .glass-btn,
-html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn {
-    background: #4e6aef !important;
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn,
+html:not(.studio-theme-dark):not(.theme-dark) body .generate-btn {
+    background: #5865f2 !important;
     color: #fff !important;
     border: none !important;
-    box-shadow: 0 4px 14px rgba(78, 106, 239, 0.32) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
 }
 
 html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .glass-btn:hover:not(:disabled),
-html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn:hover:not(:disabled) {
-    background: #4358d4 !important;
-    box-shadow: 0 6px 20px rgba(78, 106, 239, 0.38) !important;
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn:hover:not(:disabled),
+html:not(.studio-theme-dark):not(.theme-dark) body .generate-btn:hover:not(:disabled) {
+    background: #4752c4 !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 /* 参数面板：整体单卡片，内部分组无独立背景 */

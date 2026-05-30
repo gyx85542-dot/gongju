@@ -18,79 +18,68 @@
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260520-ai-chat"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
-    <link rel="stylesheet" href="/static/chat-magnific.css?v=20260520-composer-wrap">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-radius">
     <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
+    <link rel="stylesheet" href="/static/chat-magnific.css?v=20260530-input-38">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
+    <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-        :root { --accent:#ff4d94; --bg:#101010; --card:#1a1a1a; --soft:#313131; --line:rgba(255,255,255,.08); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --ease:cubic-bezier(0.22,1,0.36,1); --content-width:1160px; }
+        :root { --accent:#ff4d94; --bg:#1a1a1a; --card:#1a1a1a; --soft:#313131; --line:rgba(255,255,255,.08); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --ease:cubic-bezier(0.22,1,0.36,1); --content-width:1160px; --chat-radius:12px; --panel-radius:12px; --panel-control-bg:#262626; --panel-gap:10px; }
         * { box-sizing:border-box; }
         body { margin:0; height:100vh; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--mg-font,'Inter',-apple-system,sans-serif); -webkit-font-smoothing:antialiased; }
-        .chat-shell { height:100vh; display:flex; flex-direction:column; min-width:0; }
-        .topbar { height:82px; padding:0 36px; border-bottom:1px solid var(--line); background:rgba(16,16,16,.92); backdrop-filter:blur(16px); z-index:5; }
+        .chat-shell { height:100vh; display:flex; flex-direction:column; min-width:0; background:var(--bg); position:relative; }
+        .topbar { height:82px; padding:0 36px; border-bottom:1px solid var(--line); background:rgb(26,26,26); z-index:5; }
         .topbar-inner { width:min(var(--content-width),100%); height:100%; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:18px; }
         .title-block { min-width:0; }
         .title-block h1 { font-size:14px; font-weight:600; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
         .title-block p { margin-top:5px; font-size:10px; color:var(--muted); font-weight:600; }
         .top-actions { display:flex; align-items:center; gap:10px; position:relative; }
-        .action-btn { height:40px; min-width:40px; padding:0 12px; border-radius: 4px; display:flex; align-items:center; justify-content:center; gap:8px; background:var(--soft); border:1px solid var(--line); color:var(--muted); font-size:10px; font-weight:600; letter-spacing:.04em; transition:all .2s var(--ease); }
+        .action-btn { height:40px; min-width:40px; padding:0 12px; border-radius:var(--chat-radius); display:flex; align-items:center; justify-content:center; gap:8px; background:var(--soft); border:1px solid var(--line); color:var(--muted); font-size:10px; font-weight:600; letter-spacing:.04em; transition:all .2s var(--ease); }
         .action-btn:hover { background:#3a3a3a; color:var(--text); border-color:rgba(255,255,255,.12); }
-        .history-popover { position:absolute; top:54px; right:0; width:min(360px,calc(100vw - 36px)); max-height:520px; overflow:hidden; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 24px 60px rgba(0,0,0,.4); padding:12px; display:none; z-index:20; }
+        .history-popover { position:absolute; top:54px; right:0; width:min(360px,calc(100vw - 36px)); max-height:520px; overflow:hidden; background:var(--card); border:1px solid var(--line); border-radius:var(--chat-radius); box-shadow:0 24px 60px rgba(0,0,0,.4); padding:12px; display:none; z-index:20; }
         .history-popover.open { display:block; animation:popIn .18s var(--ease); }
         .history-title { font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--faint); }
         .history-close { color:var(--faint); transition:color .15s ease; }
         .history-close:hover { color:var(--text); }
         .thread-list { max-height:430px; overflow:auto; display:flex; flex-direction:column; gap:8px; padding-right:2px; }
         .thread-row { display:grid; grid-template-columns:minmax(0,1fr) 34px; gap:6px; align-items:stretch; }
-        .thread-item { width:100%; border:1px solid transparent; background:var(--soft); border-radius:6px; padding:13px 14px; text-align:left; transition:all .2s var(--ease); min-height:58px; min-width:0; color:var(--muted); }
+        .thread-item { width:100%; border:1px solid transparent; background:var(--soft); border-radius:var(--chat-radius); padding:13px 14px; text-align:left; transition:all .2s var(--ease); min-height:58px; min-width:0; color:var(--muted); }
         .thread-item:hover { background:#3a3a3a; color:var(--text); }
         .thread-item.active { background:rgba(255,77,148,.14); color:var(--text); border-color:rgba(255,77,148,.35); box-shadow:0 0 0 1px rgba(255,77,148,.12); }
-        .thread-delete { width:34px; border-radius:6px; display:flex; align-items:center; justify-content:center; color:var(--faint); transition:all .2s var(--ease); }
+        .thread-delete { width:34px; border-radius:var(--chat-radius); display:flex; align-items:center; justify-content:center; color:var(--faint); transition:all .2s var(--ease); }
         .thread-delete:hover { background:rgba(255,77,148,.12); color:var(--accent); }
-        .messages { flex:1; overflow:auto; padding:34px 42px 200px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+        .messages { flex:1; overflow:auto; padding:34px 42px 200px; display:flex; flex-direction:column; align-items:center; gap:18px; background:var(--bg); }
         .bubble-row { width:min(var(--content-width),100%); display:flex; gap:12px; align-items:flex-end; }
         .bubble-row.user { justify-content:flex-end; }
-        .bubble { max-width:min(780px,78%); border-radius:10px; padding:15px 18px; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
-        .bubble.user { background:var(--accent); color:#fff; border-bottom-right-radius:8px; box-shadow:0 4px 14px rgba(255,77,148,.22); }
-        .bubble.assistant { background:var(--card); border:1px solid var(--line); border-bottom-left-radius:8px; color:var(--text); box-shadow:0 2px 16px rgba(0,0,0,.24); }
-        .bubble.assistant.streaming::after { content:""; display:inline-block; width:7px; height:1.2em; margin-left:3px; border-radius: 4px; background:var(--accent); vertical-align:-.2em; animation:cursorBlink .9s steps(2,end) infinite; }
-        .bubble img.generated { display:block; width:min(460px,100%); border-radius:8px; margin-top:10px; border:1px solid var(--line); cursor:zoom-in; }
+        .bubble { max-width:min(780px,78%); border-radius:var(--chat-radius); padding:15px 18px; font-size:14px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+        .bubble.user { background:var(--accent); color:#fff; box-shadow:0 4px 14px rgba(255,77,148,.22); }
+        .bubble.assistant { background:var(--card); border:1px solid var(--line); color:var(--text); box-shadow:0 2px 16px rgba(0,0,0,.24); }
+        .bubble.assistant.streaming::after { content:""; display:inline-block; width:7px; height:1.2em; margin-left:3px; border-radius:4px; background:var(--accent); vertical-align:-.2em; animation:cursorBlink .9s steps(2,end) infinite; }
+        .bubble img.generated { display:block; width:min(460px,100%); border-radius:var(--chat-radius); margin-top:10px; border:1px solid var(--line); cursor:zoom-in; }
         .thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-        .thumb { width:58px; height:58px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,.18); }
+        .thumb { width:58px; height:58px; border-radius:var(--chat-radius); object-fit:cover; border:1px solid rgba(255,255,255,.18); }
         .assistant .thumb { border-color:var(--line); }
         .composer-wrap { position:absolute; left:0; right:0; bottom:0; padding:0 42px 24px; background:transparent; pointer-events:none; }
-        .composer-body { width:min(var(--content-width),100%); margin:0 auto; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; transition:border-color .2s var(--ease), box-shadow .2s var(--ease); box-shadow:0 14px 38px rgba(0,0,0,.32); pointer-events:auto; }
-        .composer-body.drag-over { border-color:rgba(255,77,148,.35); box-shadow:0 14px 38px rgba(0,0,0,.32), 0 0 0 3px rgba(255,77,148,.12); }
-        .mode-switch { background:var(--soft); border:1px solid var(--line); border-radius: 4px; padding:2px; display:flex; gap:2px; }
-        .mode-switch button { height:30px; min-width:70px; border-radius: 4px; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--muted); font-size:10px; font-weight:600; letter-spacing:.02em; transition:all .2s var(--ease); }
-        .mode-switch button.active { background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.24); }
-        .provider-switch { background:var(--soft); border:1px solid var(--line); border-radius: 4px; padding:2px; display:grid; grid-template-columns:1fr 1fr; gap:2px; }
-        .provider-switch button { height:30px; padding:0 10px; white-space:nowrap; border-radius: 4px; display:flex; align-items:center; justify-content:center; gap:5px; color:var(--muted); font-size:10px; font-weight:600; letter-spacing:.02em; transition:all .2s var(--ease); }
-        .provider-switch button.active { background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.24); }
-        .provider-select { min-width:112px; height:30px; border:0; border-radius: 4px; background:var(--card); color:var(--text); padding:0 10px; outline:none; font-size:10px; font-weight:600; }
-        .provider-select:focus { box-shadow:0 0 0 3px rgba(255,77,148,.12); }
-        .image-controls { display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0; }
-        .image-controls.hidden { display:none; }
-        .mini-ratio { display:flex; gap:2px; background:var(--soft); border:1px solid var(--line); border-radius: 4px; padding:2px; overflow:auto; }
-        .mini-ratio button { height:28px; min-width:42px; border-radius: 4px; display:flex; align-items:center; justify-content:center; gap:4px; color:var(--muted); font-size:10px; font-weight:600; letter-spacing:0; transition:all .2s var(--ease); }
-        .mini-ratio button.active { background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.24); }
-        .resolution-toggle { flex:0 0 auto; background:var(--soft); border:1px solid var(--line); border-radius: 4px; padding:2px; display:flex; gap:2px; }
-        .resolution-option { height:28px; min-width:40px; border-radius: 4px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:10px; font-weight:600; transition:all .2s var(--ease); }
-        .resolution-option.active { background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.24); }
-        textarea { width:100%; flex:1; min-height:44px; max-height:168px; resize:none; outline:none; border:0; padding:2px; font-size:14px; line-height:1.65; background:transparent; color:var(--text); }
-        textarea::placeholder { color:var(--faint); }
-        .attachment-stack { display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:0; }
+        .composer-body { width:min(var(--content-width),100%); margin:0 auto; display:flex; flex-direction:column; gap:var(--panel-gap); background:transparent; border:none; box-shadow:none; padding:0; pointer-events:auto; }
+        .composer-body.drag-over .chat-prompt-input { border-color:rgba(255,77,148,.35) !important; box-shadow:0 0 0 3px rgba(255,77,148,.12) !important; }
+        .chat-prompt-input { min-height:88px; max-height:168px; font-size:12px; line-height:1.65; padding:12px 14px; box-sizing:border-box; background:rgb(38,38,38); }
+        .chat-prompt-input::placeholder { color:#737373; }
         .composer-inside-foot { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
-        .left-tools { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; }
-        .inline-controls { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; }
-        .send-btn { width:44px; height:44px; border-radius: 4px; display:flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; transition:all .2s var(--ease); flex:0 0 auto; box-shadow:0 4px 14px rgba(255,77,148,.28); }
+        .left-tools { display:flex; align-items:center; gap:8px; min-width:0; flex-wrap:wrap; flex:1; }
+        .chat-model-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--panel-gap); width:min(420px,100%); }
+        .chat-model-row .size-select { width:100%; min-width:0; }
+        .send-btn { width:44px; height:44px; border-radius:var(--chat-radius); display:flex; align-items:center; justify-content:center; background:var(--accent); color:#fff; transition:all .2s var(--ease); flex:0 0 auto; box-shadow:0 4px 14px rgba(255,77,148,.28); border:none; cursor:pointer; }
         .send-btn:hover:not(:disabled) { background:#e8437f; transform:translateY(-1px); box-shadow:0 6px 18px rgba(255,77,148,.34); }
         .send-btn:disabled { opacity:.45; cursor:not-allowed; }
         .ref-strip { display:flex; align-items:center; gap:8px; overflow:auto; min-width:0; max-width:680px; min-height:0; }
         .ref-strip:empty { display:none; }
-        .ref-chip { position:relative; width:54px; height:54px; border-radius:6px; overflow:hidden; border:1px solid var(--line); background:var(--card); flex:0 0 auto; }
+        .ref-chip { position:relative; width:54px; height:54px; border-radius:var(--chat-radius); overflow:hidden; border:1px solid var(--line); background:var(--card); flex:0 0 auto; }
         .ref-chip img { width:100%; height:100%; object-fit:cover; }
         .ref-chip button { position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:50%; background:rgba(49,49,49,.92); color:var(--text); font-size:12px; line-height:18px; border:1px solid var(--line); }
-        .ms-badge { display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; background:#313131; color:#7ee787; border-radius: 4px; padding:3px 8px; border:1px solid var(--line); }
+        .ms-badge { display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; background:#313131; color:#7ee787; border-radius:var(--chat-radius); padding:3px 8px; border:1px solid var(--line); }
         .empty-history { padding:32px 12px; text-align:center; font-size:11px; font-weight:600; color:var(--faint); letter-spacing:.04em; }
         @keyframes popIn { from { opacity:0; transform:translateY(-6px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
         @keyframes cursorBlink { 0%,45% { opacity:1; } 46%,100% { opacity:0; } }
@@ -98,9 +87,7 @@
             .topbar { padding-left:18px; padding-right:18px; }
             .messages { padding:24px 18px 220px; }
             .composer-wrap { padding:0 18px 20px; }
-            .inline-controls { align-items:stretch; flex-direction:column; flex:1; }
-            .image-controls { align-items:stretch; flex-direction:column; }
-            .resolution-toggle { align-self:flex-start; }
+            .chat-model-row { width:100%; grid-template-columns:1fr; }
             .composer-inside-foot { align-items:flex-end; }
             .ref-strip { max-width:100%; }
             .bubble { max-width:88%; }
@@ -134,37 +121,16 @@
 
         <div class="composer-wrap">
             <div id="composerBody" class="composer-body">
-                <textarea id="messageInput" rows="2" placeholder="输入消息，Enter 发送..." data-i18n-placeholder="chat.inputPlaceholder" oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+                <textarea id="messageInput" rows="3" class="nano-input chat-prompt-input w-full outline-none resize-none" placeholder="输入消息，Enter 发送..." data-i18n-placeholder="chat.inputPlaceholder" oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
                 <div id="refStrip" class="ref-strip"></div>
                 <div class="composer-inside-foot">
                     <div class="left-tools">
-                        <div class="inline-controls">
-                            <div class="mode-switch">
-                                <button id="chatModeBtn" class="active" onclick="setMode('chat')"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i><span data-i18n="chat.chatMode">Chat</span></button>
-                                <button id="imageModeBtn" onclick="setMode('image')"><i data-lucide="image-plus" class="w-3.5 h-3.5"></i><span data-i18n="chat.imageMode">Image</span></button>
-                            </div>
-                            <div id="providerSwitchWrap" class="provider-switch">
-                                <select id="providerSelect" class="provider-select" onchange="setProvider(this.value)"></select>
-                                <select id="modelSelect" class="provider-select" onchange="setActiveModel(this.value)"></select>
-                            </div>
-                            <div id="imageControls" class="image-controls hidden">
-                                <div class="mini-ratio">
-                                    <button id="chat-ratio-square" class="active" onclick="setChatRatio('square')"><i data-lucide="square" class="w-3 h-3"></i>1:1</button>
-                                    <button id="chat-ratio-portrait" onclick="setChatRatio('portrait')"><i data-lucide="rectangle-vertical" class="w-3 h-3"></i>2:3</button>
-                                    <button id="chat-ratio-landscape" onclick="setChatRatio('landscape')"><i data-lucide="rectangle-horizontal" class="w-3 h-3"></i>3:2</button>
-                                    <button id="chat-ratio-portrait43" onclick="setChatRatio('portrait43')"><i data-lucide="rectangle-vertical" class="w-3 h-3"></i>3:4</button>
-                                    <button id="chat-ratio-landscape43" onclick="setChatRatio('landscape43')"><i data-lucide="rectangle-horizontal" class="w-3 h-3"></i>4:3</button>
-                                    <button id="chat-ratio-story" onclick="setChatRatio('story')"><i data-lucide="smartphone" class="w-3 h-3"></i>9:16</button>
-                                    <button id="chat-ratio-wide" onclick="setChatRatio('wide')"><i data-lucide="monitor" class="w-3 h-3"></i>16:9</button>
-                                </div>
-                                <div class="resolution-toggle" title="分辨率" data-i18n-title="chat.resolution">
-                                    <button id="chat-res-1k" class="resolution-option active" onclick="setChatResolution('1k')">1K</button>
-                                    <button id="chat-res-2k" class="resolution-option" onclick="setChatResolution('2k')">2K</button>
-                                </div>
-                            </div>
+                        <div class="chat-model-row">
+                            <select id="providerSelect" class="size-select" onchange="setProvider(this.value)"></select>
+                            <select id="modelSelect" class="size-select" onchange="setActiveModel(this.value)"></select>
                         </div>
                     </div>
-                    <button id="sendBtn" onclick="sendMessage()" class="send-btn" title="发送" data-i18n-title="chat.send"><i data-lucide="send" class="w-5 h-5"></i></button>
+                    <button id="sendBtn" onclick="sendMessage()" class="send-btn glass-btn" title="发送" data-i18n-title="chat.send"><i data-lucide="send" class="w-5 h-5"></i></button>
                 </div>
             </div>
         </div>
@@ -202,27 +168,12 @@
 
         let conversations = [];
         let currentConversation = null;
-        let mode = 'chat';
         let provider = 'comfly';
         let activeChatModel = '';
-        let activeImageProvider = 'comfly';
-        let activeImageModel = '';
         let apiProviders = [];
         let chatProviderModels = {};
-        let chatRatio = 'square';
-        let chatResolution = '1k';
         let refs = [];
-        let config = { chat_model: 'gpt-5.5', image_model: 'gpt-image-2', chat_models: [], image_models: [] };
-
-        const SIZE_OPTIONS = {
-            square: [['1024x1024','1k'], ['1536x1536','2k']],
-            portrait: [['720x1080','1k'], ['1024x1536','2k']],
-            portrait43: [['1008x1344','1k'], ['1536x2048','2k']],
-            landscape43: [['1344x1008','1k'], ['2048x1536','2k']],
-            landscape: [['1080x720','1k'], ['1536x1024','2k']],
-            story: [['720x1280','1k'], ['1080x1920','2k']],
-            wide: [['1280x720','1k'], ['1920x1080','2k']]
-        };
+        let config = { chat_model: 'gpt-5.5', chat_models: [] };
 
         const headers = () => ({'Content-Type':'application/json', 'X-User-ID':userId});
 
@@ -230,88 +181,82 @@
             const seen = new Set();
             return (list || []).map(item => String(item || '').trim()).filter(item => item && !seen.has(item) && seen.add(item));
         }
+        function panelProviders(){
+            const list = StudioApiProviders.enabledProviders(apiProviders);
+            if(list.length) return list;
+            return [{id:'comfly', name:'API', has_key:false, enabled:true, chat_models:[config.chat_model || 'gpt-4o-mini']}];
+        }
         function chatProviders(){
-            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.chat_models || []).length);
-            return list.length ? list : [{id:'comfly', name:'API', chat_models:[config.chat_model || 'gpt-4o-mini'], image_models:[config.image_model || 'gpt-image-2']}];
+            return panelProviders();
         }
-        function imageProviders(){
-            const list = (apiProviders || []).filter(p => p.enabled !== false && (p.image_models || []).length);
-            return list.length ? list : [{id:'comfly', name:'API', image_models:[config.image_model || 'gpt-image-2'], chat_models:[config.chat_model || 'gpt-4o-mini']}];
-        }
-        function providerById(id, kind='chat'){
-            const list = kind === 'image' ? imageProviders() : chatProviders();
+        function providerById(id){
+            const list = chatProviders();
             return list.find(p => p.id === id) || list[0];
         }
-        function currentProviderId(){
-            return mode === 'image' ? activeImageProvider : provider;
-        }
         function modelListForCurrent(){
-            const item = providerById(currentProviderId(), mode === 'image' ? 'image' : 'chat');
-            return uniqueModels(mode === 'image' ? item.image_models : item.chat_models);
+            return uniqueModels(providerById(provider)?.chat_models);
         }
-        function currentModel(){
-            return mode === 'image' ? activeImageModel : activeChatModel;
-        }
-        function renderProviderControls(){
+        function renderProviderControls(deletedId){
             const providerSelect = document.getElementById('providerSelect');
             const modelSelect = document.getElementById('modelSelect');
-            const providers = mode === 'image' ? imageProviders() : chatProviders();
-            const pid = currentProviderId();
-            if(!providers.some(p => p.id === pid)) {
-                if(mode === 'image') activeImageProvider = providers[0]?.id || 'comfly';
-                else provider = providers[0]?.id || 'comfly';
-            }
+            const providers = chatProviders();
+            if(!providers.length) return;
+            provider = StudioApiProviders.resolveProviderId(provider, providers, { deletedId, preferApimart: true });
             const models = modelListForCurrent();
-            if(mode === 'image' && !models.includes(activeImageModel)) activeImageModel = models[0] || config.image_model;
-            if(mode === 'chat' && !models.includes(activeChatModel)) activeChatModel = chatProviderModels[provider] && models.includes(chatProviderModels[provider]) ? chatProviderModels[provider] : (models[0] || config.chat_model);
-            providerSelect.innerHTML = providers.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === currentProviderId() ? 'selected' : ''}>${escapeHtml(p.name || p.id)}</option>`).join('');
-            modelSelect.innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m === currentModel() ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+            if(!models.includes(activeChatModel)) {
+                activeChatModel = chatProviderModels[provider] && models.includes(chatProviderModels[provider])
+                    ? chatProviderModels[provider]
+                    : (models[0] || config.chat_model);
+            }
+            providerSelect.innerHTML = StudioApiProviders.buildProviderOptionsHtml(providers, provider, escapeHtml);
+            modelSelect.innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m === activeChatModel ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+        }
+
+        async function refreshApiProviders(payload){
+            try {
+                const data = await fetch('/api/config').then(r=>r.json());
+                config = { ...config, ...data };
+                apiProviders = await StudioApiProviders.fetchProviderList();
+                config.chat_model = (config.chat_models || []).find(m => m === 'gpt-5.5') || config.chat_model || 'gpt-5.5';
+                provider = StudioApiProviders.resolveProviderId(provider, chatProviders(), { deletedId: payload && payload.deletedId, preferApimart: true });
+                activeChatModel = chatProviderModels[provider] || providerById(provider)?.chat_models?.[0] || config.chat_model;
+            } catch(e) {
+                try { apiProviders = await StudioApiProviders.fetchProviderList(); } catch(err) {}
+            }
+            renderProviderControls(payload && payload.deletedId);
+            updateModelLabel();
         }
 
         async function loadConfig(){
             try {
                 const data = await fetch('/api/config').then(r=>r.json());
                 config = { ...config, ...data };
-                apiProviders = Array.isArray(config.api_providers) ? config.api_providers : [];
+                apiProviders = await StudioApiProviders.fetchProviderList();
                 config.chat_model = (config.chat_models || []).find(m => m === 'gpt-5.5') || config.chat_model || 'gpt-5.5';
-                config.image_model = config.image_model || ((config.image_models || [])[0]) || 'gpt-image-2';
-                const chatProviderList = chatProviders();
-                provider = chatProviderList.some(p => p.id === provider) ? provider : (chatProviderList[0]?.id || 'comfly');
-                activeChatModel = chatProviderModels[provider] || providerById(provider, 'chat')?.chat_models?.[0] || config.chat_model;
-                activeImageProvider = imageProviders()[0]?.id || 'comfly';
-                activeImageModel = imageProviders()[0]?.image_models?.[0] || config.image_model;
+                provider = StudioApiProviders.resolveProviderId(provider, chatProviders(), { preferApimart: true });
+                activeChatModel = chatProviderModels[provider] || providerById(provider)?.chat_models?.[0] || config.chat_model;
                 renderProviderControls();
                 updateModelLabel();
             } catch(e) {}
         }
-        try {
-            const apiChannel = new BroadcastChannel('studio-api');
-            apiChannel.onmessage = async (e) => {
-                if(e.data?.type === 'providers-changed'){
-                    await loadConfig();
-                    renderProviderControls();
-                    updateModelLabel();
-                }
-            };
-        } catch(e) {}
+        StudioApiProviders.onProvidersChanged(refreshApiProviders);
 
         function setProvider(p) {
-            if(mode === 'image') activeImageProvider = p;
-            else provider = p;
-            const models = modelListForCurrent();
-            if(mode === 'image') activeImageModel = models[0] || activeImageModel;
-            else {
-                activeChatModel = chatProviderModels[provider] && models.includes(chatProviderModels[provider]) ? chatProviderModels[provider] : (models[0] || activeChatModel);
+            const item = panelProviders().find(x => x.id === p);
+            if(item && !StudioApiProviders.providerHasKey(item)){
+                StudioApiProviders.promptMissingKey(item);
             }
+            provider = p;
+            const models = modelListForCurrent();
+            activeChatModel = chatProviderModels[provider] && models.includes(chatProviderModels[provider])
+                ? chatProviderModels[provider]
+                : (models[0] || activeChatModel);
             renderProviderControls();
             updateModelLabel();
         }
         function setActiveModel(model){
-            if(mode === 'image') activeImageModel = model;
-            else {
-                activeChatModel = model;
-                chatProviderModels[provider] = model;
-            }
+            activeChatModel = model;
+            chatProviderModels[provider] = model;
             updateModelLabel();
         }
 
@@ -389,44 +334,8 @@
             if(actions && !actions.contains(event.target)) toggleHistory(false);
         });
 
-        function setMode(next){
-            mode = next;
-            document.getElementById('chatModeBtn').classList.toggle('active', next === 'chat');
-            document.getElementById('imageModeBtn').classList.toggle('active', next === 'image');
-            document.getElementById('imageControls').classList.toggle('hidden', next !== 'image');
-            renderProviderControls();
-            updateModelLabel();
-        }
-
         function updateModelLabel(){
-            let label = '';
-            if (mode === 'image') {
-                label = activeImageModel || config.image_model || 'Image';
-            } else {
-                label = activeChatModel || config.chat_model || 'Chat';
-            }
-            document.getElementById('modelLabel').textContent = label;
-        }
-
-        function setChatRatio(next, preferredSize = ''){
-            chatRatio = next;
-            ['square','portrait','portrait43','landscape43','landscape','story','wide'].forEach(item => {
-                document.getElementById(`chat-ratio-${item}`).classList.toggle('active', item === next);
-            });
-            if(preferredSize){ const match = SIZE_OPTIONS[next].find(([value]) => value === preferredSize); if(match) chatResolution = match[1]; }
-            updateChatResolutionUI();
-        }
-
-        function setChatResolution(next){ chatResolution = next; updateChatResolutionUI(); }
-        function updateChatResolutionUI(){
-            document.getElementById('chat-res-1k').classList.toggle('active', chatResolution === '1k');
-            document.getElementById('chat-res-2k').classList.toggle('active', chatResolution === '2k');
-        }
-
-        function currentChatSize(){
-            const options = SIZE_OPTIONS[chatRatio] || SIZE_OPTIONS.square;
-            const match = options.find(([, label]) => label === chatResolution) || options[0];
-            return match[0];
+            document.getElementById('modelLabel').textContent = activeChatModel || config.chat_model || 'Chat';
         }
 
         function renderMessages(messages){
@@ -517,13 +426,14 @@
         });
 
         function hasImageFiles(items){ return [...(items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/')); }
-        function autoGrow(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
+        function autoGrow(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 168) + 'px'; }
         function handleKey(e){ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } }
 
         async function sendMessage(){
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
             if(!message) return;
+            if(!StudioApiProviders.guardProviderKey(provider, panelProviders())) return;
             const btn = document.getElementById('sendBtn');
             btn.disabled = true;
             const pendingRefs = refs.slice();
@@ -536,32 +446,11 @@
                 document.getElementById('messages').innerHTML = '';
             }
             addMessageBubble({role:'user', content:message, attachments:pendingRefs});
-            const assistantBubble = addMessageBubble({role:'assistant', content: mode === 'image' ? tr('chat.generatingImage') : ''});
-            if(mode === 'chat') assistantBubble.bubble.classList.add('streaming');
+            const assistantBubble = addMessageBubble({role:'assistant', content: ''});
+            assistantBubble.bubble.classList.add('streaming');
             scrollBottom();
             try {
-                if(mode === 'chat') {
-                    await streamChatMessage(message, pendingRefs, assistantBubble);
-                } else {
-                    const data = await fetch('/api/chat', {
-                        method:'POST',
-                        headers:headers(),
-                        body:JSON.stringify({
-                            conversation_id: currentConversation.id || '',
-                            message,
-                            mode,
-                            size: currentChatSize(),
-                            model: activeChatModel || config.chat_model,
-                            image_model: activeImageModel || config.image_model,
-                            reference_images: pendingRefs,
-                            provider: activeImageProvider,
-                        })
-                    }).then(async r => { if(!r.ok) throw new Error((await r.json()).detail || tr('chat.requestFailed')); return r.json(); });
-                    currentConversation = data.conversation;
-                    setChatTitle(currentConversation.title);
-                    renderMessages(currentConversation.messages || []);
-                    await loadConversations();
-                }
+                await streamChatMessage(message, pendingRefs, assistantBubble);
             } catch(err) {
                 renderMessages([...(currentConversation.messages || []), {role:'assistant', content:err.message || tr('chat.requestFailed')}]);
             } finally {
@@ -628,8 +517,6 @@
 
         window.onload = async () => {
             applyLanguage();
-            setChatRatio('square');
-            setChatResolution('1k');
             await loadConfig();
             await loadConversations();
         };

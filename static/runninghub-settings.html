@@ -17,117 +17,58 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
-    <script src="/static/i18n.js?v=20260525-runninghub"></script>
+    <script src="/static/i18n.js?v=20260530-rh-options"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
-    <link rel="stylesheet" href="/static/settings-magnific.css?v=20260520-settings-sync">
+    <link rel="stylesheet" href="/static/runninghub-settings.css?v=20260530-rh-options">
+    <link rel="stylesheet" href="/static/settings-magnific.css?v=20260530-field-schema">
     <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
+    <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
+    <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
     <style>
-        :root { --bg:#101010; --panel:#1a1a1a; --soft:#313131; --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --accent:#ff4d94; }
-        body.studio-theme-dark, html.studio-theme-dark body { --bg:#101010; --panel:#1a1a1a; --soft:#313131; --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --accent:#ff4d94; }
-        * { box-sizing:border-box; }
-        body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
-        button { font-family:inherit; cursor:pointer; border:0; background:transparent; color:inherit; }
-        .page { min-height:100vh; padding:40px 32px 80px; }
-        .wrap { max-width:1100px; margin:0 auto; }
-        .page-head { padding:0 4px 28px; display:flex; justify-content:space-between; align-items:end; gap:24px; flex-wrap:wrap; }
-        .page-head .title { font-size:26px; line-height:1.05; font-weight:900; letter-spacing:-.015em; }
-        .page-head .sub { margin-top:8px; color:var(--muted); font-size:12.5px; line-height:1.55; font-weight:600; max-width:640px; }
-        .page-head .status { color:var(--muted); font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; min-height:16px; }
-        .layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:36px; align-items:start; }
-        .sidebar { display:flex; flex-direction:column; gap:12px; position:sticky; top:32px; max-height:calc(100vh - 64px); overflow-y:auto; padding:16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-        .side-section-title { color:var(--faint); font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; padding:2px 4px; }
-        .workflow-list { display:flex; flex-direction:column; gap:4px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-bottom:4px; }
-        .workflow-card { width:100%; text-align:left; border:1px solid transparent; background:transparent; border-radius:6px; padding:8px 10px; display:flex; align-items:center; gap:10px; color:var(--muted); transition:all .15s ease; min-height:48px; }
-        .workflow-card:hover { border-color:var(--text); color:var(--text); }
-        .workflow-card.active { background:var(--soft); color:var(--text); border-color:transparent; }
-        .workflow-mark { width:28px; height:28px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:var(--soft); color:var(--muted); }
-        .workflow-card.active .workflow-mark { background:var(--panel); color:var(--text); }
-        .workflow-name { min-width:0; font-size:12.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .workflow-meta { margin-top:1px; color:var(--faint); font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .add-btn { width:100%; height:40px; border:1px dashed var(--line-strong); border-radius:6px; color:var(--muted); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:800; transition:all .15s ease; }
-        .add-btn:hover { color:var(--text); border-color:var(--faint); background:var(--soft); }
-        .key-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
-        .key-row .field-frame { width:100%; }
-        .content { display:flex; flex-direction:column; gap:20px; min-width:0; }
-        .content-head { display:flex; align-items:end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:20px 24px; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-        .content-head .editor-title { font-size:22px; line-height:1.1; font-weight:900; letter-spacing:-.01em; }
-        .content-head .editor-sub { margin-top:4px; color:var(--muted); font-size:11.5px; font-weight:700; }
-        .content-actions { display:flex; gap:8px; align-items:center; }
-        .block { display:flex; flex-direction:column; gap:14px; padding:22px 24px; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-        .block-title { font-size:12px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:var(--text); }
-        .block-desc { color:var(--muted); font-size:11.5px; line-height:1.55; font-weight:600; margin-top:4px; }
-        .form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-        .field { display:flex; flex-direction:column; gap:7px; min-width:0; }
-        .field.full { grid-column:1/-1; }
-        .label { color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.02em; }
-        .field-frame { display:flex; align-items:center; padding:4px; border:1px solid var(--line); border-radius:5px; background:var(--soft); transition:border-color .15s ease; }
-        .field-frame:focus-within { border-color:var(--text); }
-        .field-frame input, .field-frame select, .field-frame textarea { width:100%; border:0; background:transparent; color:var(--text); outline:none; font-size:13px; font-weight:650; }
-        .field-frame input, .field-frame select { height:34px; padding:0 10px; }
-        .field-frame textarea { min-height:72px; padding:8px 10px; resize:vertical; }
-        .hint { color:var(--faint); font-size:11px; line-height:1.5; font-weight:600; }
-        .param-list { display:flex; flex-direction:column; gap:10px; }
-        .param-row { display:grid; grid-template-columns:1fr 90px 90px 110px 36px; gap:8px; align-items:end; padding:10px; border:1px solid var(--line); border-radius:6px; background:var(--soft); }
-        .param-row.has-select-options { grid-template-columns:1fr; align-items:stretch; }
-        .param-row-main { display:grid; grid-template-columns:1fr 90px 90px 110px 36px; gap:8px; align-items:end; }
-        .param-row .field { gap:5px; }
-        .param-options-field textarea { min-height:72px; font-size:11.5px; line-height:1.45; }
-        .param-row .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
-        .action-btn { height:36px; padding:0 14px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:800; transition:all .15s ease; border:1px solid var(--line); background:var(--panel); color:var(--muted); }
-        .action-btn:hover { color:var(--text); border-color:var(--text); }
-        .action-btn.save-btn { background:var(--accent); color:#fff; border-color:var(--accent); }
-        .action-btn.danger-btn { color:#fca5a5; border-color:rgba(248,113,113,.55); background:rgba(127,29,29,.28); }
-        .ghost-btn { height:32px; padding:0 12px; border-radius:4px; border:1px solid var(--line); color:var(--muted); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:11.5px; font-weight:750; }
-        .ghost-btn:hover { color:var(--text); border-color:var(--text); }
-        .wf-id-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:end; }
-        .node-explorer { display:flex; flex-direction:column; gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
-        .node-explorer-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-        .node-explorer-stats { font-size:11px; font-weight:700; color:var(--muted); }
-        .node-list {
-            display:grid;
-            grid-template-columns:repeat(3, minmax(0, 1fr));
-            gap:10px;
-            align-items:start;
-            width:100%;
-        }
-        .node-card { background:var(--soft); border:1px solid var(--line); border-radius:6px; overflow:hidden; min-width:0; height:fit-content; }
-        .node-card.expanded { grid-column:1 / -1; }
-        .node-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding:10px 12px; cursor:pointer; user-select:none; min-height:72px; }
-        .node-card-head:hover { background:rgba(255,255,255,.03); }
-        .node-card.expanded .node-card-head { border-bottom:1px solid var(--line); min-height:0; }
-        .node-card-head > div:first-child { min-width:0; flex:1; }
-        .node-class { font-size:12px; font-weight:850; color:var(--text); line-height:1.35; word-break:break-word; }
-        .node-meta { font-size:10px; font-weight:700; color:var(--faint); margin-top:4px; line-height:1.45; word-break:break-word; }
-        .node-card-head .node-head-actions { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:0 0 auto; }
-        .node-card-head .node-head-actions .node-explorer-stats { white-space:nowrap; }
-        .node-chev { color:var(--faint); transition:transform .15s ease; }
-        .node-card.expanded .node-chev { transform:rotate(180deg); }
-        .node-inputs { display:none; padding:12px 14px; flex-direction:column; gap:8px; }
-        .node-card.expanded .node-inputs { display:flex; }
-        .node-card.expanded .input-row { grid-template-columns:32px minmax(0,1fr) minmax(120px,200px); }
-        .input-row { display:grid; grid-template-columns:32px minmax(0,1fr); gap:8px; align-items:start; padding:8px 10px; border:1px solid var(--line); border-radius:5px; background:var(--panel); min-width:0; }
-        .input-row.is-active { border-color:var(--accent); }
-        .check-toggle { width:18px; height:18px; border:1.5px solid var(--line-strong); border-radius:3px; display:flex; align-items:center; justify-content:center; cursor:pointer; background:var(--soft); margin:0 auto; }
-        .check-toggle.checked { background:var(--accent); border-color:var(--accent); color:#fff; }
-        .input-key { font-size:12px; font-weight:800; color:var(--text); }
-        .input-orig { font-size:10.5px; font-weight:700; color:var(--faint); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .small-input { width:100%; height:28px; padding:0 8px; border:1px solid var(--line); border-radius:4px; background:var(--soft); color:var(--text); font-size:11.5px; font-weight:650; }
-        .small-input:disabled { opacity:.45; }
-        .explorer-empty { padding:28px 16px; text-align:center; border:1px dashed var(--line); border-radius:6px; color:var(--muted); font-size:12px; font-weight:700; line-height:1.6; }
-        @media (max-width: 1100px) {
-            .node-list { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; }
+        button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+        .page { min-height: 100vh; padding: 40px 32px 80px; }
+        .wrap { max-width: 1100px; margin: 0 auto; }
+        .page-head { padding: 0 4px 28px; display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+        .page-head .title { font-size: 26px; line-height: 1.05; font-weight: 900; letter-spacing: -0.015em; }
+        .page-head .sub { margin-top: 8px; font-size: 12.5px; line-height: 1.55; font-weight: 600; max-width: 640px; }
+        .page-head .status { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; min-height: 16px; }
+        .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; align-items: start; }
+        .workflow-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 4px; }
+        .workflow-card { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 8px 10px; display: flex; align-items: center; gap: 10px; min-height: 48px; }
+        .workflow-mark { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .workflow-name { min-width: 0; font-size: 12.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .workflow-meta { margin-top: 1px; font-size: 10px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .field-frame input, .field-frame select, .field-frame textarea { width: 100%; border: 0; background: transparent; outline: none; }
+        .field-frame input, .field-frame select { height: 30px; padding: 0 10px; font-size: 12px; font-weight: 650; }
+        .field-frame textarea { min-height: 72px; padding: 8px 10px; resize: vertical; font-size: 12px; font-weight: 650; }
+        .rh-node-block .node-list { grid-template-columns: 1fr; }
+        .node-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; width: 100%; }
+        .node-card { overflow: hidden; min-width: 0; height: fit-content; }
+        .node-card.expanded { grid-column: 1 / -1; }
+        .node-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; cursor: pointer; user-select: none; min-height: 72px; }
+        .node-card.expanded .node-card-head { min-height: 0; }
+        .node-card-head > div:first-child { min-width: 0; flex: 1; }
+        .node-class { font-size: 12px; font-weight: 850; line-height: 1.35; word-break: break-word; }
+        .node-meta { font-size: 10px; font-weight: 700; margin-top: 4px; line-height: 1.45; word-break: break-word; }
+        .node-card-head .node-head-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
+        .node-chev { transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+        .node-card.expanded .node-chev { transform: rotate(180deg); }
+        .node-inputs { display: none; flex-direction: column; }
+        .node-card.expanded .node-inputs { display: flex; }
+        .input-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
+        .input-key { font-size: 12px; font-weight: 800; }
+        .input-orig { font-size: 10.5px; font-weight: 700; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         @media (max-width: 900px) {
-            .layout { grid-template-columns:1fr; }
-            .param-row { grid-template-columns:1fr; }
-            .wf-id-row { grid-template-columns:1fr; }
+            .layout { grid-template-columns: 1fr; }
         }
         @media (max-width: 560px) {
-            .node-list { grid-template-columns:1fr; }
+            .node-list { grid-template-columns: 1fr; }
         }
     </style>
 </head>
-<body class="mg-studio theme-dark studio-theme-dark">
+<body class="mg-studio theme-dark studio-theme-dark settings-page rh-settings">
     <div class="page">
         <div class="wrap">
             <header class="page-head">
@@ -142,74 +83,70 @@
                 <aside class="sidebar">
                     <div class="side-section-title" data-i18n="rh.workflowList">工作流列表</div>
                     <div id="workflowList" class="workflow-list"></div>
-                    <button class="add-btn" type="button" onclick="addWorkflow()"><i data-lucide="plus" class="w-4 h-4"></i><span data-i18n="rh.addWorkflow">添加工作流</span></button>
+                    <button class="add-btn" type="button" onclick="addWorkflow()" data-i18n-title="rh.addWorkflow"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </aside>
 
-                <main class="content">
-                    <div class="content-head">
-                        <div>
-                            <div id="editorTitle" class="editor-title">—</div>
-                            <div class="editor-sub" data-i18n="rh.editorSub">配置 Workflow ID 与暴露参数</div>
+                <main class="content rh-settings-main">
+                    <header class="rh-editor-header" id="rhEditorHeader">
+                        <div class="rh-editor-header-top">
+                            <div>
+                                <h2 id="editorTitle" class="rh-editor-title">—</h2>
+                                <p class="rh-editor-sub" data-i18n="rh.editorSub">配置 Workflow ID 与暴露参数</p>
+                            </div>
                         </div>
-                        <div class="content-actions">
-                            <button id="deleteBtn" class="action-btn danger-btn" type="button" onclick="deleteWorkflow()"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span data-i18n="rh.delete">删除</span></button>
-                            <button class="action-btn save-btn" type="button" onclick="saveConfig()"><i data-lucide="save" class="w-3.5 h-3.5"></i><span data-i18n="rh.save">保存</span></button>
-                        </div>
-                    </div>
+                    </header>
 
-                    <section class="block">
-                        <div class="block-title" data-i18n="rh.apiKeyBlock">API Key</div>
-                        <div class="block-desc" data-i18n="rh.apiKeyHint">在 RunningHub 官网「API 控制台」获取 32 位 API Key，保存后写入 API/.env，页面不会回显完整内容。</div>
-                        <div class="form">
-                            <label class="field full">
-                                <span class="label">API Key</span>
-                                <div class="key-row">
-                                    <div class="field-frame"><input id="apiKeyInput" type="password" placeholder="输入 RunningHub API Key"></div>
-                                    <button class="action-btn save-btn" type="button" onclick="saveApiKey()"><i data-lucide="save" class="w-3.5 h-3.5"></i><span data-i18n="rh.saveApiKey">保存 Key</span></button>
-                                </div>
-                                <span id="keyHint" class="hint"></span>
-                            </label>
+                    <section class="rh-card" id="apiKeyCard">
+                        <h3 class="rh-card-title" data-i18n="rh.apiKeyBlock">API Key</h3>
+                        <div class="rh-key-row">
+                            <div class="field-frame"><input id="apiKeyInput" type="password" placeholder="输入 RunningHub API Key"></div>
+                            <button class="action-btn save-btn settings-btn" type="button" onclick="saveApiKey()"><i data-lucide="save"></i><span data-i18n="rh.saveApiKey">保存 Key</span></button>
                         </div>
+                        <span id="keyHint" class="rh-key-hint"></span>
                     </section>
 
-                    <section class="block" id="workflowEditor" style="display:none">
-                        <div class="block-title" data-i18n="rh.workflowBlock">工作流</div>
-                        <div class="form">
-                            <label class="field">
-                                <span class="label" data-i18n="rh.workflowName">显示名称</span>
+                    <section class="rh-card" id="workflowBasicsCard" hidden>
+                        <h3 class="rh-card-title" data-i18n="rh.workflowConfig">Workflow Configuration</h3>
+                        <div class="rh-form-stack">
+                            <label class="rh-field">
+                                <span class="rh-field-label" data-i18n="rh.workflowName">Display name</span>
                                 <div class="field-frame"><input id="wfNameInput" type="text" placeholder="文生图"></div>
                             </label>
-                            <label class="field full">
-                                <span class="label">Workflow ID</span>
-                                <div class="wf-id-row">
+                            <label class="rh-field full">
+                                <span class="rh-field-label">Workflow ID</span>
+                                <div class="rh-wf-id-row">
                                     <div class="field-frame"><input id="wfIdInput" type="text" placeholder="1850925505116598274"></div>
-                                    <button class="action-btn" type="button" id="fetchJsonBtn" onclick="fetchWorkflowJson()"><i data-lucide="download-cloud" class="w-3.5 h-3.5"></i><span data-i18n="rh.fetchJson">拉取 JSON</span></button>
-                                    <button class="ghost-btn" type="button" onclick="autoExposeSuggested()"><i data-lucide="wand-2" class="w-3.5 h-3.5"></i><span data-i18n="rh.autoExpose">智能暴露</span></button>
+                                    <div class="rh-btn-group">
+                                        <button class="action-btn settings-btn" type="button" id="fetchJsonBtn" onclick="fetchWorkflowJson()"><i data-lucide="download-cloud"></i><span data-i18n="rh.fetchJson">拉取 JSON</span></button>
+                                        <button class="ghost-btn settings-btn" type="button" onclick="autoExposeSuggested()"><i data-lucide="wand-2"></i><span data-i18n="rh.autoExpose">智能暴露</span></button>
+                                    </div>
                                 </div>
                             </label>
                         </div>
-                        <div class="hint" data-i18n="rh.workflowIdHint">从 RunningHub 工作流页面 URL 获取，例如 #/workflow/1850925505116598274 中的数字部分。目标工作流需先在网页端成功运行过一次。</div>
-
-                        <div id="nodeExplorer" class="node-explorer" style="display:none">
-                            <div class="node-explorer-head">
-                                <div>
-                                    <div class="block-title" style="margin:0" data-i18n="rh.nodeExplorer">工作流节点</div>
-                                    <div class="block-desc" data-i18n="rh.nodeExplorerHint">与 ComfyUI 设置相同：展开节点并勾选要暴露的输入项，将自动填入 nodeId 与 fieldName。</div>
-                                </div>
-                                <div id="nodeExplorerStats" class="node-explorer-stats"></div>
-                            </div>
-                            <div id="nodeList" class="node-list"></div>
-                        </div>
-
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px">
-                            <div>
-                                <div class="block-title" style="margin:0" data-i18n="rh.paramsTitle">暴露参数</div>
-                                <div class="block-desc" data-i18n="rh.paramsHint">nodeId / fieldName 对应 RunningHub 工作流 API 格式中的节点与字段，将作为工作流调用时的输入参数。</div>
-                            </div>
-                            <button class="ghost-btn" type="button" onclick="addParam()"><i data-lucide="plus" class="w-3.5 h-3.5"></i><span data-i18n="rh.addParam">添加参数</span></button>
-                        </div>
-                        <div id="paramList" class="param-list"></div>
                     </section>
+
+                    <section class="rh-card" id="workflowParamsCard" hidden>
+                        <div class="rh-card-head">
+                            <h3 class="rh-card-title" data-i18n="rh.paramsTitle">暴露参数</h3>
+                            <button class="ghost-btn settings-btn" type="button" onclick="addParam()"><i data-lucide="plus"></i><span data-i18n="rh.addParam">添加参数</span></button>
+                        </div>
+                        <div id="rhNodeBlock" class="rh-node-block" hidden>
+                            <div id="nodeExplorer" class="node-explorer">
+                                <div class="node-explorer-head">
+                                    <div>
+                                        <h4 class="rh-node-block-title" data-i18n="rh.nodeExplorer">工作流节点</h4>
+                                    </div>
+                                </div>
+                                <div id="nodeList" class="node-list"></div>
+                            </div>
+                        </div>
+                        <div id="paramList" class="rh-param-list"></div>
+                    </section>
+
+                    <div class="rh-action-bar rh-action-bar--footer" id="rhActionBar" hidden>
+                        <button id="deleteBtn" class="action-btn danger-btn settings-btn" type="button" onclick="deleteWorkflow()"><i data-lucide="trash-2"></i><span data-i18n="rh.delete">删除</span></button>
+                        <button class="action-btn save-btn settings-btn" type="button" onclick="saveConfig()"><i data-lucide="save"></i><span data-i18n="rh.save">保存</span></button>
+                    </div>
                 </main>
             </div>
         </div>
@@ -278,7 +215,11 @@
             return { type: guessRhType(rawValue, fieldName), options: [], default: rawValue };
         }
         const workflowList = document.getElementById('workflowList');
-        const workflowEditor = document.getElementById('workflowEditor');
+        const workflowBasicsCard = document.getElementById('workflowBasicsCard');
+        const workflowParamsCard = document.getElementById('workflowParamsCard');
+        const rhNodeBlock = document.getElementById('rhNodeBlock');
+        const rhActionBar = document.getElementById('rhActionBar');
+        const deleteBtn = document.getElementById('deleteBtn');
         const editorTitle = document.getElementById('editorTitle');
         const statusEl = document.getElementById('status');
         const apiKeyInput = document.getElementById('apiKeyInput');
@@ -288,8 +229,6 @@
         const paramList = document.getElementById('paramList');
         const nodeExplorer = document.getElementById('nodeExplorer');
         const nodeList = document.getElementById('nodeList');
-        const nodeExplorerStats = document.getElementById('nodeExplorerStats');
-
         function tr(key){ return window.StudioI18n ? StudioI18n.t(key) : key; }
         function tf(key, vars={}){
             return Object.entries(vars).reduce((text, [k, v]) => text.replaceAll(`{${k}}`, String(v ?? '')), tr(key));
@@ -299,6 +238,125 @@
         function escapeHtml(str){ return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
         function escapeAttr(str){ return escapeHtml(str).replace(/`/g, '&#96;'); }
         function uid(prefix='rh'){ return `${prefix}-${Math.random().toString(36).slice(2, 8)}`; }
+        const RH_DATA_TYPES = ['text', 'textarea', 'number', 'image'];
+        function rhFieldIsDropdown(field){
+            rhNormalizeFieldSchema(field);
+            return String(field.inputMethod || '').toLowerCase() === 'dropdown';
+        }
+        function rhSyncLegacyType(field){
+            const dt = String(field.dataType || 'text').toLowerCase();
+            const im = String(field.inputMethod || 'manual').toLowerCase();
+            field.dataType = RH_DATA_TYPES.includes(dt) ? dt : 'text';
+            field.inputMethod = im === 'dropdown' ? 'dropdown' : 'manual';
+            field.type = field.inputMethod === 'dropdown' ? 'select' : field.dataType;
+            return field;
+        }
+        function rhNormalizeFieldSchema(field){
+            if(!field) return field;
+            const legacy = String(field.type || 'text').toLowerCase();
+            let dt = String(field.dataType || '').toLowerCase();
+            let im = String(field.inputMethod || '').toLowerCase();
+            if(!dt || !im){
+                if(legacy === 'select'){
+                    dt = dt || 'text';
+                    im = im || 'dropdown';
+                } else if(legacy === 'textarea'){
+                    dt = 'textarea';
+                    im = 'manual';
+                } else if(RH_DATA_TYPES.includes(legacy)){
+                    dt = legacy;
+                    im = 'manual';
+                } else {
+                    dt = 'text';
+                    im = 'manual';
+                }
+            }
+            field.dataType = RH_DATA_TYPES.includes(dt) ? dt : 'text';
+            field.inputMethod = im === 'dropdown' ? 'dropdown' : 'manual';
+            return rhSyncLegacyType(field);
+        }
+        function rhSchemaFromResolved(resolved){
+            if(resolved?.type === 'select'){
+                return { dataType: 'text', inputMethod: 'dropdown' };
+            }
+            const dt = RH_DATA_TYPES.includes(String(resolved?.type || '').toLowerCase())
+                ? String(resolved.type).toLowerCase()
+                : 'text';
+            return { dataType: dt, inputMethod: 'manual' };
+        }
+        function rhOptionsFromWorkflowJson(field){
+            const nodeId = String(field?.nodeId || '').trim();
+            const fieldName = String(field?.fieldName || '').trim();
+            if(!nodeId || !fieldName) return [];
+            const raw = rhWorkflowJson?.[nodeId]?.inputs?.[fieldName];
+            const cached = rhInputMeta?.[nodeId]?.[fieldName];
+            if(cached?.type === 'select' && (cached.options || []).length){
+                return cached.options.map(o => String(o));
+            }
+            const resolved = rhResolveFieldMeta(nodeId, fieldName, raw ?? field.default);
+            if((resolved.options || []).length){
+                return resolved.options.map(o => String(o));
+            }
+            if(raw !== undefined && raw !== null && raw !== '' && typeof raw !== 'object'){
+                return [String(raw)];
+            }
+            return [];
+        }
+        function rhEnsureOptionRows(options){
+            const list = (options || []).map(o => String(o));
+            return list.length ? list : [''];
+        }
+        function rhHydrateDropdownField(field, preferJson = false){
+            if(!field || !rhFieldIsDropdown(field)) return;
+            const raw = rhWorkflowJson?.[field.nodeId]?.inputs?.[field.fieldName];
+            if(typeof raw === 'string' && !field.apiValue) field.apiValue = raw;
+            const jsonOpts = rhOptionsFromWorkflowJson(field);
+            const existing = (field.options || []).map(o => String(o)).filter(o => o.trim());
+            if(preferJson || !existing.length){
+                field.options = jsonOpts.length ? jsonOpts : rhEnsureOptionRows(existing);
+            } else if(jsonOpts.length && jsonOpts.length > existing.length){
+                field.options = jsonOpts;
+            } else {
+                field.options = rhEnsureOptionRows(field.options);
+            }
+            field.options = rhEnsureOptionRows(field.options);
+            if(field.default !== undefined && field.default !== null && field.default !== ''){
+                field.default = rhCanonicalOption(field.options.filter(o => o.trim()), field.default);
+            } else {
+                const first = field.options.find(o => String(o).trim());
+                if(first !== undefined) field.default = first;
+            }
+            rhSyncLegacyType(field);
+        }
+        function renderParamOptionEditor(field, index){
+            const opts = rhEnsureOptionRows(field.options);
+            field.options = opts;
+            const jsonOpts = rhOptionsFromWorkflowJson(field);
+            const fromJsonHint = jsonOpts.length
+                ? `<span class="rh-options-json-hint">${escapeHtml(tr('rh.optionsFromJson'))}</span>`
+                : '';
+            const rows = opts.map((opt, optIdx) => `
+                <div class="rh-option-row">
+                    <div class="field-frame"><input type="text" value="${escapeAttr(String(opt))}" placeholder="${escapeAttr(tr('rh.optionValue'))}" oninput="updateParamOption(${index}, ${optIdx}, this.value)"></div>
+                    <button class="action-btn danger-btn rh-option-delete settings-btn" type="button" onclick="removeParamOption(${index}, ${optIdx})" title="${tr('rh.delete')}"><i data-lucide="x"></i></button>
+                </div>
+            `).join('');
+            return `
+                <div class="rh-param-options-block">
+                    <div class="rh-param-options-head">
+                        <span class="rh-field-label">${tr('rh.selectOptions')}</span>
+                        ${fromJsonHint}
+                        <button class="ghost-btn settings-btn rh-option-add" type="button" onclick="addParamOption(${index})"><i data-lucide="plus"></i><span>${tr('rh.addOption')}</span></button>
+                    </div>
+                    <div class="rh-option-list">${rows}</div>
+                </div>
+            `;
+        }
+        function normalizeAllWorkflowFieldSchemas(){
+            (config.workflows || []).forEach(wf => {
+                wf.fields = (wf.fields || []).map(f => rhNormalizeFieldSchema(f));
+            });
+        }
         window.toggleRhField = toggleRhField;
         window.updateRhFieldName = updateRhFieldName;
         window.fetchWorkflowJson = fetchWorkflowJson;
@@ -337,47 +395,56 @@
             }
             const fields = wf.fields || [];
             if(!fields.length){
-                paramList.innerHTML = `<div class="hint">${tr('rh.noParams')}</div>`;
+                paramList.innerHTML = `<div class="rh-empty-hint">${tr('rh.noParams')}</div>`;
                 return;
             }
             paramList.innerHTML = fields.map((field, index) => {
-                const isSelect = String(field.type || '').toLowerCase() === 'select';
-                const optionsText = (field.options || []).join('\n');
+                rhNormalizeFieldSchema(field);
+                const isDropdown = rhFieldIsDropdown(field);
+                const dataType = field.dataType || 'text';
+                const inputMethod = field.inputMethod || 'manual';
                 return `
-                <div class="param-row ${isSelect ? 'has-select-options' : ''}" data-index="${index}">
-                    <div class="param-row-main">
-                        <label class="field">
-                            <span class="label">${tr('rh.paramName')}</span>
+                <div class="rh-param-row" data-index="${index}">
+                    <div class="rh-param-row-main">
+                        <label class="rh-field">
+                            <span class="rh-field-label">${tr('rh.paramName')}</span>
                             <div class="field-frame"><input value="${escapeHtml(field.name || '')}" oninput="updateParam(${index}, 'name', this.value)" placeholder="提示词"></div>
                         </label>
-                        <label class="field">
-                            <span class="label">nodeId</span>
+                        <label class="rh-field">
+                            <span class="rh-field-label">nodeId</span>
                             <div class="field-frame"><input value="${escapeHtml(field.nodeId || '')}" oninput="updateParam(${index}, 'nodeId', this.value)" placeholder="6"></div>
                         </label>
-                        <label class="field">
-                            <span class="label">fieldName</span>
+                        <label class="rh-field">
+                            <span class="rh-field-label">fieldName</span>
                             <div class="field-frame"><input value="${escapeHtml(field.fieldName || '')}" oninput="updateParam(${index}, 'fieldName', this.value)" placeholder="text"></div>
                         </label>
-                        <label class="field">
-                            <span class="label">${tr('rh.paramType')}</span>
-                            <div class="field-frame">
-                                <select onchange="updateParamType(${index}, this.value)">
-                                    <option value="text" ${field.type === 'text' ? 'selected' : ''}>text</option>
-                                    <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>textarea</option>
-                                    <option value="number" ${field.type === 'number' ? 'selected' : ''}>number</option>
-                                    <option value="select" ${field.type === 'select' ? 'selected' : ''}>select</option>
-                                    <option value="image" ${field.type === 'image' ? 'selected' : ''}>image</option>
+                        <label class="rh-field">
+                            <span class="rh-field-label">${tr('rh.dataType')}</span>
+                            <div class="field-frame field-frame--select">
+                                <select class="size-select" onchange="updateParamDataType(${index}, this.value)">
+                                    <option value="text" ${dataType === 'text' ? 'selected' : ''}>text</option>
+                                    <option value="textarea" ${dataType === 'textarea' ? 'selected' : ''}>textarea</option>
+                                    <option value="number" ${dataType === 'number' ? 'selected' : ''}>number</option>
+                                    <option value="image" ${dataType === 'image' ? 'selected' : ''}>image</option>
                                 </select>
                             </div>
                         </label>
-                        <button class="action-btn danger-btn" type="button" style="height:36px;padding:0" onclick="removeParam(${index})" title="${tr('rh.delete')}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                    ${isSelect ? `
-                        <label class="field param-options-field full">
-                            <span class="label">${tr('rh.selectOptions')}</span>
-                            <div class="field-frame"><textarea placeholder="${escapeAttr(tr('rh.selectOptionsHint'))}" oninput="updateParamOptions(${index}, this.value)">${escapeHtml(optionsText)}</textarea></div>
+                        <label class="rh-field">
+                            <span class="rh-field-label">${tr('rh.inputMethod')}</span>
+                            <div class="field-frame field-frame--select">
+                                <select class="size-select" onchange="updateParamInputMethod(${index}, this.value)">
+                                    <option value="manual" ${inputMethod === 'manual' ? 'selected' : ''}>${escapeHtml(tr('rh.inputManual'))}</option>
+                                    <option value="dropdown" ${inputMethod === 'dropdown' ? 'selected' : ''}>${escapeHtml(tr('rh.inputDropdown'))}</option>
+                                </select>
+                            </div>
                         </label>
-                    ` : ''}
+                        <button class="action-btn danger-btn param-delete-btn settings-btn" type="button" onclick="removeParam(${index})" title="${tr('rh.delete')}"><i data-lucide="trash-2"></i></button>
+                    </div>
+                    <div class="rh-param-options-wrap ${isDropdown ? 'is-open' : ''}" aria-hidden="${isDropdown ? 'false' : 'true'}">
+                        <div class="rh-param-options-inner">
+                            ${renderParamOptionEditor(field, index)}
+                        </div>
+                    </div>
                 </div>
             `;
             }).join('');
@@ -413,20 +480,25 @@
                 wf.fields = wf.fields.filter(f => f !== existing);
             } else {
                 const resolved = rhResolveFieldMeta(nodeId, fieldName, rawValue);
-                const type = resolved.type || 'text';
+                const schema = rhSchemaFromResolved(resolved);
                 let fname = String(fieldName || '').trim();
-                if((type === 'text' || type === 'textarea') && !fname) fname = 'text';
-                const title = nodeLabel(rhWorkflowJson?.[nodeId] || {});
+                if((schema.dataType === 'text' || schema.dataType === 'textarea') && !fname) fname = 'text';
                 const item = {
                     id: uid('f'),
-                    name: title ? `${title} · ${fieldName}` : fname,
+                    name: fname,
                     nodeId: String(nodeId),
                     fieldName: fname,
-                    type,
+                    dataType: schema.dataType,
+                    inputMethod: schema.inputMethod,
                     default: resolved.default ?? ((rawValue !== null && typeof rawValue !== 'object') ? rawValue : ''),
                 };
-                if(type === 'select'){
-                    item.options = resolved.options || [];
+                rhSyncLegacyType(item);
+                if(rhFieldIsDropdown(item)){
+                    item.options = rhOptionsFromWorkflowJson(item);
+                    if(!item.options.length && rawValue !== undefined && rawValue !== null && rawValue !== '' && typeof rawValue !== 'object'){
+                        item.options = [String(rawValue)];
+                    }
+                    item.options = rhEnsureOptionRows(item.options);
                     if(typeof rawValue === 'string') item.apiValue = rawValue;
                 }
                 wf.fields.push(item);
@@ -461,24 +533,23 @@
                         <div class="input-key">${escapeHtml(inputKey)}</div>
                         <div class="input-orig">${tr('rh.defaultValue')}${badge}</div>
                     </div>
-                    <input class="small-input" type="text" placeholder="${escapeAttr(tr('rh.paramName'))}" value="${active ? escapeAttr(f.name) : escapeAttr(inputKey)}" ${active ? `oninput="updateRhFieldName('${escapeAttr(f.id)}', this.value)"` : 'disabled'}>
                 </div>
             `;
         }
+        function syncRhNodeBlockVisibility(){
+            const hasNodes = !!(rhWorkflowJson && Object.keys(rhWorkflowJson).length);
+            if(rhNodeBlock) rhNodeBlock.hidden = !hasNodes;
+        }
+        function setWorkflowPanelsVisible(visible){
+            if(workflowBasicsCard) workflowBasicsCard.hidden = !visible;
+            if(workflowParamsCard) workflowParamsCard.hidden = !visible;
+            if(rhActionBar) rhActionBar.hidden = !visible;
+        }
         function renderNodeExplorer(){
             if(!nodeExplorer || !nodeList) return;
+            syncRhNodeBlockVisibility();
             if(!rhWorkflowJson || !Object.keys(rhWorkflowJson).length){
-                nodeExplorer.style.display = 'none';
                 return;
-            }
-            nodeExplorer.style.display = 'flex';
-            const wf = currentWorkflow();
-            const exposed = (wf?.fields || []).length;
-            if(nodeExplorerStats){
-                nodeExplorerStats.textContent = tf('rh.nodeStats', {
-                    nodes: Object.keys(rhWorkflowJson).length,
-                    exposed,
-                });
             }
             const nodes = Object.entries(rhWorkflowJson).sort((a, b) => {
                 const an = parseInt(a[0], 10), bn = parseInt(b[0], 10);
@@ -497,7 +568,6 @@
                                 <div class="node-meta">#${escapeHtml(nodeId)} · ${escapeHtml(node?.class_type || '')} · ${tf('rh.configurableCount', {count: inputs.length})}</div>
                             </div>
                             <div class="node-head-actions">
-                                ${exposedCount ? `<span class="node-explorer-stats">${tf('rh.exposedCount', {count: exposedCount})}</span>` : ''}
                                 <i data-lucide="chevron-down" class="w-4 h-4 node-chev"></i>
                             </div>
                         </div>
@@ -533,6 +603,9 @@
                 rhSuggestedFields = data.suggested_fields || [];
                 rhInputMeta = data.input_meta || {};
                 wf.workflow_id = data.workflow_id || workflowId;
+                (wf.fields || []).forEach(field => {
+                    if(rhFieldIsDropdown(field)) rhHydrateDropdownField(field, true);
+                });
                 syncExposedFieldMeta(wf);
                 renderWorkflowList();
                 renderParamList();
@@ -552,16 +625,20 @@
             wf.fields = wf.fields || [];
             rhSuggestedFields.forEach(item => {
                 if(rhFieldFor(item.nodeId, item.fieldName)) return;
+                const schema = rhSchemaFromResolved(item);
                 const entry = {
                     id: uid('f'),
                     name: item.name || item.fieldName,
                     nodeId: String(item.nodeId),
                     fieldName: String(item.fieldName || 'text'),
-                    type: item.type || 'text',
+                    dataType: schema.dataType,
+                    inputMethod: schema.inputMethod,
                     default: item.default ?? '',
                 };
-                if(entry.type === 'select'){
-                    entry.options = item.options || [];
+                rhSyncLegacyType(entry);
+                if(rhFieldIsDropdown(entry)){
+                    entry.options = item.options?.length ? item.options : rhOptionsFromWorkflowJson(entry);
+                    entry.options = rhEnsureOptionRows(entry.options);
                     if(item.apiValue !== undefined) entry.apiValue = item.apiValue;
                 }
                 wf.fields.push(entry);
@@ -571,10 +648,11 @@
         }
         function renderEditor(){
             const wf = currentWorkflow();
-            workflowEditor.style.display = wf ? 'flex' : 'none';
+            setWorkflowPanelsVisible(!!wf);
             if(!wf){
                 editorTitle.textContent = tr('rh.selectWorkflow');
                 rhWorkflowJson = null;
+                syncRhNodeBlockVisibility();
                 return;
             }
             editorTitle.textContent = wf.name || wf.id;
@@ -586,10 +664,11 @@
         }
 
         function normalizeRhField(field){
-            const t = String(field.type || 'text').toLowerCase();
+            rhNormalizeFieldSchema(field);
+            const dt = String(field.dataType || 'text').toLowerCase();
             const nodeId = String(field.nodeId || '').trim();
             let fieldName = String(field.fieldName || '').trim();
-            if(nodeId && !fieldName && (t === 'text' || t === 'textarea')) fieldName = 'text';
+            if(nodeId && !fieldName && (dt === 'text' || dt === 'textarea')) fieldName = 'text';
             field.nodeId = nodeId;
             field.fieldName = fieldName;
             return field;
@@ -615,34 +694,23 @@
         function syncParamOptionsFromDom(){
             const wf = currentWorkflow();
             if(!wf || !paramList) return;
-            paramList.querySelectorAll('.param-row[data-index]').forEach(row => {
+            paramList.querySelectorAll('.rh-param-row[data-index]').forEach(row => {
                 const index = Number(row.dataset.index);
                 const field = wf.fields?.[index];
-                if(!field || String(field.type || '').toLowerCase() !== 'select') return;
-                const ta = row.querySelector('.param-options-field textarea');
-                if(ta) updateParamOptions(index, ta.value);
+                if(!field || !rhFieldIsDropdown(field)) return;
+                const inputs = row.querySelectorAll('.rh-option-list .rh-option-row input');
+                field.options = Array.from(inputs).map(input => input.value);
             });
+        }
+        function syncParamOptionsForSave(field){
+            if(!field || !rhFieldIsDropdown(field)) return;
+            field.options = (field.options || []).map(o => String(o).trim()).filter(Boolean);
         }
         function hydrateRhSelectFields(wf){
             if(!wf) return;
             (wf.fields || []).forEach(field => {
-                const raw = rhWorkflowJson?.[field.nodeId]?.inputs?.[field.fieldName];
-                if(typeof raw === 'string' && !field.apiValue) field.apiValue = raw;
-                const resolved = rhResolveFieldMeta(field.nodeId, field.fieldName, raw ?? field.default);
-                const existing = field.options || [];
-                if(resolved.type === 'select'){
-                    field.type = 'select';
-                    if((resolved.options || []).length > existing.length){
-                        field.options = resolved.options;
-                    } else if(!existing.length && (resolved.options || []).length){
-                        field.options = resolved.options;
-                    }
-                    if(field.default !== undefined && field.default !== null && field.default !== ''){
-                        field.default = rhCanonicalOption(field.options || [], field.default);
-                    } else if((field.options || []).length){
-                        field.default = field.options[0];
-                    }
-                }
+                rhNormalizeFieldSchema(field);
+                rhHydrateDropdownField(field);
             });
         }
         function hydrateAllWorkflowSelectFields(){
@@ -691,7 +759,16 @@
             const wf = currentWorkflow();
             if(!wf) return;
             wf.fields = wf.fields || [];
-            wf.fields.push({ id: uid('f'), name: '提示词', nodeId: '', fieldName: 'text', type: 'text', default: '' });
+            wf.fields.push({
+                id: uid('f'),
+                name: '提示词',
+                nodeId: '',
+                fieldName: 'text',
+                dataType: 'text',
+                inputMethod: 'manual',
+                type: 'text',
+                default: '',
+            });
             renderParamList();
         };
 
@@ -699,36 +776,71 @@
             const wf = currentWorkflow();
             if(!wf || !wf.fields || !wf.fields[index]) return;
             wf.fields[index][key] = value;
+            const field = wf.fields[index];
+            if(rhFieldIsDropdown(field) && (key === 'nodeId' || key === 'fieldName')){
+                rhHydrateDropdownField(field, true);
+                renderParamList();
+            }
         };
-        window.updateParamType = function(index, value){
+        window.updateParamDataType = function(index, value){
             const wf = currentWorkflow();
             const field = wf?.fields?.[index];
             if(!field) return;
-            field.type = value;
-            if(value === 'select'){
-                const raw = rhWorkflowJson?.[field.nodeId]?.inputs?.[field.fieldName];
-                const resolved = rhResolveFieldMeta(field.nodeId, field.fieldName, raw ?? field.default);
-                field.options = resolved.options?.length ? resolved.options : (field.options || []);
-                if(typeof raw === 'string') field.apiValue = raw;
-                if(field.default !== undefined && field.default !== null && field.default !== ''){
-                    field.default = rhCanonicalOption(field.options, field.default);
-                } else if(field.options.length){
-                    field.default = field.options[0];
-                }
+            field.dataType = RH_DATA_TYPES.includes(String(value || '').toLowerCase()) ? String(value).toLowerCase() : 'text';
+            rhSyncLegacyType(field);
+            renderParamList();
+        };
+        window.updateParamInputMethod = function(index, value){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.inputMethod = String(value || '').toLowerCase() === 'dropdown' ? 'dropdown' : 'manual';
+            if(field.inputMethod === 'dropdown'){
+                rhHydrateDropdownField(field, true);
             } else {
-                delete field.options;
+                field.options = [];
                 delete field.apiValue;
+            }
+            rhSyncLegacyType(field);
+            renderParamList();
+        };
+        window.updateParamOption = function(index, optIdx, value){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.options = rhEnsureOptionRows(field.options);
+            field.options[optIdx] = value;
+            if(field.default !== undefined && field.default !== null && field.default !== ''){
+                const trimmed = field.options.map(o => String(o).trim()).filter(Boolean);
+                field.default = rhCanonicalOption(trimmed, field.default);
+            }
+        };
+        window.addParamOption = function(index){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.options = rhEnsureOptionRows(field.options);
+            field.options.push('');
+            renderParamList();
+        };
+        window.removeParamOption = function(index, optIdx){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.options = rhEnsureOptionRows(field.options);
+            if(field.options.length <= 1){
+                field.options = [''];
+            } else {
+                field.options.splice(optIdx, 1);
             }
             renderParamList();
         };
-        window.updateParamOptions = function(index, text){
+        window.reloadParamOptionsFromJson = function(index){
             const wf = currentWorkflow();
             const field = wf?.fields?.[index];
-            if(!field) return;
-            field.options = String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
-            if(field.default !== undefined && field.default !== null && field.default !== ''){
-                field.default = rhCanonicalOption(field.options, field.default);
-            }
+            if(!field || !rhFieldIsDropdown(field)) return;
+            rhHydrateDropdownField(field, true);
+            renderParamList();
         };
         function syncExposedFieldMeta(wf){
             hydrateRhSelectFields(wf);
@@ -792,15 +904,20 @@
                 name: wf.name,
                 workflow_id: wf.workflow_id,
                 fields: (wf.fields || []).map(f => {
+                    rhNormalizeFieldSchema(f);
+                    rhSyncLegacyType(f);
+                    syncParamOptionsForSave(f);
                     const item = {
                         id: f.id,
                         name: f.name,
                         nodeId: f.nodeId,
                         fieldName: f.fieldName,
                         type: f.type,
+                        dataType: f.dataType,
+                        inputMethod: f.inputMethod,
                         default: f.default,
                     };
-                    if(String(f.type || '').toLowerCase() === 'select'){
+                    if(rhFieldIsDropdown(f)){
                         item.options = Array.isArray(f.options) ? f.options : [];
                         if(f.apiValue !== undefined && f.apiValue !== null && f.apiValue !== ''){
                             item.apiValue = f.apiValue;
@@ -827,6 +944,7 @@
                 config.has_key = data.has_key;
                 config.key_preview = data.key_preview;
                 config.workflows = data.workflows || [];
+                normalizeAllWorkflowFieldSchemas();
                 applyKeyHint();
                 hydrateAllWorkflowSelectFields();
                 renderWorkflowList();
@@ -845,6 +963,7 @@
                 config.has_key = data.has_key;
                 config.key_preview = data.key_preview;
                 config.workflows = data.workflows || [];
+                normalizeAllWorkflowFieldSchemas();
                 applyKeyHint();
                 hydrateAllWorkflowSelectFields();
                 selectedId = (config.workflows || [])[0]?.id || '';
