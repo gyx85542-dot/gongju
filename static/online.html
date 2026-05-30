@@ -713,7 +713,7 @@
             const primary = providers.find(p => p.primary);
             if(primary) return primary.id;
             const apimart = providers.find(p => p.id === 'custom-api' || p.id === 'apimart' || String(p.name || '').toLowerCase() === 'apimart');
-            return apimart?.id || providers.find(p => p.id !== 'modelscope')?.id || providers[0]?.id || 'custom-api';
+            return apimart?.id || providers.find(p => p.enabled !== false)?.id || providers[0]?.id || 'custom-api';
         }
         function imageProviders(){
             const list = (apiProviders || []).filter(p => p.enabled !== false && (p.image_models || []).length);

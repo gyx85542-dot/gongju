@@ -369,6 +369,10 @@
 
         .studio-shell.active {
             display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            width: 100%;
+            height: 100%;
         }
 
         .studio-panels {
@@ -642,9 +646,9 @@
                     <span class="nav-icon"><i data-lucide="messages-square"></i></span>
                     <span class="nav-text" data-i18n="nav.gpt">AI 对话</span>
                 </div>
-                <div class="nav-item" onclick="switchUI(this, 'canvas')">
-                    <span class="nav-icon"><i data-lucide="layout-grid"></i></span>
-                    <span class="nav-text" data-i18n="nav.canvas">无限画布</span>
+                <div class="nav-item" onclick="switchUI(this, 'runninghub')">
+                    <span class="nav-icon"><i data-lucide="zap"></i></span>
+                    <span class="nav-text" data-i18n="nav.runninghub">RunningHub</span>
                 </div>
             </nav>
 
@@ -660,6 +664,10 @@
                 <button class="side-pill" onclick="switchUI(this, 'comfyui-settings')" type="button" title="ComfyUI 设置">
                     <span class="side-pill-icon"><i data-lucide="blocks"></i></span>
                     <span class="side-pill-text" data-i18n="common.comfyuiSettings">ComfyUI 设置</span>
+                </button>
+                <button class="side-pill" onclick="switchUI(this, 'runninghub-settings')" type="button" title="RunningHub 设置">
+                    <span class="side-pill-icon"><i data-lucide="settings-2"></i></span>
+                    <span class="side-pill-text" data-i18n="common.runninghubSettings">RunningHub 设置</span>
                 </button>
             </div>
         </aside>
@@ -685,35 +693,6 @@
                 setSidebarExpanded(expanded, false);
             }
             initSidebarState();
-            /* 在侧栏 DOM 解析完后立即把 active 类移到当前页对应的入口 */
-            (function(){
-                try {
-                    var valid = ['online','local','video','gpt-chat','canvas','api-settings','comfyui-settings'];
-                    var STUDIO = ['online','local','video'];
-                    var pageId = localStorage.getItem('studio_active_page');
-                    if(!valid.includes(pageId)) pageId = 'online';
-                    document.querySelectorAll('.nav-item.active, .side-pill.active').forEach(function(n){
-                        n.classList.remove('active');
-                    });
-                    document.querySelectorAll('iframe').forEach(function(f){ f.classList.remove('active'); });
-                    var target = document.querySelector('[onclick*="\'' + pageId + '\'"]');
-                    if(target) target.classList.add('active');
-                    var isStudio = STUDIO.includes(pageId);
-                    var studioShell = document.getElementById('studio-shell');
-                    var fullStage = document.getElementById('full-stage');
-                    if(studioShell) studioShell.classList.toggle('active', isStudio);
-                    if(fullStage) fullStage.classList.toggle('active', !isStudio);
-                    if(isStudio){
-                        var panel = document.getElementById('frame-' + pageId);
-                        if(panel) panel.classList.add('active');
-                        var gallery = document.getElementById('frame-gallery');
-                        if(gallery) gallery.classList.add('active');
-                    } else {
-                        var frame = document.getElementById('frame-' + pageId);
-                        if(frame) frame.classList.add('active');
-                    }
-                } catch(e) {}
-            })();
         </script>
 
         <main class="stage">
@@ -722,6 +701,7 @@
                     <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260523-ref-drag-white" class="active" scrolling="no"></iframe>
                     <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260526-comfy-prompt" scrolling="no"></iframe>
                     <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260526-seedance20" scrolling="no"></iframe>
+                    <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260529-runninghub" scrolling="no"></iframe>
                 </div>
                 <div class="studio-gallery-wrap">
                     <iframe id="frame-gallery" data-src="/static/gallery.html?v=20260525-gallery-poll" class="active" scrolling="no"></iframe>
@@ -729,9 +709,9 @@
             </div>
             <div id="full-stage" class="full-stage">
                 <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260520-composer-wrap" scrolling="yes"></iframe>
-                <iframe id="frame-canvas" data-src="/static/canvas.html?v=20260526-canvas-fix" scrolling="yes"></iframe>
                 <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
                 <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260520-settings-sync" scrolling="yes"></iframe>
+                <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260525-runninghub" scrolling="yes"></iframe>
             </div>
 
             <div class="nano-monitor is-hidden" id="nano-monitor">
@@ -884,9 +864,9 @@
         localStorage.setItem("client_id", CID);
         const ACTIVE_PAGE_KEY = 'studio_active_page';
         const DEFAULT_PAGE_ID = 'online';
-        const PAGE_IDS = ['online','local','video','gpt-chat','canvas','api-settings','comfyui-settings'];
+        const PAGE_IDS = ['online','local','video','gpt-chat','runninghub','api-settings','comfyui-settings','runninghub-settings'];
 
-        const STUDIO_PAGE_IDS = ['online','local','video'];
+        const STUDIO_PAGE_IDS = ['online','local','video','runninghub'];
         const STUDIO_AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
         window.__studioViewerCtx = { items: [], pinnedKeys: [], favoriteKeys: [] };
 
@@ -980,18 +960,36 @@
             } catch(e){}
         }
 
-        function updateMonitorVisibility(pageId) {
+        function updateMonitorVisibility() {
             const monitor = document.getElementById('nano-monitor');
-            if(monitor) monitor.classList.toggle('is-hidden', pageId !== 'canvas');
+            if(monitor) monitor.classList.add('is-hidden');
+        }
+
+        function navTriggerForPage(id){
+            const nodes = document.querySelectorAll('.nav-item[onclick], .side-pill[onclick]');
+            for(const node of nodes){
+                const onclick = node.getAttribute('onclick') || '';
+                const match = onclick.match(/switchUI\([^,]+,\s*['"]([^'"]+)['"]/);
+                if(match && match[1] === id) return node;
+            }
+            return null;
+        }
+
+        function notifyGalleryRefresh(){
+            try {
+                new BroadcastChannel('studio-gallery').postMessage({ type: 'gallery-refresh' });
+            } catch(e) {}
         }
 
         function switchUI(el, id, options = {}) {
             if(!PAGE_IDS.includes(id)) id = DEFAULT_PAGE_ID;
             document.querySelectorAll('.nav-item,.side-pill').forEach(n => n.classList.remove('active'));
-            if(el) el.classList.add('active');
+            const trigger = el || navTriggerForPage(id);
+            if(trigger) trigger.classList.add('active');
 
             const studioShell = document.getElementById('studio-shell');
             const fullStage = document.getElementById('full-stage');
+            const gallery = document.getElementById('frame-gallery');
             const isStudio = STUDIO_PAGE_IDS.includes(id);
 
             if(studioShell) studioShell.classList.toggle('active', isStudio);
@@ -1003,31 +1001,32 @@
             if(isStudio){
                 const panel = document.getElementById('frame-' + id);
                 if(panel) panel.classList.add('active');
+                if(gallery){
+                    gallery.classList.add('active');
+                    gallery.style.visibility = '';
+                }
                 ensureFrameLoaded(panel);
-                ensureFrameLoaded(document.getElementById('frame-gallery'));
+                ensureFrameLoaded(gallery);
                 syncThemeToFrame(panel);
                 syncLanguageToFrame(panel);
-                syncThemeToFrame(document.getElementById('frame-gallery'));
-                syncLanguageToFrame(document.getElementById('frame-gallery'));
+                syncThemeToFrame(gallery);
+                syncLanguageToFrame(gallery);
+                notifyGalleryRefresh();
             } else {
                 const target = document.getElementById('frame-' + id);
                 if(target) target.classList.add('active');
                 ensureFrameLoaded(target);
                 syncThemeToFrame(target);
                 syncLanguageToFrame(target);
-                if (id === 'canvas' && target?.src) {
-                    try { target.contentWindow?.postMessage({ type: 'canvas-focus' }, '*'); } catch(e) {}
-                }
             }
 
             if(!options.skipRemember) localStorage.setItem(ACTIVE_PAGE_KEY, id);
-            updateMonitorVisibility(id);
+            updateMonitorVisibility();
         }
 
         function restoreActivePage() {
             const id = PAGE_IDS.includes(localStorage.getItem(ACTIVE_PAGE_KEY)) ? localStorage.getItem(ACTIVE_PAGE_KEY) : DEFAULT_PAGE_ID;
-            const trigger = document.querySelector(`[onclick*="'${id}'"],[onclick*='"${id}"']`);
-            switchUI(trigger, id, { skipRemember:true });
+            switchUI(navTriggerForPage(id), id, { skipRemember:true });
             document.documentElement.classList.remove('studio-route-booting');
         }
         document.addEventListener('DOMContentLoaded', () => {
@@ -1119,6 +1118,12 @@
                 } catch(e) {}
             });
         }
+
+        window.addEventListener('message', (e) => {
+            const page = e.data?.type === 'studio-navigate' ? e.data.page : '';
+            if(!page || !PAGE_IDS.includes(page)) return;
+            switchUI(navTriggerForPage(page), page);
+        });
 
         window.addEventListener('DOMContentLoaded', () => {
             if(window.StudioI18n) window.StudioI18n.apply();

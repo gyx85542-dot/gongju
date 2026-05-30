@@ -242,50 +242,6 @@ COMFYUI_ADDRESS = COMFYUI_INSTANCES[0]
 
 AI_BASE_URL = os.getenv("COMFLY_BASE_URL", "https://ai.comfly.chat").rstrip("/")
 AI_API_KEY = os.getenv("COMFLY_API_KEY", "")
-MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "")
-MODELSCOPE_CHAT_BASE_URL = "https://api-inference.modelscope.cn/v1"
-MODELSCOPE_DEFAULT_IMAGE_MODELS = [
-    "Tongyi-MAI/Z-Image-Turbo",
-    "Qwen/Qwen-Image-2512",
-    "Qwen/Qwen-Image-Edit-2511",
-    "black-forest-labs/FLUX.2-klein-9B",
-]
-MODELSCOPE_DEFAULT_CHAT_MODELS = [
-    "Qwen/Qwen3-235B-A22B",
-    "Qwen/Qwen3-VL-235B-A22B-Instruct",
-    "MiniMax/MiniMax-M2.7:MiniMax",
-]
-_MODELSCOPE_CONFIGURED_CHAT_MODELS = [m.strip() for m in os.getenv("MODELSCOPE_CHAT_MODELS", "").split(",") if m.strip()]
-MODELSCOPE_CHAT_MODELS = list(dict.fromkeys([m for m in [*MODELSCOPE_DEFAULT_CHAT_MODELS, *_MODELSCOPE_CONFIGURED_CHAT_MODELS] if m]))
-MODELSCOPE_DEFAULT_IMAGE_MODEL = MODELSCOPE_DEFAULT_IMAGE_MODELS[0]
-MODELSCOPE_DEFAULT_CHAT_MODEL = "Qwen/Qwen3-235B-A22B"
-MODELSCOPE_DEFAULT_LORAS = [
-    {
-        "id": "Daniel8152/film",
-        "name": "Z-Image Film",
-        "target_model": "Tongyi-MAI/Z-Image-Turbo",
-        "strength": 0.8,
-        "enabled": True,
-        "note": "",
-    },
-    {
-        "id": "Daniel8152/Qwen-Image-2512-Film",
-        "name": "Qwen Image 2512 Film",
-        "target_model": "Qwen/Qwen-Image-2512",
-        "strength": 0.8,
-        "enabled": True,
-        "note": "",
-    },
-    {
-        "id": "Daniel8152/Klein-enhance",
-        "name": "Klein enhance",
-        "target_model": "black-forest-labs/FLUX.2-klein-9B",
-        "strength": 0.8,
-        "enabled": True,
-        "note": "",
-    },
-]
-MODELSCOPE_DEFAULTS_VERSION = 3
 CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4o-mini")
 IMAGE_MODEL = os.getenv("IMAGE_MODEL", "gpt-image-2")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "You are a helpful assistant.")
@@ -346,9 +302,8 @@ def model_list(env_name, primary, defaults):
 def reload_env_globals():
     """保存 API 设置后，将 os.environ 里最新的值同步回模块级全局变量，
     避免保存后需要重启才能生效。"""
-    global MODELSCOPE_API_KEY, AI_API_KEY, AI_BASE_URL
-    global IMAGE_MODELS, CHAT_MODELS, VIDEO_MODELS, MODELSCOPE_CHAT_MODELS
-    MODELSCOPE_API_KEY = os.getenv("MODELSCOPE_API_KEY", "")
+    global AI_API_KEY, AI_BASE_URL
+    global IMAGE_MODELS, CHAT_MODELS, VIDEO_MODELS
     AI_API_KEY = os.getenv("COMFLY_API_KEY", "")
     AI_BASE_URL = os.getenv("COMFLY_BASE_URL", "https://ai.comfly.chat").rstrip("/")
     IMAGE_MODELS = model_list("IMAGE_MODELS", os.getenv("IMAGE_MODEL", IMAGE_MODEL), ["nano-banana-pro"])
@@ -371,9 +326,6 @@ def reload_env_globals():
         "doubao-seedance-1-0-lite-t2v-250428",
         "doubao-seedance-1-0-lite-i2v-250428",
     ])
-    _configured = [m.strip() for m in os.getenv("MODELSCOPE_CHAT_MODELS", "").split(",") if m.strip()]
-    MODELSCOPE_CHAT_MODELS = list(dict.fromkeys([m for m in [*MODELSCOPE_DEFAULT_CHAT_MODELS, *_configured] if m]))
-
 CHAT_MODELS = model_list("CHAT_MODELS", CHAT_MODEL, ["gpt-4o-mini", "gemini-3.1-flash-image-preview-2k"])
 IMAGE_MODELS = model_list("IMAGE_MODELS", IMAGE_MODEL, ["nano-banana-pro"])
 VIDEO_MODELS = model_list("VIDEO_MODELS", "veo3-fast", [
@@ -402,8 +354,6 @@ VIDEO_MODELS = model_list("VIDEO_MODELS", "veo3-fast", [
 def provider_key_env(provider_id):
     if provider_id == "comfly":
         return "COMFLY_API_KEY"
-    if provider_id == "modelscope":
-        return "MODELSCOPE_API_KEY"
     return f"API_PROVIDER_{re.sub(r'[^A-Za-z0-9]', '_', provider_id).upper()}_KEY"
 
 def mask_secret(value):
@@ -413,46 +363,10 @@ def mask_secret(value):
     return f"••••••••{tail}"
 
 def default_api_providers():
-    # 只保留 ModelScope 为强制默认平台，其他平台均可自定义增删
-    return [
-        {
-            "id": "modelscope",
-            "name": "ModelScope",
-            "base_url": MODELSCOPE_CHAT_BASE_URL,
-            "protocol": "openai",
-            "image_generation_endpoint": "",
-            "image_edit_endpoint": "",
-            "enabled": True,
-            "primary": False,
-            "image_models": MODELSCOPE_DEFAULT_IMAGE_MODELS,
-            "chat_models": MODELSCOPE_CHAT_MODELS,
-            "video_models": [],
-            "ms_loras": MODELSCOPE_DEFAULT_LORAS,
-            "ms_defaults_version": MODELSCOPE_DEFAULTS_VERSION,
-        },
-    ]
+    return []
 
 def merge_default_api_providers(providers):
-    merged = [dict(item) for item in providers]
-    # 只强制保留 modelscope（不再强制 comfly）
-    ms_default = next((d for d in default_api_providers() if d["id"] == "modelscope"), None)
-    if ms_default:
-        current = next((item for item in merged if item.get("id") == "modelscope"), None)
-        if not current:
-            merged.append(ms_default)
-        else:
-            if not current.get("base_url"):
-                current["base_url"] = ms_default["base_url"]
-            seeded_version = int(current.get("ms_defaults_version") or 0)
-            if seeded_version < MODELSCOPE_DEFAULTS_VERSION:
-                image_models = model_list_from_values([*MODELSCOPE_DEFAULT_IMAGE_MODELS, *(current.get("image_models") or [])])
-                chat_models = model_list_from_values([*MODELSCOPE_DEFAULT_CHAT_MODELS, *(current.get("chat_models") or [])])
-                loras = normalize_ms_loras([*MODELSCOPE_DEFAULT_LORAS, *(current.get("ms_loras") or [])])
-                current["image_models"] = image_models
-                current["chat_models"] = chat_models
-                current["ms_loras"] = loras
-                current["ms_defaults_version"] = MODELSCOPE_DEFAULTS_VERSION
-    return merged
+    return [dict(item) for item in providers]
 
 def normalize_model_list(values):
     return model_list_from_values(values)
@@ -465,38 +379,6 @@ def model_list_from_values(values):
             selected_model(item, item)
             deduped.append(item)
     return deduped
-
-def normalize_ms_loras(values):
-    normalized = []
-    seen = set()
-    for raw in values or []:
-        if not isinstance(raw, dict):
-            continue
-        lora_id = str(raw.get("id") or "").strip()
-        if not lora_id:
-            continue
-        target_model = str(raw.get("target_model") or raw.get("model") or "").strip()
-        if not target_model:
-            continue
-        key = (target_model, lora_id)
-        if key in seen:
-            continue
-        seen.add(key)
-        try:
-            strength = float(raw.get("strength", raw.get("default_strength", 0.8)))
-        except Exception:
-            strength = 0.8
-        strength = max(0.0, min(2.0, strength))
-        name = re.sub(r"\s+", " ", str(raw.get("name") or "").strip())[:80]
-        normalized.append({
-            "id": lora_id[:180],
-            "name": name or lora_id,
-            "target_model": target_model[:180],
-            "strength": strength,
-            "enabled": bool(raw.get("enabled", True)),
-            "note": str(raw.get("note") or "").strip()[:300],
-        })
-    return normalized
 
 def normalize_endpoint_override(value, label):
     endpoint = str(value or "").strip()
@@ -549,8 +431,6 @@ def normalize_provider(item):
         "image_models": model_list_from_values(item.get("image_models") or []),
         "chat_models": model_list_from_values(item.get("chat_models") or []),
         "video_models": model_list_from_values(item.get("video_models") or []),
-        "ms_loras": normalize_ms_loras(item.get("ms_loras") or []),
-        "ms_defaults_version": int(item.get("ms_defaults_version") or 0),
     }
 
 def load_api_providers():
@@ -567,7 +447,10 @@ def load_api_providers():
         else:
             return defaults
     try:
-        providers = [normalize_provider(item) for item in raw if isinstance(item, dict)]
+        providers = [
+            normalize_provider(item) for item in raw
+            if isinstance(item, dict) and str(item.get("id") or "").strip().lower() != "modelscope"
+        ]
         return merge_default_api_providers(providers or defaults)
     except Exception as e:
         print(f"加载 API 平台配置失败: {e}")
@@ -586,15 +469,15 @@ def public_provider(provider):
     }
 
 def get_primary_provider_id(providers=None):
-    """返回当前首选 provider 的 id；优先 primary=True 的，否则取第一个非 modelscope 的，再次取第一个。"""
+    """返回当前首选 provider 的 id；优先 primary=True 的，否则取第一个已启用平台。"""
     providers = providers if providers is not None else load_api_providers()
     primary = next((p for p in providers if p.get("primary") and p.get("enabled", True)), None)
     if primary:
         return primary["id"]
-    non_ms = next((p for p in providers if p["id"] != "modelscope" and p.get("enabled", True)), None)
-    if non_ms:
-        return non_ms["id"]
-    return providers[0]["id"] if providers else "modelscope"
+    enabled = next((p for p in providers if p.get("enabled", True)), None)
+    if enabled:
+        return enabled["id"]
+    return providers[0]["id"] if providers else "comfly"
 
 def get_api_provider(provider_id="comfly"):
     providers = load_api_providers()
@@ -871,7 +754,7 @@ class OnlineVideoRequest(BaseModel):
     generate_audio: bool = False
     job_id: Optional[str] = None
 
-STUDIO_HISTORY_TYPES = {"online", "local-comfy", "online-video", "online-audio"}
+STUDIO_HISTORY_TYPES = {"online", "local-comfy", "online-video", "online-audio", "runninghub"}
 
 def history_has_media(item):
     images = item.get("images") or []
@@ -912,8 +795,6 @@ class ApiProviderPayload(BaseModel):
     image_models: List[str] = []
     chat_models: List[str] = []
     video_models: List[str] = []
-    ms_loras: List[Dict[str, Any]] = []
-    ms_defaults_version: int = 0
     api_key: Optional[str] = None
     clear_key: bool = False
 
@@ -927,18 +808,6 @@ class ChatRequest(BaseModel):
     quality: str = "auto"
     reference_images: List[AIReference] = []
     provider: str = "comfly"
-    ms_model: str = ""
-
-class MsGenerateRequest(BaseModel):
-    prompt: str
-    api_key: str = ""
-    model: str = "black-forest-labs/FLUX.2-klein-9B"
-    image_urls: List[str] = []
-    width: int = 0
-    height: int = 0
-    size: str = ""
-    loras: Optional[Any] = None
-    client_id: Optional[str] = None
 
 class CanvasLLMRequest(BaseModel):
     message: str = Field(min_length=1, max_length=LLM_MESSAGE_MAX_LENGTH)
@@ -946,7 +815,6 @@ class CanvasLLMRequest(BaseModel):
     model: str = ""
     messages: List[Dict[str, Any]] = []
     provider: str = "comfly"
-    ms_model: str = ""
     images: List[str] = []   # 可以是 /output/*.png、/assets/*.png 本地路径 或 http(s) URL 或 data URL
 
 class ConversationCreateRequest(BaseModel):
@@ -1216,14 +1084,7 @@ def display_title(text):
     title = re.sub(r"\s+", " ", text or "").strip()
     return title[:24] or "新对话"
 
-def resolve_chat_provider(provider: str, model: str, ms_model: str):
-    if provider == "modelscope":
-        if not MODELSCOPE_API_KEY:
-            raise HTTPException(status_code=400, detail="未配置 MODELSCOPE_API_KEY，请在 API/.env 中填写。")
-        base = MODELSCOPE_CHAT_BASE_URL
-        hdrs = {"Authorization": f"Bearer {MODELSCOPE_API_KEY}", "Content-Type": "application/json"}
-        mdl = selected_model(ms_model or model, MODELSCOPE_CHAT_MODELS[0] if MODELSCOPE_CHAT_MODELS else "MiniMax/MiniMax-M2.7")
-        return base, hdrs, mdl
+def resolve_chat_provider(provider: str, model: str):
     api_provider = get_api_provider(provider or "")
     base_root = (api_provider.get("base_url") or AI_BASE_URL).rstrip("/")
     if not base_root:
@@ -1257,12 +1118,6 @@ def selected_model(requested, fallback):
     if len(model) > 240 or any(ord(ch) < 32 or ord(ch) == 127 for ch in model):
         raise HTTPException(status_code=400, detail=f"模型名称不合法：{model}")
     return model
-
-def modelscope_size(value, fallback="1024x1024"):
-    size = str(value or fallback).strip().lower().replace("*", "x")
-    if re.fullmatch(r"\d{2,5}x\d{2,5}", size):
-        return size
-    raise HTTPException(status_code=400, detail=f"ModelScope size 格式不正确：{value or fallback}，应为 WxH，例如 1024x1024")
 
 def unwrap_apimart_response(raw):
     """APIMart 将标准 OpenAI 响应包在 {"code":200,"data":{...}} 里；如果检测到就解包。"""
@@ -1515,15 +1370,6 @@ def compress_data_url_image(value, max_size=1536, jpeg_quality=88):
     except Exception as e:
         print(f"data url image compress failed, fallback to raw: {e}")
         return value
-
-def modelscope_image_url(value, max_size=1536):
-    if not value:
-        return value
-    if isinstance(value, str) and (value.startswith("/output/") or value.startswith("/assets/")):
-        return reference_to_data_url({"url": value}, max_size=max_size)
-    if isinstance(value, str) and value.startswith("data:image/"):
-        return compress_data_url_image(value, max_size=max_size)
-    return value
 
 def valid_video_image_input(value: str) -> bool:
     if not isinstance(value, str):
@@ -1908,72 +1754,8 @@ def apimart_size_resolution(size):
     best = min(common, key=lambda item: abs(ratio - item[0] / item[1]))
     return best[2], resolution
 
-async def generate_modelscope_provider_image(prompt, size, model, reference_images=None, provider=None):
-    clean_token = MODELSCOPE_API_KEY.strip()
-    if not clean_token:
-        raise HTTPException(status_code=400, detail="未配置 ModelScope API Key，请在 API 设置中填写。")
-    width, height = parse_size_pair(size)
-    refs = []
-    for ref in (reference_images or [])[:13]:
-        if not ref.get("url"):
-            continue
-        # 把参考图压缩为 data URL，避免 base64 payload 过大导致 MS 内部任务失败
-        refs.append(modelscope_image_url(ref.get("url", ""), max_size=1536))
-    headers = {
-        "Authorization": f"Bearer {clean_token}",
-        "Content-Type": "application/json",
-        "X-ModelScope-Async-Mode": "true",
-    }
-    payload = {
-        "model": selected_model(model, "Tongyi-MAI/Z-Image-Turbo"),
-        "prompt": prompt.strip(),
-    }
-    if width and height:
-        payload["width"] = width
-        payload["height"] = height
-        payload["size"] = f"{width}x{height}"
-    if refs:
-        payload["image_url"] = refs
-
-    base_root = ((provider or {}).get("base_url") or MODELSCOPE_CHAT_BASE_URL).rstrip("/")
-    api_root = base_root if base_root.endswith("/v1") else f"{base_root}/v1"
-    async with httpx.AsyncClient(timeout=AI_REQUEST_TIMEOUT) as client:
-        submit_res = await client.post(f"{api_root}/images/generations", headers=headers, json=payload)
-        submit_res.raise_for_status()
-        raw = submit_res.json()
-        task_id = raw.get("task_id")
-        if not task_id:
-            try:
-                return extract_image(raw), raw
-            except HTTPException:
-                raise HTTPException(status_code=502, detail=f"ModelScope 未返回 task_id：{raw}")
-
-        deadline = time.monotonic() + AI_REQUEST_TIMEOUT
-        last_payload = raw
-        while time.monotonic() < deadline:
-            await asyncio.sleep(IMAGE_POLL_INTERVAL)
-            result = await client.get(
-                f"{api_root}/tasks/{task_id}",
-                headers={**headers, "X-ModelScope-Task-Type": "image_generation"},
-            )
-            result.raise_for_status()
-            data = result.json()
-            last_payload = data
-            status = str(data.get("task_status") or "").upper()
-            if status == "SUCCEED":
-                images = data.get("output_images") or []
-                if not images:
-                    raise HTTPException(status_code=502, detail=f"ModelScope 成功但没有返回图片：{data}")
-                return {"type": "url", "value": images[0]}, data
-            if status in {"FAILED", "FAIL", "ERROR", "CANCELED", "CANCELLED", "TIMEOUT", "REVOKED"}:
-                detail = data.get("error_info") or data.get("message") or data.get("detail") or str(data)
-                raise HTTPException(status_code=502, detail=f"ModelScope 任务失败：{detail}")
-        raise HTTPException(status_code=504, detail=f"ModelScope 生图任务超时：{last_payload}")
-
 async def generate_ai_image(prompt, size, quality, model, reference_images=None, provider_id="comfly"):
     provider = get_api_provider(provider_id)
-    if provider["id"] == "modelscope":
-        return await generate_modelscope_provider_image(prompt, size, model, reference_images, provider)
     is_gpt2 = is_gpt_image_2_model(model)
     is_apimart = is_apimart_provider(provider)
     quality = str(quality or "").strip().lower()
@@ -2234,8 +2016,6 @@ async def ai_config():
         "api_providers": providers,
         "primary_provider_id": get_primary_provider_id(providers),
         "has_api_key": bool(AI_API_KEY),
-        "ms_chat_models": MODELSCOPE_CHAT_MODELS,
-        "has_ms_key": bool(MODELSCOPE_API_KEY),
     }
 
 @app.get("/api/models")
@@ -2253,6 +2033,8 @@ async def save_providers(payload: List[ApiProviderPayload]):
     # 收集每个 item 的 primary 字段
     raw_primary_flags = [bool(getattr(item, "primary", False)) for item in payload]
     for item in payload:
+        if str(item.id or "").strip().lower() == "modelscope":
+            continue
         provider = normalize_provider(item.dict(exclude={"api_key"}))
         if any(existing["id"] == provider["id"] for existing in providers):
             raise HTTPException(status_code=400, detail=f"API 平台 ID 重复：{provider['id']}")
@@ -2267,8 +2049,6 @@ async def save_providers(payload: List[ApiProviderPayload]):
             env_updates["IMAGE_MODELS"] = ",".join(provider["image_models"])
             env_updates["CHAT_MODELS"] = ",".join(provider["chat_models"])
             env_updates["VIDEO_MODELS"] = ",".join(provider.get("video_models") or [])
-        if provider["id"] == "modelscope":
-            env_updates["MODELSCOPE_CHAT_MODELS"] = ",".join(provider["chat_models"])
     if not providers:
         raise HTTPException(status_code=400, detail="至少保留一个 API 平台")
     # 强制最多一个 primary（取最后被标记的；都没标记则保持原样不强制）
@@ -2283,19 +2063,14 @@ async def save_providers(payload: List[ApiProviderPayload]):
         reload_env_globals()   # 立即将最新 env 值同步回模块全局变量，无需重启
     return {"providers": [public_provider(p) for p in providers]}
 
-# --- ModelScope Token (从 env 读取，不再支持通过 UI 修改) ---
-
 @app.get("/api/config/token")
 async def get_global_token():
-    # 优先读 env，回退到 global_config.json（兼容旧数据）
-    if MODELSCOPE_API_KEY:
-        return {"token": MODELSCOPE_API_KEY}
     if os.path.exists(GLOBAL_CONFIG_FILE):
         try:
             with open(GLOBAL_CONFIG_FILE, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                return {"token": config.get("modelscope_token", "")}
-        except:
+                return {"token": config.get("api_token", "")}
+        except Exception:
             pass
     return {"token": ""}
 
@@ -2948,9 +2723,9 @@ async def online_video(payload: OnlineVideoRequest):
 
 @app.post("/api/canvas-llm")
 async def canvas_llm(payload: CanvasLLMRequest):
-    chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model, payload.ms_model)
+    chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model)
     # 判断协议：APIMart 异步 vs 标准 OpenAI
-    _llm_provider = get_api_provider(payload.provider) if payload.provider not in ("modelscope",) else {}
+    _llm_provider = get_api_provider(payload.provider)
     _is_apimart = is_apimart_provider(_llm_provider)
     upstream_messages = [{"role": "system", "content": payload.system_prompt or SYSTEM_PROMPT}]
     for item in payload.messages[-MAX_HISTORY_MESSAGES:]:
@@ -3175,7 +2950,7 @@ async def chat(payload: ChatRequest, request: Request, x_user_id: str = Header(d
     save_conversation(user_id, conversation)
 
     if payload.mode == "image":
-        image_provider_id = payload.provider if payload.provider not in {"modelscope"} else "comfly"
+        image_provider_id = payload.provider or get_primary_provider_id()
         provider = get_api_provider(image_provider_id)
         default_model = (provider.get("image_models") or [IMAGE_MODEL])[0]
         model = selected_model(payload.image_model or payload.model, default_model)
@@ -3197,8 +2972,8 @@ async def chat(payload: ChatRequest, request: Request, x_user_id: str = Header(d
             "raw_usage": raw.get("usage") if isinstance(raw, dict) else None,
         }
     else:
-        chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model, payload.ms_model)
-        _conv_provider = get_api_provider(payload.provider) if payload.provider not in ("modelscope",) else {}
+        chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model)
+        _conv_provider = get_api_provider(payload.provider)
         _conv_is_apimart = is_apimart_provider(_conv_provider)
         history = conversation["messages"][-MAX_HISTORY_MESSAGES:]
         upstream_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -3264,7 +3039,7 @@ async def chat_stream(payload: ChatRequest, request: Request, x_user_id: str = H
     conversation["updated_at"] = now_ms()
     save_conversation(user_id, conversation)
 
-    chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model, payload.ms_model)
+    chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model)
     history = conversation["messages"][-MAX_HISTORY_MESSAGES:]
     upstream_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for item in history:
@@ -3443,376 +3218,6 @@ async def delete_online_pending(job_id: str):
         global ACTIVE_PENDING_JOBS
         ACTIVE_PENDING_JOBS = [job for job in ACTIVE_PENDING_JOBS if job["id"] != job_id]
     return {"success": True}
-
-# --- ModelScope 角度控制 ---
-
-@app.post("/api/angle/poll_status")
-async def poll_angle_cloud(req: CloudPollRequest):
-    base_url = 'https://api-inference.modelscope.cn/'
-    clean_token = (req.api_key or MODELSCOPE_API_KEY).strip()
-    if not clean_token:
-        raise HTTPException(status_code=400, detail="未提供 ModelScope API Key")
-
-    headers = {
-        "Authorization": f"Bearer {clean_token}",
-        "Content-Type": "application/json",
-        "X-ModelScope-Async-Mode": "true"
-    }
-    task_id = req.task_id
-    print(f"Resuming polling for Angle Task: {task_id}")
-
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            for i in range(300):
-                await asyncio.sleep(2)
-                try:
-                    result = await client.get(
-                        f"{base_url}v1/tasks/{task_id}",
-                        headers={**headers, "X-ModelScope-Task-Type": "image_generation"},
-                    )
-                    data = result.json()
-                    status = data.get("task_status")
-
-                    if status == "SUCCEED":
-                        img_url = data["output_images"][0]
-                        local_path = ""
-                        try:
-                            async with httpx.AsyncClient() as dl_client:
-                                img_res = await dl_client.get(img_url)
-                                if img_res.status_code == 200:
-                                    filename = f"cloud_angle_{int(time.time())}.png"
-                                    file_path = output_path_for(filename, "output")
-                                    with open(file_path, "wb") as f:
-                                        f.write(img_res.content)
-                                    local_path = output_url_for(filename, "output")
-                                else:
-                                    local_path = img_url
-                        except Exception:
-                            local_path = img_url
-
-                        record = {"timestamp": time.time(), "prompt": f"Resumed {task_id}", "images": [local_path], "type": "angle"}
-                        save_to_history(record)
-                        if req.client_id:
-                            await manager.send_personal_message({"type": "cloud_status", "status": "SUCCEED", "task_id": task_id}, req.client_id)
-                        return {"url": local_path}
-
-                    elif status == "FAILED":
-                        if req.client_id:
-                            await manager.send_personal_message({"type": "cloud_status", "status": "FAILED", "task_id": task_id}, req.client_id)
-                        raise Exception(f"ModelScope task failed: {data}")
-
-                    if i % 5 == 0 and req.client_id:
-                        await manager.send_personal_message({
-                            "type": "cloud_status", "status": f"{status} ({i}/300)",
-                            "task_id": task_id, "progress": i, "total": 300
-                        }, req.client_id)
-
-                except Exception as loop_e:
-                    print(f"Angle polling error: {loop_e}")
-                    continue
-
-            if req.client_id:
-                await manager.send_personal_message({"type": "cloud_status", "status": "TIMEOUT", "task_id": task_id}, req.client_id)
-            return {"status": "timeout", "task_id": task_id, "message": "Task still pending"}
-
-    except Exception as e:
-        print(f"Angle polling error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/angle/generate")
-async def generate_angle_cloud(req: CloudGenRequest):
-    base_url = 'https://api-inference.modelscope.cn/'
-    clean_token = (req.api_key or MODELSCOPE_API_KEY).strip()
-    if not clean_token:
-        raise HTTPException(status_code=400, detail="未提供 ModelScope API Key")
-
-    headers = {
-        "Authorization": f"Bearer {clean_token}",
-        "Content-Type": "application/json",
-        "X-ModelScope-Async-Mode": "true"
-    }
-    model = selected_model(req.model, "Qwen/Qwen-Image-Edit-2511")
-    payload = {
-        "model": model,
-        "prompt": req.prompt.strip(),
-        "image_url": [modelscope_image_url(url, max_size=1536) for url in req.image_urls]
-    }
-    if req.resolution:
-        payload["size"] = modelscope_size(req.resolution)
-    if req.loras is not None:
-        payload["loras"] = req.loras
-
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            submit_res = await client.post(f"{base_url}v1/images/generations", headers=headers, json=payload)
-            if submit_res.status_code != 200:
-                try:
-                    detail = submit_res.json()
-                except:
-                    detail = submit_res.text
-                raise HTTPException(status_code=submit_res.status_code, detail=detail)
-
-            task_id = submit_res.json().get("task_id")
-            print(f"Angle Task submitted, ID: {task_id}")
-
-            for i in range(300):
-                await asyncio.sleep(2)
-                try:
-                    result = await client.get(
-                        f"{base_url}v1/tasks/{task_id}",
-                        headers={**headers, "X-ModelScope-Task-Type": "image_generation"},
-                    )
-                    data = result.json()
-                    status = data.get("task_status")
-
-                    if status == "SUCCEED":
-                        img_url = data["output_images"][0]
-                        local_path = ""
-                        try:
-                            async with httpx.AsyncClient() as dl_client:
-                                img_res = await dl_client.get(img_url)
-                                if img_res.status_code == 200:
-                                    filename = f"cloud_angle_{int(time.time())}.png"
-                                    file_path = output_path_for(filename, "output")
-                                    with open(file_path, "wb") as f:
-                                        f.write(img_res.content)
-                                    local_path = output_url_for(filename, "output")
-                                else:
-                                    local_path = img_url
-                        except Exception:
-                            local_path = img_url
-
-                        record = {"timestamp": time.time(), "prompt": req.prompt, "images": [local_path], "type": "angle"}
-                        save_to_history(record)
-                        if req.client_id:
-                            await manager.send_personal_message({"type": "cloud_status", "status": "SUCCEED", "task_id": task_id}, req.client_id)
-                        if GLOBAL_LOOP:
-                            asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(record), GLOBAL_LOOP)
-                        return {"url": local_path, "task_id": task_id}
-
-                    elif status == "FAILED":
-                        if req.client_id:
-                            await manager.send_personal_message({"type": "cloud_status", "status": "FAILED", "task_id": task_id}, req.client_id)
-                        raise Exception(f"ModelScope task failed: {data}")
-
-                    if i % 5 == 0 and req.client_id:
-                        await manager.send_personal_message({
-                            "type": "cloud_status", "status": f"{status} ({i}/300)",
-                            "task_id": task_id, "progress": i, "total": 300
-                        }, req.client_id)
-
-                except Exception as loop_e:
-                    print(f"Angle polling error: {loop_e}")
-                    continue
-
-            if req.client_id:
-                await manager.send_personal_message({"type": "cloud_status", "status": "TIMEOUT", "task_id": task_id}, req.client_id)
-            return {"status": "timeout", "task_id": task_id, "message": "Task still pending"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Angle generation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-# --- ModelScope Z-Image 云端生图 ---
-
-@app.post("/generate")
-async def generate_cloud(req: CloudGenRequest):
-    base_url = 'https://api-inference.modelscope.cn/'
-    clean_token = (req.api_key or MODELSCOPE_API_KEY).strip()
-    if not clean_token:
-        raise HTTPException(status_code=400, detail="未提供 ModelScope API Key")
-
-    headers = {
-        "Authorization": f"Bearer {clean_token}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": "Tongyi-MAI/Z-Image-Turbo",
-        "prompt": req.prompt.strip(),
-        "size": modelscope_size(req.resolution),
-        "n": 1
-    }
-    if req.loras is not None:
-        payload["loras"] = req.loras
-
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            submit_res = await client.post(
-                f"{base_url}v1/images/generations",
-                headers={**headers, "X-ModelScope-Async-Mode": "true"},
-                json=payload
-            )
-            if submit_res.status_code != 200:
-                try:
-                    detail = submit_res.json()
-                except:
-                    detail = submit_res.text
-                raise HTTPException(status_code=submit_res.status_code, detail=detail)
-
-            task_id = submit_res.json().get("task_id")
-            print(f"Z-Image Task submitted, ID: {task_id}")
-
-            for i in range(200):
-                await asyncio.sleep(3)
-                try:
-                    result = await client.get(
-                        f"{base_url}v1/tasks/{task_id}",
-                        headers={**headers, "X-ModelScope-Task-Type": "image_generation"},
-                    )
-                    data = result.json()
-                    status = data.get("task_status")
-
-                    if i % 5 == 0:
-                        print(f"Task {task_id} status check {i}: {status}")
-
-                    if status == "SUCCEED":
-                        img_url = data["output_images"][0]
-                        local_path = ""
-                        try:
-                            async with httpx.AsyncClient() as dl_client:
-                                img_res = await dl_client.get(img_url)
-                                if img_res.status_code == 200:
-                                    filename = f"cloud_{int(time.time())}.png"
-                                    file_path = output_path_for(filename, "output")
-                                    with open(file_path, "wb") as f:
-                                        f.write(img_res.content)
-                                    local_path = output_url_for(filename, "output")
-                                else:
-                                    local_path = img_url
-                        except Exception as dl_e:
-                            print(f"Download error: {dl_e}")
-                            local_path = img_url
-
-                        record = {"timestamp": time.time(), "prompt": req.prompt, "images": [local_path], "type": "cloud"}
-                        save_to_history(record)
-                        try:
-                            await manager.broadcast_new_image(record)
-                        except Exception:
-                            pass
-                        return {"url": local_path}
-
-                    elif status == "FAILED":
-                        raise Exception(f"ModelScope task failed: {data}")
-
-                except Exception as loop_e:
-                    print(f"Polling error (retrying): {loop_e}")
-                    continue
-
-            raise Exception("Cloud generation timeout")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Cloud generation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-# --- ModelScope 通用图片生成（支持图生图） ---
-
-@app.post("/api/ms/generate")
-async def ms_generate(req: MsGenerateRequest):
-    base_url = 'https://api-inference.modelscope.cn/'
-    clean_token = (req.api_key or MODELSCOPE_API_KEY).strip()
-    if not clean_token:
-        raise HTTPException(status_code=400, detail="未配置 ModelScope API Key，请在 API 设置中填写，或重新保存 ModelScope Token。")
-
-    headers = {
-        "Authorization": f"Bearer {clean_token}",
-        "Content-Type": "application/json",
-        "X-ModelScope-Async-Mode": "true"
-    }
-    payload = {
-        "model": req.model,
-        "prompt": req.prompt.strip(),
-    }
-    if req.width and req.height:
-        payload["width"] = req.width
-        payload["height"] = req.height
-        payload["size"] = modelscope_size(req.size or f"{req.width}x{req.height}")
-    elif req.size:
-        payload["size"] = modelscope_size(req.size)
-    if req.image_urls:
-        payload["image_url"] = [modelscope_image_url(url, max_size=1536) for url in req.image_urls]
-    if req.loras is not None:
-        payload["loras"] = req.loras
-
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            submit_res = await client.post(
-                f"{base_url}v1/images/generations",
-                headers=headers,
-                json=payload
-            )
-            if submit_res.status_code != 200:
-                try:
-                    detail = submit_res.json()
-                except:
-                    detail = submit_res.text
-                raise HTTPException(status_code=submit_res.status_code, detail=detail)
-
-            task_id = submit_res.json().get("task_id")
-            print(f"MS Generate Task submitted ({req.model}), ID: {task_id}")
-
-            TERMINAL_FAILED_STATUSES = {"FAILED", "FAIL", "ERROR", "CANCELED", "CANCELLED", "TIMEOUT", "REVOKED"}
-
-            for i in range(300):
-                await asyncio.sleep(2)
-                try:
-                    result = await client.get(
-                        f"{base_url}v1/tasks/{task_id}",
-                        headers={**headers, "X-ModelScope-Task-Type": "image_generation"},
-                    )
-                    data = result.json()
-                    status = data.get("task_status")
-                    print(f"MS Task {task_id} poll {i}: status={status}")
-
-                    if status == "SUCCEED":
-                        img_url = data["output_images"][0]
-                        local_path = ""
-                        try:
-                            async with httpx.AsyncClient() as dl_client:
-                                img_res = await dl_client.get(img_url)
-                                if img_res.status_code == 200:
-                                    filename = f"ms_{req.model.replace('/', '_').replace(':', '_')}_{int(time.time())}.png"
-                                    file_path = output_path_for(filename, "output")
-                                    with open(file_path, "wb") as f:
-                                        f.write(img_res.content)
-                                    local_path = output_url_for(filename, "output")
-                                else:
-                                    local_path = img_url
-                        except Exception:
-                            local_path = img_url
-
-                        record = {
-                            "timestamp": time.time(),
-                            "prompt": req.prompt,
-                            "images": [local_path],
-                            "type": "klein",
-                            "model": req.model,
-                        }
-                        save_to_history(record)
-                        if GLOBAL_LOOP:
-                            asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(record), GLOBAL_LOOP)
-                        return {"url": local_path, "task_id": task_id}
-
-                    elif status in TERMINAL_FAILED_STATUSES:
-                        error_info = data.get("error_info") or data.get("message") or data.get("detail") or str(data)
-                        raise HTTPException(status_code=502, detail=f"MS task {status}: {error_info}")
-
-                except HTTPException:
-                    raise
-                except Exception as loop_e:
-                    print(f"MS polling error: {loop_e}")
-                    continue
-
-            raise HTTPException(status_code=504, detail="MS 生图超时")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"MS generate error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
 
 # --- 本地 ComfyUI 生图 ---
 
@@ -4275,6 +3680,837 @@ def run_workflow(name: str, payload: WorkflowRunRequest):
         reference_images=[ref.dict() for ref in payload.reference_images if ref.url],
     )
     return generate(req)
+
+# --- RunningHub API ---
+RUNNINGHUB_BASE_URL = "https://www.runninghub.cn"
+RUNNINGHUB_API_KEY_ENV = "RUNNINGHUB_API_KEY"
+RUNNINGHUB_CONFIG_FILE = os.path.join(DATA_DIR, "runninghub.json")
+RUNNINGHUB_LOCK = Lock()
+RUNNINGHUB_FIELD_TYPES = {"text", "textarea", "number", "image", "boolean", "select"}
+
+class RunningHubField(BaseModel):
+    id: str = ""
+    name: str = ""
+    nodeId: str = ""
+    fieldName: str = ""
+    type: str = "text"
+    default: Any = ""
+    options: List[str] = []
+    apiValue: Any = None  # 工作流 JSON 中的原始值（COMBO 须原样提交，如 dimensions 的空格）
+
+class RunningHubWorkflow(BaseModel):
+    id: str = ""
+    name: str = ""
+    workflow_id: str = ""
+    fields: List[RunningHubField] = []
+
+class RunningHubConfigPayload(BaseModel):
+    api_key: Optional[str] = None
+    workflows: Optional[List[RunningHubWorkflow]] = None
+
+class RunningHubRunRequest(BaseModel):
+    workflow_id: str
+    fields: Dict[str, Any] = {}
+    prompt: str = ""
+    reference_images: List[Dict[str, Any]] = []
+    client_id: str = ""
+
+class RunningHubFetchJsonRequest(BaseModel):
+    workflow_id: str = ""
+
+def runninghub_default_config():
+    return {"workflows": []}
+
+def load_runninghub_config():
+    with RUNNINGHUB_LOCK:
+        if not os.path.exists(RUNNINGHUB_CONFIG_FILE):
+            return runninghub_default_config()
+        try:
+            with open(RUNNINGHUB_CONFIG_FILE, "r", encoding="utf-8") as f:
+                raw = json.load(f) or {}
+        except Exception:
+            return runninghub_default_config()
+    workflows = []
+    for wf_item in raw.get("workflows") or []:
+        if not isinstance(wf_item, dict):
+            continue
+        wf_id = str(wf_item.get("id") or "").strip() or f"rh-{uuid.uuid4().hex[:8]}"
+        fields = []
+        for field in wf_item.get("fields") or []:
+            if not isinstance(field, dict):
+                continue
+            ftype = str(field.get("type") or "text").strip().lower()
+            if ftype not in RUNNINGHUB_FIELD_TYPES:
+                ftype = "text"
+            options = [str(o) for o in (field.get("options") or []) if str(o).strip()]
+            field_item = {
+                "id": str(field.get("id") or "").strip() or f"f-{uuid.uuid4().hex[:6]}",
+                "name": str(field.get("name") or "").strip(),
+                "nodeId": str(field.get("nodeId") or "").strip(),
+                "fieldName": str(field.get("fieldName") or "").strip(),
+                "type": ftype,
+                "default": field.get("default", ""),
+                "options": options,
+            }
+            if field.get("apiValue") is not None:
+                field_item["apiValue"] = field.get("apiValue")
+            fields.append(field_item)
+        workflows.append({
+            "id": wf_id,
+            "name": str(wf_item.get("name") or "").strip() or wf_id,
+            "workflow_id": str(wf_item.get("workflow_id") or "").strip(),
+            "fields": runninghub_normalize_workflow_fields(fields),
+        })
+    return {"workflows": workflows}
+
+def save_runninghub_config(payload: RunningHubConfigPayload):
+    data = load_runninghub_config()
+    if payload.workflows is None:
+        workflows = data.get("workflows") or []
+    else:
+        workflows = []
+    for item in payload.workflows or []:
+        wf_id = str(item.id or "").strip() or f"rh-{uuid.uuid4().hex[:8]}"
+        fields = []
+        for field in item.fields or []:
+            ftype = str(field.type or "text").strip().lower()
+            if ftype not in RUNNINGHUB_FIELD_TYPES:
+                ftype = "text"
+            options = [str(o) for o in (field.options or []) if str(o).strip()]
+            item = {
+                "id": str(field.id or "").strip() or f"f-{uuid.uuid4().hex[:6]}",
+                "name": str(field.name or "").strip(),
+                "nodeId": str(field.nodeId or "").strip(),
+                "fieldName": str(field.fieldName or "").strip(),
+                "type": ftype,
+                "default": field.default if field.default is not None else "",
+                "options": options,
+            }
+            if field.apiValue is not None:
+                item["apiValue"] = field.apiValue
+            fields.append(item)
+        workflows.append({
+            "id": wf_id,
+            "name": str(item.name or "").strip() or wf_id,
+            "workflow_id": str(item.workflow_id or "").strip(),
+            "fields": runninghub_normalize_workflow_fields(fields),
+        })
+    data["workflows"] = workflows
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with RUNNINGHUB_LOCK:
+        with open(RUNNINGHUB_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    env_updates = {}
+    if payload.api_key is not None:
+        env_updates[RUNNINGHUB_API_KEY_ENV] = str(payload.api_key or "").strip()
+    if env_updates:
+        update_env_values(env_updates)
+        reload_env_globals()
+    return data
+
+def runninghub_api_key():
+    return str(os.getenv(RUNNINGHUB_API_KEY_ENV, "") or "").strip()
+
+def runninghub_public_config():
+    key = runninghub_api_key()
+    return {
+        "has_key": bool(key),
+        "key_preview": f"{key[:4]}...{key[-4:]}" if len(key) >= 8 else "",
+        "key_env": RUNNINGHUB_API_KEY_ENV,
+        "workflows": load_runninghub_config().get("workflows") or [],
+    }
+
+def runninghub_post(path: str, payload: dict, timeout=120):
+    url = f"{RUNNINGHUB_BASE_URL}{path}"
+    headers = {"Content-Type": "application/json", "Host": "www.runninghub.cn"}
+    resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+    try:
+        data = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"RunningHub 返回非 JSON：{resp.text[:200]}")
+    return data
+
+def runninghub_parse_workflow_prompt(data: Any) -> Dict[str, Any]:
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, str):
+        text = data.strip()
+        if not text:
+            raise HTTPException(status_code=502, detail="工作流 JSON 为空")
+        try:
+            parsed = json.loads(text)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"工作流 JSON 解析失败：{exc}") from exc
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=502, detail="工作流 JSON 格式无效")
+        return parsed
+    raise HTTPException(status_code=502, detail="未返回有效的工作流 prompt")
+
+def runninghub_fetch_workflow_json(workflow_id: str) -> Dict[str, Any]:
+    workflow_id = str(workflow_id or "").strip()
+    if not workflow_id:
+        raise HTTPException(status_code=400, detail="请填写 Workflow ID")
+    api_key = runninghub_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先在 RunningHub 设置中配置 API Key")
+    body = runninghub_post(
+        "/api/openapi/getJsonApiFormat",
+        {"apiKey": api_key, "workflowId": workflow_id},
+        timeout=60,
+    )
+    if body.get("code") != 0:
+        raise HTTPException(status_code=400, detail=body.get("msg") or "获取工作流 JSON 失败")
+    payload = body.get("data") or {}
+    prompt_raw = payload.get("prompt") if isinstance(payload, dict) else payload
+    workflow = runninghub_parse_workflow_prompt(prompt_raw)
+    return {"workflow_id": workflow_id, "workflow": workflow, "node_count": len(workflow)}
+
+def runninghub_is_link_input(value: Any) -> bool:
+    return isinstance(value, list) and len(value) == 2 and isinstance(value[0], str) and isinstance(value[1], int)
+
+def runninghub_norm_spaces(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip())
+
+RUNNINGHUB_SDXL_DIMENSIONS = [
+    "1536 x 640 (landscape)",
+    "1344 x 768 (landscape)",
+    "1216 x 832 (landscape)",
+    "1152 x 896 (landscape)",
+    "1024 x 1024 (square)",
+    "896 x 1152 (portrait)",
+    "832 x 1216 (portrait)",
+    "768 x 1344 (portrait)",
+    "640 x 1536 (portrait)",
+]
+
+RUNNINGHUB_SAMPLER_NAMES = [
+    "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2", "dpm_2_ancestral", "lms",
+    "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_2m",
+    "dpmpp_sde_gpu", "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm", "uni_pc",
+    "uni_pc_bh2",
+]
+
+RUNNINGHUB_SCHEDULERS = [
+    "normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "beta",
+]
+
+RUNNINGHUB_SELECT_PRESETS: Dict[str, List[str]] = {
+    "dimensions": RUNNINGHUB_SDXL_DIMENSIONS,
+    "resolution": RUNNINGHUB_SDXL_DIMENSIONS,
+    "preset": RUNNINGHUB_SDXL_DIMENSIONS,
+    "sampler_name": RUNNINGHUB_SAMPLER_NAMES,
+    "scheduler": RUNNINGHUB_SCHEDULERS,
+}
+
+def runninghub_canonical_option(options: List[str], value: Any) -> Any:
+    if value is None or value == "":
+        return value
+    sv = str(value)
+    if sv in options:
+        return sv
+    norm_val = runninghub_norm_spaces(sv)
+    for opt in options:
+        if runninghub_norm_spaces(opt) == norm_val:
+            return opt
+    return value
+
+def runninghub_ensure_option_in_list(options: List[str], value: Any) -> List[str]:
+    opts = [str(o) for o in options if str(o).strip()]
+    if value is None or value == "":
+        return opts
+    canonical = runninghub_canonical_option(opts, value)
+    if canonical in opts:
+        return opts
+    return [str(canonical)] + opts
+
+def runninghub_infer_select_options(class_type: str, field_name: str, value: Any) -> Optional[List[str]]:
+    if runninghub_is_link_input(value) or isinstance(value, (dict, list)):
+        return None
+    if not isinstance(value, str):
+        return None
+    fn = str(field_name or "").strip().lower()
+    if re.search(r"prompt|text|description|caption|提示|正向|负向", fn) or len(value) > 120:
+        return None
+    if re.search(r"image|filename|path", fn):
+        return None
+    presets = RUNNINGHUB_SELECT_PRESETS.get(fn)
+    if presets:
+        return runninghub_ensure_option_in_list(presets, value)
+    if re.search(r"\d+\s*x\s*\d+", value, re.I):
+        return runninghub_ensure_option_in_list(RUNNINGHUB_SDXL_DIMENSIONS, value)
+    return None
+
+def runninghub_resolve_field_meta(
+    value: Any,
+    input_name: str,
+    class_type: str = "",
+) -> Dict[str, Any]:
+    select_options = runninghub_infer_select_options(class_type, input_name, value)
+    if select_options:
+        default = runninghub_canonical_option(select_options, value)
+        return {"type": "select", "options": select_options, "default": default}
+    lc = str(input_name or "").lower()
+    if isinstance(value, bool):
+        return {"type": "text", "options": [], "default": value}
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return {"type": "number", "options": [], "default": value}
+    if isinstance(value, str):
+        if re.search(r"prompt|text|description|caption|提示|正向|负向", lc) or len(value) > 80:
+            ftype = "textarea" if len(value) > 80 or "prompt" in lc else "text"
+            return {"type": ftype, "options": [], "default": value}
+        if re.search(r"image|filename|path", lc):
+            return {"type": "image", "options": [], "default": value}
+        return {"type": "text", "options": [], "default": value}
+    return {"type": "text", "options": [], "default": value if not isinstance(value, (dict, list)) else ""}
+
+def runninghub_guess_field_type(value: Any, input_name: str, class_type: str = "") -> str:
+    return runninghub_resolve_field_meta(value, input_name, class_type).get("type") or "text"
+
+def runninghub_build_input_meta(workflow: Dict[str, Any]) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    meta: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for node_id, node in (workflow or {}).items():
+        if not isinstance(node, dict):
+            continue
+        class_type = str(node.get("class_type") or "")
+        inputs = node.get("inputs") or {}
+        if not isinstance(inputs, dict):
+            continue
+        node_meta: Dict[str, Dict[str, Any]] = {}
+        for input_name, raw_value in inputs.items():
+            if runninghub_is_link_input(raw_value):
+                continue
+            resolved = runninghub_resolve_field_meta(raw_value, input_name, class_type)
+            if resolved.get("type") == "select":
+                node_meta[str(input_name)] = {
+                    "type": "select",
+                    "options": resolved.get("options") or [],
+                }
+        if node_meta:
+            meta[str(node_id)] = node_meta
+    return meta
+
+def runninghub_should_auto_expose(input_name: str, value: Any) -> bool:
+    if runninghub_is_link_input(value):
+        return False
+    if isinstance(value, (dict, list)):
+        return False
+    lc = str(input_name or "").lower()
+    if re.search(r"seed|noise|latent|model|clip|vae|ckpt|checkpoint|unet|lora|control|mask|cond|guidance", lc):
+        return False
+    if isinstance(value, str) and value.startswith(("http://", "https://")):
+        return False
+    return True
+
+def runninghub_suggest_fields(workflow: Dict[str, Any]) -> List[Dict[str, Any]]:
+    suggested = []
+    for node_id, node in workflow.items():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs") or {}
+        if not isinstance(inputs, dict):
+            continue
+        title = str((node.get("_meta") or {}).get("title") or node.get("class_type") or node_id)
+        class_type = str(node.get("class_type") or "")
+        for input_name, raw_value in inputs.items():
+            if not runninghub_should_auto_expose(input_name, raw_value):
+                continue
+            resolved = runninghub_resolve_field_meta(raw_value, input_name, class_type)
+            ftype = resolved.get("type") or "text"
+            if ftype == "image":
+                continue
+            default = resolved.get("default")
+            if default is None and not isinstance(raw_value, (dict, list)):
+                default = raw_value
+            if default is None:
+                default = ""
+            label = str(input_name or "").strip()
+            if title and label:
+                display = f"{title} · {label}"
+            else:
+                display = title or label
+            field_name = str(input_name or "").strip()
+            if ftype in ("text", "textarea") and not field_name:
+                field_name = "text"
+            item = {
+                "nodeId": str(node_id),
+                "fieldName": field_name,
+                "name": display,
+                "type": ftype,
+                "default": default,
+            }
+            if ftype == "select":
+                item["options"] = resolved.get("options") or []
+                if isinstance(raw_value, str):
+                    item["apiValue"] = raw_value
+            suggested.append(item)
+    return suggested
+
+def runninghub_upload_file(path: str, api_key: str):
+    url = f"{RUNNINGHUB_BASE_URL}/task/openapi/upload"
+    with open(path, "rb") as f:
+        files = {"file": (os.path.basename(path), f, content_type_for_path(path))}
+        data = {"apiKey": api_key, "fileType": "input"}
+        resp = requests.post(url, files=files, data=data, headers={"Host": "www.runninghub.cn"}, timeout=120)
+    try:
+        body = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"RunningHub 上传失败：{resp.text[:200]}")
+    if body.get("code") != 0:
+        raise HTTPException(status_code=400, detail=body.get("msg") or "RunningHub 上传失败")
+    file_name = (body.get("data") or {}).get("fileName")
+    if not file_name:
+        raise HTTPException(status_code=502, detail="RunningHub 上传未返回 fileName")
+    return file_name
+
+def runninghub_is_text_field(field_type: str) -> bool:
+    return str(field_type or "").lower() in ("text", "textarea")
+
+def runninghub_normalize_field_name(field: dict) -> str:
+    """ComfyUI 文本节点常见字段名为 text；配置留空时自动补全，避免 nodeInfoList 漏传提示词。"""
+    field_name = str(field.get("fieldName") or "").strip()
+    if field_name:
+        return field_name
+    ftype = str(field.get("type") or "text").strip().lower()
+    if runninghub_is_text_field(ftype):
+        return "text"
+    if ftype == "image":
+        return "image"
+    label = f"{field.get('name') or ''} {field.get('fieldName') or ''}".lower()
+    if any(k in label for k in ("prompt", "提示", "caption", "positive", "negative")):
+        return "text"
+    return ""
+
+def runninghub_fill_select_options(field: dict) -> dict:
+    ftype = str(field.get("type") or "text").strip().lower()
+    if ftype != "select":
+        return field
+    field_name = str(field.get("fieldName") or "").strip()
+    default = field.get("default", "")
+    opts = [str(o) for o in (field.get("options") or []) if str(o).strip()]
+    if len(opts) <= 1:
+        inferred = runninghub_infer_select_options("", field_name, default)
+        if inferred and len(inferred) > len(opts):
+            opts = inferred
+    if not opts and default not in (None, ""):
+        opts = [str(default)]
+    field["options"] = opts
+    if opts:
+        field["default"] = runninghub_canonical_option(opts, default)
+    return field
+
+def runninghub_normalize_workflow_fields(fields: list) -> list:
+    normalized = []
+    for field in fields or []:
+        if not isinstance(field, dict):
+            continue
+        item = dict(field)
+        item["fieldName"] = runninghub_normalize_field_name(item)
+        ftype = str(item.get("type") or "text").strip().lower()
+        if ftype == "select":
+            runninghub_fill_select_options(item)
+        else:
+            item.pop("options", None)
+        normalized.append(item)
+    return normalized
+
+def runninghub_value_is_empty(field_type: str, value: Any) -> bool:
+    ftype = str(field_type or "").lower()
+    if ftype == "boolean":
+        return False
+    if ftype == "number":
+        return value is None or value == ""
+    if ftype == "image":
+        return not str(value or "").strip()
+    return not str(value if value is not None else "").strip()
+
+def runninghub_resolve_select_raw(field: dict, incoming_value: Any) -> Any:
+    """select/COMBO 字段：优先使用工作流原始 apiValue，用户改选后用其选项字符串。"""
+    ftype = str(field.get("type") or "text").strip().lower()
+    if ftype != "select":
+        return incoming_value
+    api_value = field.get("apiValue")
+    if api_value is None or api_value == "":
+        if isinstance(field.get("default"), str):
+            api_value = field.get("default")
+    if incoming_value is None or incoming_value == "":
+        return api_value if api_value is not None else ""
+    inc = incoming_value
+    default = field.get("default", "")
+    if api_value is not None and isinstance(inc, str) and isinstance(default, str):
+        if runninghub_norm_spaces(inc) == runninghub_norm_spaces(default):
+            return api_value
+    return inc
+
+def runninghub_align_field_value(
+    node_id: str,
+    field_name: str,
+    value: Any,
+    workflow_prompt: Optional[Dict[str, Any]] = None,
+) -> Any:
+    """下拉/文本值在归一化空格后若与工作流默认值等价，则提交工作流 JSON 中的原始字符串。"""
+    if workflow_prompt is None or value is None:
+        return value
+    node = workflow_prompt.get(str(node_id))
+    if not isinstance(node, dict):
+        return value
+    inputs = node.get("inputs") or {}
+    if not isinstance(inputs, dict):
+        return value
+    original = inputs.get(field_name)
+    if isinstance(value, str) and isinstance(original, str):
+        if runninghub_norm_spaces(value) == runninghub_norm_spaces(original):
+            return original
+    if isinstance(value, (int, float)) and isinstance(original, (int, float)) and not isinstance(original, bool):
+        try:
+            if float(value) == float(original):
+                return original
+        except Exception:
+            pass
+    return value
+
+def build_runninghub_node_info_list(
+    workflow: dict,
+    payload: RunningHubRunRequest,
+    api_key: str,
+    workflow_prompt: Optional[Dict[str, Any]] = None,
+):
+    """按 RunningHub openapi create 文档组装 nodeInfoList，避免空值覆盖工作流默认提示词。"""
+    refs = []
+    for ref in payload.reference_images or []:
+        url = ref.get("url") if isinstance(ref, dict) else ref
+        if url:
+            refs.append(str(url))
+    incoming = {str(k): v for k, v in (payload.fields or {}).items()}
+    global_prompt = (payload.prompt or "").strip()
+    resolved = []
+    for field in workflow.get("fields") or []:
+        fid = str(field.get("id") or "").strip()
+        node_id = str(field.get("nodeId") or "").strip()
+        field_name = runninghub_normalize_field_name(field)
+        if not node_id or not field_name:
+            continue
+        ftype = str(field.get("type") or "text").lower()
+        raw_value = incoming.get(fid)
+        if raw_value is None:
+            raw_value = field.get("default", "")
+        raw_value = runninghub_resolve_select_raw(field, raw_value)
+        resolved.append({
+            "fid": fid,
+            "node_id": node_id,
+            "field_name": field_name,
+            "ftype": ftype,
+            "raw": raw_value,
+        })
+    text_items = [item for item in resolved if runninghub_is_text_field(item["ftype"])]
+    if global_prompt:
+        if len(text_items) == 1:
+            text_items[0]["raw"] = global_prompt
+        else:
+            for item in text_items:
+                if runninghub_value_is_empty(item["ftype"], item["raw"]):
+                    item["raw"] = global_prompt
+    node_info_list = []
+    seen = set()
+    for item in resolved:
+        value = runninghub_field_value(api_key, item["ftype"], item["raw"], refs)
+        if item["ftype"] == "image" and runninghub_value_is_empty("image", value):
+            continue
+        if runninghub_value_is_empty(item["ftype"], value):
+            continue
+        dedupe_key = (item["node_id"], item["field_name"])
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        field_value = runninghub_align_field_value(
+            item["node_id"],
+            item["field_name"],
+            value,
+            workflow_prompt,
+        )
+        if item["ftype"] in ("select", "text", "textarea"):
+            field_value = str(field_value if field_value is not None else "")
+        node_info_list.append({
+            "nodeId": item["node_id"],
+            "fieldName": item["field_name"],
+            "fieldValue": field_value,
+        })
+    return node_info_list, global_prompt
+
+def runninghub_field_value(api_key: str, field_type: str, value: Any, references: List[str]):
+    if value is None:
+        value = ""
+    if field_type == "image":
+        ref = ""
+        if isinstance(value, str) and value.strip():
+            ref = value.strip()
+        elif references:
+            ref = references.pop(0)
+        if not ref:
+            return ""
+        if ref.startswith("http://") or ref.startswith("https://"):
+            return ref
+        local_path = output_file_from_url(ref)
+        if local_path:
+            return runninghub_upload_file(local_path, api_key)
+        return ref
+    if field_type in ("number",):
+        try:
+            if isinstance(value, str) and value.strip():
+                if "." in value or "e" in value.lower():
+                    return float(value)
+                return int(value)
+        except Exception:
+            pass
+        return value
+    if field_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in {"1", "true", "yes", "on"}
+    if field_type == "select":
+        return str(value if value is not None else "")
+    return str(value if value is not None else "").strip()
+
+def runninghub_download_output(url: str):
+    parsed = urllib.parse.urlparse(url)
+    ext = os.path.splitext(parsed.path)[1].lower() or ".png"
+    if ext not in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov"]:
+        ext = ".png"
+    filename = f"rh_{uuid.uuid4().hex[:12]}{ext}"
+    folder, _ = output_storage("output")
+    path = os.path.join(folder, filename)
+    with requests.get(url, stream=True, timeout=120) as resp:
+        resp.raise_for_status()
+        with open(path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=1024 * 64):
+                if chunk:
+                    f.write(chunk)
+    rel = os.path.relpath(path, OUTPUT_DIR).replace("\\", "/")
+    return f"/output/{rel}"
+
+def runninghub_format_task_failure(data: Any) -> str:
+    if not isinstance(data, dict):
+        return ""
+    failed = data.get("failedReason") if isinstance(data.get("failedReason"), dict) else data
+    if not isinstance(failed, dict):
+        return str(data.get("exception_message") or data.get("msg") or "").strip()
+    parts = []
+    node_name = str(failed.get("node_name") or failed.get("nodeName") or "").strip()
+    if node_name:
+        parts.append(f"节点 {node_name}")
+    exc = str(failed.get("exception_message") or failed.get("message") or "").strip()
+    if exc:
+        parts.append(exc)
+    trace = str(failed.get("traceback") or "").strip()
+    if trace:
+        parts.append(trace[:800])
+    return " — ".join(parts) if parts else ""
+
+def runninghub_collect_output_urls(outputs_body: dict) -> List[str]:
+    data = outputs_body.get("data")
+    urls: List[str] = []
+    if isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            file_url = str(item.get("fileUrl") or item.get("url") or "").strip()
+            if file_url:
+                urls.append(file_url)
+    elif isinstance(data, dict):
+        file_url = str(data.get("fileUrl") or data.get("url") or "").strip()
+        if file_url:
+            urls.append(file_url)
+    return urls
+
+def runninghub_wait_outputs(api_key: str, task_id: str, timeout_sec=600):
+    """轮询 outputs 接口直至拿到 fileUrl；勿在 status=SUCCESS 时提前退出（官方推荐只查 outputs）。"""
+    deadline = time.time() + timeout_sec
+    last_code = None
+    last_msg = ""
+    poll_interval = 3
+    empty_success_hits = 0
+    while time.time() < deadline:
+        outputs_body = runninghub_post("/task/openapi/outputs", {"apiKey": api_key, "taskId": task_id})
+        code = outputs_body.get("code")
+        last_code = code
+        last_msg = str(outputs_body.get("msg") or "")
+        if code == 0:
+            urls = runninghub_collect_output_urls(outputs_body)
+            if urls:
+                local_urls = []
+                for remote in urls:
+                    try:
+                        local_urls.append(runninghub_download_output(remote))
+                    except Exception as e:
+                        print(f"RunningHub 下载输出失败: {e}")
+                        local_urls.append(remote)
+                return {"status": "SUCCESS", "outputs": local_urls, "remote_outputs": urls}
+            try:
+                status_body = runninghub_post("/task/openapi/status", {"apiKey": api_key, "taskId": task_id})
+                if status_body.get("code") == 0 and str(status_body.get("data") or "") == "SUCCESS":
+                    empty_success_hits += 1
+                    if empty_success_hits >= 2:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "RunningHub 任务已结束但未返回图片，通常是 nodeInfoList 参数与工作流不匹配。"
+                                "请检查暴露参数的值是否与 RunningHub 工作流 JSON 中完全一致"
+                                "（例如 dimensions 的空格格式），并避免覆盖 Seed/Int 等内部节点。"
+                                f"（taskId={task_id}）"
+                            ),
+                        )
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+        elif code in (804, 813):
+            empty_success_hits = 0
+            time.sleep(poll_interval)
+            continue
+        elif code == 805:
+            detail = runninghub_format_task_failure(outputs_body.get("data"))
+            if not detail:
+                detail = last_msg or "RunningHub 任务执行失败"
+            raise HTTPException(status_code=400, detail=f"{detail}（taskId={task_id}）")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"RunningHub 查询失败（code={code}，{last_msg or 'unknown'}，taskId={task_id}）",
+            )
+        time.sleep(poll_interval)
+    raise HTTPException(
+        status_code=408,
+        detail=f"RunningHub 任务超时（已等待 {int(timeout_sec)} 秒，最后 code={last_code}，{last_msg or '无输出'}，taskId={task_id}）",
+    )
+
+@app.get("/api/runninghub/config")
+async def get_runninghub_config():
+    return runninghub_public_config()
+
+@app.put("/api/runninghub/config")
+async def put_runninghub_config(payload: RunningHubConfigPayload):
+    data = save_runninghub_config(payload)
+    return runninghub_public_config()
+
+@app.post("/api/runninghub/fetch-workflow-json")
+async def fetch_runninghub_workflow_json(payload: RunningHubFetchJsonRequest):
+    result = runninghub_fetch_workflow_json(payload.workflow_id)
+    workflow = result["workflow"]
+    return {
+        **result,
+        "suggested_fields": runninghub_suggest_fields(workflow),
+        "input_meta": runninghub_build_input_meta(workflow),
+    }
+
+@app.get("/api/runninghub/workflows")
+async def list_runninghub_workflows():
+    return {"workflows": load_runninghub_config().get("workflows") or []}
+
+@app.get("/api/runninghub/workflows/{workflow_key}")
+async def get_runninghub_workflow(workflow_key: str):
+    cfg = load_runninghub_config()
+    workflow = next((w for w in cfg.get("workflows") or [] if w.get("id") == workflow_key), None)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="RunningHub 工作流不存在")
+    return {"workflow": workflow}
+
+@app.post("/api/runninghub/run")
+async def run_runninghub_workflow(payload: RunningHubRunRequest):
+    api_key = runninghub_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先在 RunningHub 设置中配置 API Key")
+    cfg = load_runninghub_config()
+    workflow = next((w for w in cfg.get("workflows") or [] if w.get("id") == payload.workflow_id), None)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="RunningHub 工作流不存在")
+    rh_workflow_id = str(workflow.get("workflow_id") or "").strip()
+    if not rh_workflow_id:
+        raise HTTPException(status_code=400, detail="该工作流未配置 RunningHub Workflow ID")
+    workflow_prompt = None
+    try:
+        workflow_prompt = runninghub_fetch_workflow_json(rh_workflow_id).get("workflow")
+    except Exception as exc:
+        print(f"RunningHub 拉取工作流 JSON 用于参数对齐失败: {exc}")
+    node_info_list, global_prompt = build_runninghub_node_info_list(
+        workflow, payload, api_key, workflow_prompt=workflow_prompt,
+    )
+    if global_prompt and not node_info_list:
+        missing = [
+            str(f.get("id") or "")
+            for f in (workflow.get("fields") or [])
+            if str(f.get("nodeId") or "").strip() and not runninghub_normalize_field_name(f)
+        ]
+        hint = "请在 RunningHub 设置中为每个参数填写 nodeId 与 fieldName（文本节点常用 fieldName=text，例如 nodeId=6、fieldName=text）。"
+        if missing:
+            hint = f"参数 {', '.join(missing)} 缺少 fieldName。{hint}"
+        raise HTTPException(status_code=400, detail=f"已填写提示词，但无法写入 nodeInfoList。{hint}")
+    create_payload = {
+        "apiKey": api_key,
+        "workflowId": rh_workflow_id,
+        "nodeInfoList": node_info_list,
+    }
+    for item in node_info_list:
+        fv = item.get("fieldValue")
+        print(
+            f"RunningHub param nodeId={item.get('nodeId')} fieldName={item.get('fieldName')} "
+            f"type={type(fv).__name__} value={json.dumps(fv, ensure_ascii=False)}"
+        )
+    create_body = runninghub_post("/task/openapi/create", create_payload)
+    if create_body.get("code") != 0:
+        raise HTTPException(
+            status_code=400,
+            detail=create_body.get("msg") or f"RunningHub 创建任务失败：{json.dumps(node_info_list, ensure_ascii=False)}",
+        )
+    task_id = str((create_body.get("data") or {}).get("taskId") or "")
+    if not task_id:
+        raise HTTPException(status_code=502, detail="RunningHub 未返回 taskId")
+    result = runninghub_wait_outputs(api_key, task_id)
+    outputs = result.get("outputs") or []
+    images = [u for u in outputs if str(u).startswith("/output/") or str(u).startswith("/assets/") or (str(u).startswith("http") and not str(u).lower().endswith((".mp4", ".webm", ".mov")))]
+    videos = [u for u in outputs if str(u).lower().endswith((".mp4", ".webm", ".mov"))]
+    if not images and outputs:
+        images = [u for u in outputs if not str(u).lower().endswith((".mp4", ".webm", ".mov"))]
+    prompt_text = global_prompt
+    if not prompt_text:
+        incoming = {str(k): v for k, v in (payload.fields or {}).items()}
+        for field in workflow.get("fields") or []:
+            if runninghub_is_text_field(str(field.get("type") or "")):
+                fid = str(field.get("id") or "")
+                val = str(incoming.get(fid) or field.get("default") or "").strip()
+                if val:
+                    prompt_text = val
+                    break
+    if not prompt_text:
+        prompt_text = str(workflow.get("name") or payload.workflow_id)
+    current_timestamp = time.time()
+    record = {
+        "prompt": prompt_text,
+        "images": images,
+        "videos": videos,
+        "outputs": outputs,
+        "timestamp": current_timestamp,
+        "type": "runninghub",
+        "workflow_id": payload.workflow_id,
+        "workflow_name": workflow.get("name") or payload.workflow_id,
+        "params": {
+            "fields": payload.fields or {},
+            "reference_images": [ref if isinstance(ref, dict) else {"url": ref} for ref in (payload.reference_images or [])],
+            "nodeInfoList": node_info_list,
+        },
+        "task_id": task_id,
+    }
+    save_to_history(record)
+    if GLOBAL_LOOP:
+        asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(record), GLOBAL_LOOP)
+    return {
+        "task_id": task_id,
+        "images": images,
+        "videos": videos,
+        "outputs": outputs,
+        "remote_outputs": result.get("remote_outputs") or [],
+        "timestamp": current_timestamp,
+        "type": "runninghub",
+        "prompt": prompt_text,
+    }
 
 if __name__ == "__main__":
     import uvicorn

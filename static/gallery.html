@@ -197,7 +197,7 @@
         const META_PIN = 'studio_pinned', META_FAV = 'studio_favorites', META_ORDER = 'studio_display_order';
         const META_FILTER = 'studio_media_filter';
         const META_COLS = 'studio_output_cols';
-        const STUDIO_TYPES = new Set(['online', 'local-comfy', 'online-video', 'online-audio']);
+        const STUDIO_TYPES = new Set(['online', 'local-comfy', 'online-video', 'online-audio', 'runninghub']);
         let allHistory = [], pendingJobs = [], outputCols = 4, boardPickSlotId = '';
         let bulkSelectMode = false, selectedKeys = new Set(), bulkDrag = null, bulkDown = null;
         let mediaFilter = localStorage.getItem(META_FILTER) || 'all';

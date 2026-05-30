@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunningHub 设置</title>
+    <script>
+        (function(){
+            try {
+                localStorage.setItem('studio_theme', 'light');
+                localStorage.setItem('canvas_theme', 'light');
+                document.documentElement.classList.add('studio-theme-dark');
+                document.documentElement.classList.add('theme-dark');
+            } catch(e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260520-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260525-runninghub"></script>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <link rel="stylesheet" href="/static/settings-magnific.css?v=20260520-settings-sync">
+    <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
+    <style>
+        :root { --bg:#1a1a1a; --panel:#262626; --soft:#313131; --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --accent:#ff4d94; }
+        body.studio-theme-dark, html.studio-theme-dark body { --bg:#1a1a1a; --panel:#262626; --soft:#313131; --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373; --accent:#ff4d94; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+        button { font-family:inherit; cursor:pointer; border:0; background:transparent; color:inherit; }
+        .page { min-height:100vh; padding:40px 32px 80px; }
+        .wrap { max-width:1100px; margin:0 auto; }
+        .page-head { padding:0 4px 28px; display:flex; justify-content:space-between; align-items:end; gap:24px; flex-wrap:wrap; }
+        .page-head .title { font-size:26px; line-height:1.05; font-weight:900; letter-spacing:-.015em; }
+        .page-head .sub { margin-top:8px; color:var(--muted); font-size:12.5px; line-height:1.55; font-weight:600; max-width:640px; }
+        .page-head .status { color:var(--muted); font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; min-height:16px; }
+        .layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:36px; align-items:start; }
+        .sidebar { display:flex; flex-direction:column; gap:12px; position:sticky; top:32px; max-height:calc(100vh - 64px); overflow-y:auto; padding:16px; background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+        .side-section-title { color:var(--faint); font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; padding:2px 4px; }
+        .workflow-list { display:flex; flex-direction:column; gap:4px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-bottom:4px; }
+        .workflow-card { width:100%; text-align:left; border:1px solid transparent; background:transparent; border-radius:12px; padding:8px 10px; display:flex; align-items:center; gap:10px; color:var(--muted); transition:all .15s ease; min-height:48px; }
+        .workflow-card:hover { border-color:var(--text); color:var(--text); }
+        .workflow-card.active { background:var(--soft); color:var(--text); border-color:transparent; }
+        .workflow-mark { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:var(--soft); color:var(--muted); }
+        .workflow-card.active .workflow-mark { background:var(--panel); color:var(--text); }
+        .workflow-name { min-width:0; font-size:12.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .workflow-meta { margin-top:1px; color:var(--faint); font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .add-btn { width:100%; height:40px; border:1px dashed var(--line-strong); border-radius:12px; color:var(--muted); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:800; transition:all .15s ease; }
+        .add-btn:hover { color:var(--text); border-color:var(--faint); background:var(--soft); }
+        .key-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
+        .key-row .field-frame { width:100%; }
+        .content { display:flex; flex-direction:column; gap:20px; min-width:0; }
+        .content-head { display:flex; align-items:end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:20px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+        .content-head .editor-title { font-size:22px; line-height:1.1; font-weight:900; letter-spacing:-.01em; }
+        .content-head .editor-sub { margin-top:4px; color:var(--muted); font-size:11.5px; font-weight:700; }
+        .content-actions { display:flex; gap:8px; align-items:center; }
+        .block { display:flex; flex-direction:column; gap:14px; padding:22px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+        .block-title { font-size:12px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:var(--text); }
+        .block-desc { color:var(--muted); font-size:11.5px; line-height:1.55; font-weight:600; margin-top:4px; }
+        .form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .field { display:flex; flex-direction:column; gap:7px; min-width:0; }
+        .field.full { grid-column:1/-1; }
+        .label { color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.02em; }
+        .field-frame { display:flex; align-items:center; padding:4px; border:1px solid var(--line); border-radius:11px; background:var(--soft); transition:border-color .15s ease; }
+        .field-frame:focus-within { border-color:var(--text); }
+        .field-frame input, .field-frame select, .field-frame textarea { width:100%; border:0; background:transparent; color:var(--text); outline:none; font-size:13px; font-weight:650; }
+        .field-frame input, .field-frame select { height:34px; padding:0 10px; }
+        .field-frame textarea { min-height:72px; padding:8px 10px; resize:vertical; }
+        .hint { color:var(--faint); font-size:11px; line-height:1.5; font-weight:600; }
+        .param-list { display:flex; flex-direction:column; gap:10px; }
+        .param-row { display:grid; grid-template-columns:1fr 90px 90px 110px 36px; gap:8px; align-items:end; padding:10px; border:1px solid var(--line); border-radius:12px; background:var(--soft); }
+        .param-row.has-select-options { grid-template-columns:1fr; align-items:stretch; }
+        .param-row-main { display:grid; grid-template-columns:1fr 90px 90px 110px 36px; gap:8px; align-items:end; }
+        .param-row .field { gap:5px; }
+        .param-options-field textarea { min-height:72px; font-size:11.5px; line-height:1.45; }
+        .param-row .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
+        .action-btn { height:36px; padding:0 14px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:800; transition:all .15s ease; border:1px solid var(--line); background:var(--panel); color:var(--muted); }
+        .action-btn:hover { color:var(--text); border-color:var(--text); }
+        .action-btn.save-btn { background:var(--accent); color:#fff; border-color:var(--accent); }
+        .action-btn.danger-btn { color:#fca5a5; border-color:rgba(248,113,113,.55); background:rgba(127,29,29,.28); }
+        .ghost-btn { height:32px; padding:0 12px; border-radius:9px; border:1px solid var(--line); color:var(--muted); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:11.5px; font-weight:750; }
+        .ghost-btn:hover { color:var(--text); border-color:var(--text); }
+        .wf-id-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:end; }
+        .node-explorer { display:flex; flex-direction:column; gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+        .node-explorer-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+        .node-explorer-stats { font-size:11px; font-weight:700; color:var(--muted); }
+        .node-list {
+            display:grid;
+            grid-template-columns:repeat(3, minmax(0, 1fr));
+            gap:10px;
+            align-items:start;
+            width:100%;
+        }
+        .node-card { background:var(--soft); border:1px solid var(--line); border-radius:12px; overflow:hidden; min-width:0; height:fit-content; }
+        .node-card.expanded { grid-column:1 / -1; }
+        .node-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding:10px 12px; cursor:pointer; user-select:none; min-height:72px; }
+        .node-card-head:hover { background:rgba(255,255,255,.03); }
+        .node-card.expanded .node-card-head { border-bottom:1px solid var(--line); min-height:0; }
+        .node-card-head > div:first-child { min-width:0; flex:1; }
+        .node-class { font-size:12px; font-weight:850; color:var(--text); line-height:1.35; word-break:break-word; }
+        .node-meta { font-size:10px; font-weight:700; color:var(--faint); margin-top:4px; line-height:1.45; word-break:break-word; }
+        .node-card-head .node-head-actions { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:0 0 auto; }
+        .node-card-head .node-head-actions .node-explorer-stats { white-space:nowrap; }
+        .node-chev { color:var(--faint); transition:transform .15s ease; }
+        .node-card.expanded .node-chev { transform:rotate(180deg); }
+        .node-inputs { display:none; padding:12px 14px; flex-direction:column; gap:8px; }
+        .node-card.expanded .node-inputs { display:flex; }
+        .node-card.expanded .input-row { grid-template-columns:32px minmax(0,1fr) minmax(120px,200px); }
+        .input-row { display:grid; grid-template-columns:32px minmax(0,1fr); gap:8px; align-items:start; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--panel); min-width:0; }
+        .input-row.is-active { border-color:var(--accent); }
+        .check-toggle { width:18px; height:18px; border:1.5px solid var(--line-strong); border-radius:5px; display:flex; align-items:center; justify-content:center; cursor:pointer; background:var(--soft); margin:0 auto; }
+        .check-toggle.checked { background:var(--accent); border-color:var(--accent); color:#fff; }
+        .input-key { font-size:12px; font-weight:800; color:var(--text); }
+        .input-orig { font-size:10.5px; font-weight:700; color:var(--faint); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .small-input { width:100%; height:28px; padding:0 8px; border:1px solid var(--line); border-radius:8px; background:var(--soft); color:var(--text); font-size:11.5px; font-weight:650; }
+        .small-input:disabled { opacity:.45; }
+        .explorer-empty { padding:28px 16px; text-align:center; border:1px dashed var(--line); border-radius:12px; color:var(--muted); font-size:12px; font-weight:700; line-height:1.6; }
+        @media (max-width: 1100px) {
+            .node-list { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 900px) {
+            .layout { grid-template-columns:1fr; }
+            .param-row { grid-template-columns:1fr; }
+            .wf-id-row { grid-template-columns:1fr; }
+        }
+        @media (max-width: 560px) {
+            .node-list { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body class="mg-studio theme-dark studio-theme-dark">
+    <div class="page">
+        <div class="wrap">
+            <header class="page-head">
+                <div>
+                    <div class="title" data-i18n="rh.title">RunningHub 设置</div>
+                    <div class="sub" data-i18n="rh.subtitle">配置 RunningHub API Key 与云端 ComfyUI 工作流。从 RunningHub 工作流页面地址栏获取 Workflow ID，并设置要在画布节点上暴露的参数。</div>
+                </div>
+                <div id="status" class="status"></div>
+            </header>
+
+            <div class="layout">
+                <aside class="sidebar">
+                    <div class="side-section-title" data-i18n="rh.workflowList">工作流列表</div>
+                    <div id="workflowList" class="workflow-list"></div>
+                    <button class="add-btn" type="button" onclick="addWorkflow()"><i data-lucide="plus" class="w-4 h-4"></i><span data-i18n="rh.addWorkflow">添加工作流</span></button>
+                </aside>
+
+                <main class="content">
+                    <div class="content-head">
+                        <div>
+                            <div id="editorTitle" class="editor-title">—</div>
+                            <div class="editor-sub" data-i18n="rh.editorSub">配置 Workflow ID 与暴露参数</div>
+                        </div>
+                        <div class="content-actions">
+                            <button id="deleteBtn" class="action-btn danger-btn" type="button" onclick="deleteWorkflow()"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span data-i18n="rh.delete">删除</span></button>
+                            <button class="action-btn save-btn" type="button" onclick="saveConfig()"><i data-lucide="save" class="w-3.5 h-3.5"></i><span data-i18n="rh.save">保存</span></button>
+                        </div>
+                    </div>
+
+                    <section class="block">
+                        <div class="block-title" data-i18n="rh.apiKeyBlock">API Key</div>
+                        <div class="block-desc" data-i18n="rh.apiKeyHint">在 RunningHub 官网「API 控制台」获取 32 位 API Key，保存后写入 API/.env，页面不会回显完整内容。</div>
+                        <div class="form">
+                            <label class="field full">
+                                <span class="label">API Key</span>
+                                <div class="key-row">
+                                    <div class="field-frame"><input id="apiKeyInput" type="password" placeholder="输入 RunningHub API Key"></div>
+                                    <button class="action-btn save-btn" type="button" onclick="saveApiKey()"><i data-lucide="save" class="w-3.5 h-3.5"></i><span data-i18n="rh.saveApiKey">保存 Key</span></button>
+                                </div>
+                                <span id="keyHint" class="hint"></span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="block" id="workflowEditor" style="display:none">
+                        <div class="block-title" data-i18n="rh.workflowBlock">工作流</div>
+                        <div class="form">
+                            <label class="field">
+                                <span class="label" data-i18n="rh.workflowName">显示名称</span>
+                                <div class="field-frame"><input id="wfNameInput" type="text" placeholder="文生图"></div>
+                            </label>
+                            <label class="field full">
+                                <span class="label">Workflow ID</span>
+                                <div class="wf-id-row">
+                                    <div class="field-frame"><input id="wfIdInput" type="text" placeholder="1850925505116598274"></div>
+                                    <button class="action-btn" type="button" id="fetchJsonBtn" onclick="fetchWorkflowJson()"><i data-lucide="download-cloud" class="w-3.5 h-3.5"></i><span data-i18n="rh.fetchJson">拉取 JSON</span></button>
+                                    <button class="ghost-btn" type="button" onclick="autoExposeSuggested()"><i data-lucide="wand-2" class="w-3.5 h-3.5"></i><span data-i18n="rh.autoExpose">智能暴露</span></button>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="hint" data-i18n="rh.workflowIdHint">从 RunningHub 工作流页面 URL 获取，例如 #/workflow/1850925505116598274 中的数字部分。目标工作流需先在网页端成功运行过一次。</div>
+
+                        <div id="nodeExplorer" class="node-explorer" style="display:none">
+                            <div class="node-explorer-head">
+                                <div>
+                                    <div class="block-title" style="margin:0" data-i18n="rh.nodeExplorer">工作流节点</div>
+                                    <div class="block-desc" data-i18n="rh.nodeExplorerHint">与 ComfyUI 设置相同：展开节点并勾选要暴露的输入项，将自动填入 nodeId 与 fieldName。</div>
+                                </div>
+                                <div id="nodeExplorerStats" class="node-explorer-stats"></div>
+                            </div>
+                            <div id="nodeList" class="node-list"></div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px">
+                            <div>
+                                <div class="block-title" style="margin:0" data-i18n="rh.paramsTitle">暴露参数</div>
+                                <div class="block-desc" data-i18n="rh.paramsHint">nodeId / fieldName 对应 RunningHub 工作流 API 格式中的节点与字段，将作为工作流调用时的输入参数。</div>
+                            </div>
+                            <button class="ghost-btn" type="button" onclick="addParam()"><i data-lucide="plus" class="w-3.5 h-3.5"></i><span data-i18n="rh.addParam">添加参数</span></button>
+                        </div>
+                        <div id="paramList" class="param-list"></div>
+                    </section>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let config = { has_key: false, key_preview: '', workflows: [] };
+        let selectedId = '';
+        let rhWorkflowJson = null;
+        let rhSuggestedFields = [];
+        let rhInputMeta = {};
+        const RH_SDXL_DIMENSIONS = [
+            '1536 x 640 (landscape)', '1344 x 768 (landscape)', '1216 x 832 (landscape)',
+            '1152 x 896 (landscape)', '1024 x 1024 (square)', '896 x 1152 (portrait)',
+            '832 x 1216 (portrait)', '768 x 1344 (portrait)', '640 x 1536 (portrait)',
+        ];
+        const RH_SAMPLER_NAMES = [
+            'euler', 'euler_ancestral', 'heun', 'heunpp2', 'dpm_2', 'dpm_2_ancestral', 'lms',
+            'dpm_fast', 'dpm_adaptive', 'dpmpp_2s_ancestral', 'dpmpp_sde', 'dpmpp_2m',
+            'dpmpp_sde_gpu', 'dpmpp_3m_sde', 'dpmpp_3m_sde_gpu', 'ddpm', 'lcm', 'uni_pc', 'uni_pc_bh2',
+        ];
+        const RH_SCHEDULERS = ['normal', 'karras', 'exponential', 'sgm_uniform', 'simple', 'ddim_uniform', 'beta'];
+        const RH_SELECT_PRESETS = {
+            dimensions: RH_SDXL_DIMENSIONS,
+            resolution: RH_SDXL_DIMENSIONS,
+            preset: RH_SDXL_DIMENSIONS,
+            sampler_name: RH_SAMPLER_NAMES,
+            scheduler: RH_SCHEDULERS,
+        };
+        function rhNormSpaces(text){ return String(text || '').trim().replace(/\s+/g, ' '); }
+        function rhCanonicalOption(options, value){
+            if(value === null || value === undefined || value === '') return value;
+            const sv = String(value);
+            if(options.includes(sv)) return sv;
+            const nv = rhNormSpaces(sv);
+            const hit = options.find(o => rhNormSpaces(o) === nv);
+            return hit || sv;
+        }
+        function rhEnsureOptions(options, value){
+            const opts = (options || []).map(o => String(o)).filter(Boolean);
+            if(value === null || value === undefined || value === '') return opts;
+            const canonical = rhCanonicalOption(opts, value);
+            return opts.includes(canonical) ? opts : [String(canonical), ...opts];
+        }
+        function rhInferSelectOptions(node, fieldName, value){
+            if(typeof value !== 'string') return null;
+            const fn = String(fieldName || '').toLowerCase();
+            if(/prompt|text|description|caption|提示|正向|负向/.test(fn) || value.length > 120) return null;
+            if(/image|filename|path/.test(fn)) return null;
+            const presets = RH_SELECT_PRESETS[fn];
+            if(presets) return rhEnsureOptions(presets, value);
+            if(/\d+\s*x\s*\d+/i.test(value)) return rhEnsureOptions(RH_SDXL_DIMENSIONS, value);
+            return null;
+        }
+        function rhResolveFieldMeta(nodeId, fieldName, rawValue){
+            const cached = rhInputMeta?.[nodeId]?.[fieldName];
+            if(cached?.type === 'select' && (cached.options || []).length){
+                const options = cached.options;
+                return { type: 'select', options, default: rhCanonicalOption(options, rawValue) };
+            }
+            const node = rhWorkflowJson?.[nodeId];
+            const selectOptions = rhInferSelectOptions(node, fieldName, rawValue);
+            if(selectOptions){
+                return { type: 'select', options: selectOptions, default: rhCanonicalOption(selectOptions, rawValue) };
+            }
+            return { type: guessRhType(rawValue, fieldName), options: [], default: rawValue };
+        }
+        const workflowList = document.getElementById('workflowList');
+        const workflowEditor = document.getElementById('workflowEditor');
+        const editorTitle = document.getElementById('editorTitle');
+        const statusEl = document.getElementById('status');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const keyHint = document.getElementById('keyHint');
+        const wfNameInput = document.getElementById('wfNameInput');
+        const wfIdInput = document.getElementById('wfIdInput');
+        const paramList = document.getElementById('paramList');
+        const nodeExplorer = document.getElementById('nodeExplorer');
+        const nodeList = document.getElementById('nodeList');
+        const nodeExplorerStats = document.getElementById('nodeExplorerStats');
+
+        function tr(key){ return window.StudioI18n ? StudioI18n.t(key) : key; }
+        function tf(key, vars={}){
+            return Object.entries(vars).reduce((text, [k, v]) => text.replaceAll(`{${k}}`, String(v ?? '')), tr(key));
+        }
+        function refreshIcons(){ if(window.lucide) lucide.createIcons(); }
+        function setStatus(text){ statusEl.textContent = text || ''; }
+        function escapeHtml(str){ return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+        function escapeAttr(str){ return escapeHtml(str).replace(/`/g, '&#96;'); }
+        function uid(prefix='rh'){ return `${prefix}-${Math.random().toString(36).slice(2, 8)}`; }
+        window.toggleRhField = toggleRhField;
+        window.updateRhFieldName = updateRhFieldName;
+        window.fetchWorkflowJson = fetchWorkflowJson;
+        window.autoExposeSuggested = autoExposeSuggested;
+
+        function currentWorkflow(){
+            return (config.workflows || []).find(w => w.id === selectedId) || null;
+        }
+
+        function renderWorkflowList(){
+            const items = config.workflows || [];
+            if(!items.length){
+                workflowList.innerHTML = `<div class="hint" style="padding:8px 4px">${tr('rh.emptyList')}</div>`;
+                return;
+            }
+            workflowList.innerHTML = items.map(item => {
+                const active = item.id === selectedId ? 'active' : '';
+                return `
+                    <button class="workflow-card ${active}" type="button" onclick="selectWorkflow('${escapeHtml(item.id)}')">
+                        <span class="workflow-mark"><i data-lucide="zap" class="w-4 h-4"></i></span>
+                        <span class="min-w-0">
+                            <div class="workflow-name">${escapeHtml(item.name || item.id)}</div>
+                            <div class="workflow-meta">${escapeHtml(item.workflow_id || tr('rh.noWorkflowId'))}</div>
+                        </span>
+                    </button>
+                `;
+            }).join('');
+            refreshIcons();
+        }
+
+        function renderParamList(){
+            const wf = currentWorkflow();
+            if(!wf){
+                paramList.innerHTML = '';
+                return;
+            }
+            const fields = wf.fields || [];
+            if(!fields.length){
+                paramList.innerHTML = `<div class="hint">${tr('rh.noParams')}</div>`;
+                return;
+            }
+            paramList.innerHTML = fields.map((field, index) => {
+                const isSelect = String(field.type || '').toLowerCase() === 'select';
+                const optionsText = (field.options || []).join('\n');
+                return `
+                <div class="param-row ${isSelect ? 'has-select-options' : ''}" data-index="${index}">
+                    <div class="param-row-main">
+                        <label class="field">
+                            <span class="label">${tr('rh.paramName')}</span>
+                            <div class="field-frame"><input value="${escapeHtml(field.name || '')}" oninput="updateParam(${index}, 'name', this.value)" placeholder="提示词"></div>
+                        </label>
+                        <label class="field">
+                            <span class="label">nodeId</span>
+                            <div class="field-frame"><input value="${escapeHtml(field.nodeId || '')}" oninput="updateParam(${index}, 'nodeId', this.value)" placeholder="6"></div>
+                        </label>
+                        <label class="field">
+                            <span class="label">fieldName</span>
+                            <div class="field-frame"><input value="${escapeHtml(field.fieldName || '')}" oninput="updateParam(${index}, 'fieldName', this.value)" placeholder="text"></div>
+                        </label>
+                        <label class="field">
+                            <span class="label">${tr('rh.paramType')}</span>
+                            <div class="field-frame">
+                                <select onchange="updateParamType(${index}, this.value)">
+                                    <option value="text" ${field.type === 'text' ? 'selected' : ''}>text</option>
+                                    <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>textarea</option>
+                                    <option value="number" ${field.type === 'number' ? 'selected' : ''}>number</option>
+                                    <option value="select" ${field.type === 'select' ? 'selected' : ''}>select</option>
+                                    <option value="image" ${field.type === 'image' ? 'selected' : ''}>image</option>
+                                </select>
+                            </div>
+                        </label>
+                        <button class="action-btn danger-btn" type="button" style="height:36px;padding:0" onclick="removeParam(${index})" title="${tr('rh.delete')}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    ${isSelect ? `
+                        <label class="field param-options-field full">
+                            <span class="label">${tr('rh.selectOptions')}</span>
+                            <div class="field-frame"><textarea placeholder="${escapeAttr(tr('rh.selectOptionsHint'))}" oninput="updateParamOptions(${index}, this.value)">${escapeHtml(optionsText)}</textarea></div>
+                        </label>
+                    ` : ''}
+                </div>
+            `;
+            }).join('');
+            refreshIcons();
+        }
+
+        function isLinkInput(value){
+            return Array.isArray(value) && value.length === 2 && typeof value[0] === 'string' && typeof value[1] === 'number';
+        }
+        function rhFieldFor(nodeId, fieldName){
+            const wf = currentWorkflow();
+            return (wf?.fields || []).find(f => String(f.nodeId) === String(nodeId) && String(f.fieldName) === String(fieldName));
+        }
+        function nodeLabel(node){
+            return node?._meta?.title || node?.class_type || tr('rh.unnamedNode');
+        }
+        function guessRhType(value, inputName){
+            const lc = String(inputName || '').toLowerCase();
+            if(typeof value === 'number') return 'number';
+            if(typeof value === 'string'){
+                if(/prompt|text|description|caption|提示|正向|负向/.test(lc) || value.length > 80) return value.length > 80 ? 'textarea' : 'text';
+                return 'text';
+            }
+            return 'text';
+        }
+        function toggleRhField(nodeId, fieldName){
+            const wf = currentWorkflow();
+            if(!wf) return;
+            const rawValue = rhWorkflowJson?.[nodeId]?.inputs?.[fieldName];
+            wf.fields = wf.fields || [];
+            const existing = rhFieldFor(nodeId, fieldName);
+            if(existing){
+                wf.fields = wf.fields.filter(f => f !== existing);
+            } else {
+                const resolved = rhResolveFieldMeta(nodeId, fieldName, rawValue);
+                const type = resolved.type || 'text';
+                let fname = String(fieldName || '').trim();
+                if((type === 'text' || type === 'textarea') && !fname) fname = 'text';
+                const title = nodeLabel(rhWorkflowJson?.[nodeId] || {});
+                const item = {
+                    id: uid('f'),
+                    name: title ? `${title} · ${fieldName}` : fname,
+                    nodeId: String(nodeId),
+                    fieldName: fname,
+                    type,
+                    default: resolved.default ?? ((rawValue !== null && typeof rawValue !== 'object') ? rawValue : ''),
+                };
+                if(type === 'select'){
+                    item.options = resolved.options || [];
+                    if(typeof rawValue === 'string') item.apiValue = rawValue;
+                }
+                wf.fields.push(item);
+            }
+            renderParamList();
+            renderNodeExplorer();
+        }
+        function updateRhFieldName(fieldId, name){
+            const f = (currentWorkflow()?.fields || []).find(x => x.id === fieldId);
+            if(f) f.name = name;
+        }
+        function renderRhInputRow(nodeId, inputKey, rawValue){
+            const f = rhFieldFor(nodeId, inputKey);
+            const active = !!f;
+            let badge = '';
+            if(typeof rawValue === 'string'){
+                const preview = rawValue.length > 48 ? rawValue.slice(0, 48) + '…' : rawValue;
+                badge = `"${escapeHtml(preview)}"`;
+            } else if(typeof rawValue === 'number'){
+                badge = String(rawValue);
+            } else if(typeof rawValue === 'boolean'){
+                badge = rawValue ? 'true' : 'false';
+            } else {
+                badge = escapeHtml(String(rawValue));
+            }
+            return `
+                <div class="input-row ${active ? 'is-active' : ''}">
+                    <div class="check-toggle ${active ? 'checked' : ''}" onclick="toggleRhField('${escapeAttr(nodeId)}','${escapeAttr(inputKey)}')">
+                        ${active ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}
+                    </div>
+                    <div>
+                        <div class="input-key">${escapeHtml(inputKey)}</div>
+                        <div class="input-orig">${tr('rh.defaultValue')}${badge}</div>
+                    </div>
+                    <input class="small-input" type="text" placeholder="${escapeAttr(tr('rh.paramName'))}" value="${active ? escapeAttr(f.name) : escapeAttr(inputKey)}" ${active ? `oninput="updateRhFieldName('${escapeAttr(f.id)}', this.value)"` : 'disabled'}>
+                </div>
+            `;
+        }
+        function renderNodeExplorer(){
+            if(!nodeExplorer || !nodeList) return;
+            if(!rhWorkflowJson || !Object.keys(rhWorkflowJson).length){
+                nodeExplorer.style.display = 'none';
+                return;
+            }
+            nodeExplorer.style.display = 'flex';
+            const wf = currentWorkflow();
+            const exposed = (wf?.fields || []).length;
+            if(nodeExplorerStats){
+                nodeExplorerStats.textContent = tf('rh.nodeStats', {
+                    nodes: Object.keys(rhWorkflowJson).length,
+                    exposed,
+                });
+            }
+            const nodes = Object.entries(rhWorkflowJson).sort((a, b) => {
+                const an = parseInt(a[0], 10), bn = parseInt(b[0], 10);
+                if(!isNaN(an) && !isNaN(bn)) return an - bn;
+                return String(a[0]).localeCompare(String(b[0]));
+            });
+            nodeList.innerHTML = nodes.map(([nodeId, node]) => {
+                const inputs = Object.entries(node?.inputs || {}).filter(([k, v]) => !isLinkInput(v));
+                const exposedCount = inputs.filter(([k]) => rhFieldFor(nodeId, k)).length;
+                const expanded = exposedCount > 0;
+                return `
+                    <div class="node-card ${expanded ? 'expanded' : ''}" id="rh-node-${escapeAttr(nodeId)}">
+                        <div class="node-card-head" onclick="this.parentElement.classList.toggle('expanded')">
+                            <div style="min-width:0">
+                                <div class="node-class">${escapeHtml(nodeLabel(node))}</div>
+                                <div class="node-meta">#${escapeHtml(nodeId)} · ${escapeHtml(node?.class_type || '')} · ${tf('rh.configurableCount', {count: inputs.length})}</div>
+                            </div>
+                            <div class="node-head-actions">
+                                ${exposedCount ? `<span class="node-explorer-stats">${tf('rh.exposedCount', {count: exposedCount})}</span>` : ''}
+                                <i data-lucide="chevron-down" class="w-4 h-4 node-chev"></i>
+                            </div>
+                        </div>
+                        <div class="node-inputs">
+                            ${inputs.length ? inputs.map(([k, v]) => renderRhInputRow(nodeId, k, v)).join('') : `<div class="explorer-empty">${tr('rh.noConfigInputs')}</div>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            refreshIcons();
+        }
+        async function fetchWorkflowJson(){
+            syncEditorToModel();
+            const wf = currentWorkflow();
+            if(!wf) return;
+            const workflowId = wfIdInput.value.trim();
+            if(!workflowId){ alert(tr('rh.workflowIdRequired')); return; }
+            if(!config.has_key){ alert(tr('rh.noKey')); return; }
+            const btn = document.getElementById('fetchJsonBtn');
+            if(btn){ btn.disabled = true; }
+            setStatus(tr('rh.fetchingJson'));
+            try {
+                const data = await fetch('/api/runninghub/fetch-workflow-json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workflow_id: workflowId }),
+                }).then(async r => {
+                    const body = await r.json().catch(() => ({}));
+                    if(!r.ok) throw new Error(apiErrorMessage(r, body));
+                    return body;
+                });
+                rhWorkflowJson = data.workflow || null;
+                rhSuggestedFields = data.suggested_fields || [];
+                rhInputMeta = data.input_meta || {};
+                wf.workflow_id = data.workflow_id || workflowId;
+                syncExposedFieldMeta(wf);
+                renderWorkflowList();
+                renderParamList();
+                renderNodeExplorer();
+                setStatus(tf('rh.fetchJsonOk', { nodes: data.node_count || 0 }));
+            } catch(err) {
+                setStatus('');
+                alert(err.message || tr('rh.fetchJsonFailed'));
+            } finally {
+                if(btn){ btn.disabled = false; }
+                refreshIcons();
+            }
+        }
+        function autoExposeSuggested(){
+            const wf = currentWorkflow();
+            if(!wf || !rhSuggestedFields.length){ alert(tr('rh.fetchJsonFirst')); return; }
+            wf.fields = wf.fields || [];
+            rhSuggestedFields.forEach(item => {
+                if(rhFieldFor(item.nodeId, item.fieldName)) return;
+                const entry = {
+                    id: uid('f'),
+                    name: item.name || item.fieldName,
+                    nodeId: String(item.nodeId),
+                    fieldName: String(item.fieldName || 'text'),
+                    type: item.type || 'text',
+                    default: item.default ?? '',
+                };
+                if(entry.type === 'select'){
+                    entry.options = item.options || [];
+                    if(item.apiValue !== undefined) entry.apiValue = item.apiValue;
+                }
+                wf.fields.push(entry);
+            });
+            renderParamList();
+            renderNodeExplorer();
+        }
+        function renderEditor(){
+            const wf = currentWorkflow();
+            workflowEditor.style.display = wf ? 'flex' : 'none';
+            if(!wf){
+                editorTitle.textContent = tr('rh.selectWorkflow');
+                rhWorkflowJson = null;
+                return;
+            }
+            editorTitle.textContent = wf.name || wf.id;
+            wfNameInput.value = wf.name || '';
+            wfIdInput.value = wf.workflow_id || '';
+            syncExposedFieldMeta(wf);
+            renderParamList();
+            renderNodeExplorer();
+        }
+
+        function normalizeRhField(field){
+            const t = String(field.type || 'text').toLowerCase();
+            const nodeId = String(field.nodeId || '').trim();
+            let fieldName = String(field.fieldName || '').trim();
+            if(nodeId && !fieldName && (t === 'text' || t === 'textarea')) fieldName = 'text';
+            field.nodeId = nodeId;
+            field.fieldName = fieldName;
+            return field;
+        }
+        function normalizeWorkflowFields(wf){
+            if(!wf) return;
+            wf.fields = (wf.fields || []).map(normalizeRhField);
+        }
+        function validateWorkflowsBeforeSave(){
+            for(const wf of config.workflows || []){
+                normalizeWorkflowFields(wf);
+                if(!String(wf.workflow_id || '').trim()) continue;
+                for(const field of wf.fields || []){
+                    const nodeId = String(field.nodeId || '').trim();
+                    const fieldName = String(field.fieldName || '').trim();
+                    if(nodeId && !fieldName){
+                        return `工作流「${wf.name || wf.id}」的参数缺少 fieldName（有 nodeId=${nodeId}）。文本节点请填 text。`;
+                    }
+                }
+            }
+            return '';
+        }
+        function syncParamOptionsFromDom(){
+            const wf = currentWorkflow();
+            if(!wf || !paramList) return;
+            paramList.querySelectorAll('.param-row[data-index]').forEach(row => {
+                const index = Number(row.dataset.index);
+                const field = wf.fields?.[index];
+                if(!field || String(field.type || '').toLowerCase() !== 'select') return;
+                const ta = row.querySelector('.param-options-field textarea');
+                if(ta) updateParamOptions(index, ta.value);
+            });
+        }
+        function hydrateRhSelectFields(wf){
+            if(!wf) return;
+            (wf.fields || []).forEach(field => {
+                const raw = rhWorkflowJson?.[field.nodeId]?.inputs?.[field.fieldName];
+                if(typeof raw === 'string' && !field.apiValue) field.apiValue = raw;
+                const resolved = rhResolveFieldMeta(field.nodeId, field.fieldName, raw ?? field.default);
+                const existing = field.options || [];
+                if(resolved.type === 'select'){
+                    field.type = 'select';
+                    if((resolved.options || []).length > existing.length){
+                        field.options = resolved.options;
+                    } else if(!existing.length && (resolved.options || []).length){
+                        field.options = resolved.options;
+                    }
+                    if(field.default !== undefined && field.default !== null && field.default !== ''){
+                        field.default = rhCanonicalOption(field.options || [], field.default);
+                    } else if((field.options || []).length){
+                        field.default = field.options[0];
+                    }
+                }
+            });
+        }
+        function hydrateAllWorkflowSelectFields(){
+            (config.workflows || []).forEach(hydrateRhSelectFields);
+        }
+        function syncEditorToModel(){
+            const wf = currentWorkflow();
+            if(!wf) return;
+            syncParamOptionsFromDom();
+            wf.name = wfNameInput.value.trim() || wf.id;
+            wf.workflow_id = wfIdInput.value.trim();
+            normalizeWorkflowFields(wf);
+            hydrateRhSelectFields(wf);
+        }
+
+        window.selectWorkflow = function(id){
+            syncEditorToModel();
+            selectedId = id;
+            const wf = currentWorkflow();
+            if(wf) hydrateRhSelectFields(wf);
+            renderWorkflowList();
+            renderEditor();
+        };
+
+        window.addWorkflow = function(){
+            syncEditorToModel();
+            const item = { id: uid('rh-wf'), name: tr('rh.newWorkflow'), workflow_id: '', fields: [] };
+            config.workflows = config.workflows || [];
+            config.workflows.push(item);
+            selectedId = item.id;
+            renderWorkflowList();
+            renderEditor();
+        };
+
+        window.deleteWorkflow = function(){
+            const wf = currentWorkflow();
+            if(!wf) return;
+            if(!confirm(tr('rh.deleteConfirm'))) return;
+            config.workflows = (config.workflows || []).filter(w => w.id !== wf.id);
+            selectedId = (config.workflows[0] || {}).id || '';
+            renderWorkflowList();
+            renderEditor();
+        };
+
+        window.addParam = function(){
+            const wf = currentWorkflow();
+            if(!wf) return;
+            wf.fields = wf.fields || [];
+            wf.fields.push({ id: uid('f'), name: '提示词', nodeId: '', fieldName: 'text', type: 'text', default: '' });
+            renderParamList();
+        };
+
+        window.updateParam = function(index, key, value){
+            const wf = currentWorkflow();
+            if(!wf || !wf.fields || !wf.fields[index]) return;
+            wf.fields[index][key] = value;
+        };
+        window.updateParamType = function(index, value){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.type = value;
+            if(value === 'select'){
+                const raw = rhWorkflowJson?.[field.nodeId]?.inputs?.[field.fieldName];
+                const resolved = rhResolveFieldMeta(field.nodeId, field.fieldName, raw ?? field.default);
+                field.options = resolved.options?.length ? resolved.options : (field.options || []);
+                if(typeof raw === 'string') field.apiValue = raw;
+                if(field.default !== undefined && field.default !== null && field.default !== ''){
+                    field.default = rhCanonicalOption(field.options, field.default);
+                } else if(field.options.length){
+                    field.default = field.options[0];
+                }
+            } else {
+                delete field.options;
+                delete field.apiValue;
+            }
+            renderParamList();
+        };
+        window.updateParamOptions = function(index, text){
+            const wf = currentWorkflow();
+            const field = wf?.fields?.[index];
+            if(!field) return;
+            field.options = String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
+            if(field.default !== undefined && field.default !== null && field.default !== ''){
+                field.default = rhCanonicalOption(field.options, field.default);
+            }
+        };
+        function syncExposedFieldMeta(wf){
+            hydrateRhSelectFields(wf);
+        }
+
+        window.removeParam = function(index){
+            const wf = currentWorkflow();
+            if(!wf || !wf.fields) return;
+            wf.fields.splice(index, 1);
+            renderParamList();
+        };
+
+        wfNameInput.oninput = () => { const wf = currentWorkflow(); if(wf) wf.name = wfNameInput.value; renderWorkflowList(); };
+        wfIdInput.oninput = () => { const wf = currentWorkflow(); if(wf) wf.workflow_id = wfIdInput.value; renderWorkflowList(); };
+
+        function applyKeyHint(){
+            keyHint.textContent = config.has_key ? `${tr('rh.keySaved')} ${config.key_preview || ''}` : tr('rh.noKey');
+            apiKeyInput.placeholder = config.has_key ? tr('rh.keepKey') : tr('rh.enterKey');
+        }
+
+        function apiErrorMessage(res, body){
+            if(res.status === 404) return tr('rh.serverRestart');
+            const d = body?.detail;
+            if(typeof d === 'string') return d;
+            if(Array.isArray(d) && d.length) return d[0]?.msg || String(d[0]);
+            return tr('rh.saveFailed');
+        }
+
+        async function saveApiKey(){
+            const key = apiKeyInput.value.trim();
+            if(!key && !config.has_key){
+                alert(tr('rh.enterKey'));
+                return;
+            }
+            setStatus(tr('rh.saving'));
+            try {
+                const res = await fetch('/api/runninghub/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: key })
+                });
+                const body = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(apiErrorMessage(res, body));
+                const data = body;
+                config = data;
+                apiKeyInput.value = '';
+                applyKeyHint();
+                setStatus(tr('rh.saved'));
+                try { new BroadcastChannel('studio-api').postMessage({ type: 'runninghub-changed' }); } catch(e) {}
+            } catch(err) {
+                setStatus('');
+                alert(err.message || '保存失败');
+            }
+        }
+
+        function serializeWorkflowsForSave(){
+            hydrateAllWorkflowSelectFields();
+            syncEditorToModel();
+            return (config.workflows || []).map(wf => ({
+                id: wf.id,
+                name: wf.name,
+                workflow_id: wf.workflow_id,
+                fields: (wf.fields || []).map(f => {
+                    const item = {
+                        id: f.id,
+                        name: f.name,
+                        nodeId: f.nodeId,
+                        fieldName: f.fieldName,
+                        type: f.type,
+                        default: f.default,
+                    };
+                    if(String(f.type || '').toLowerCase() === 'select'){
+                        item.options = Array.isArray(f.options) ? f.options : [];
+                        if(f.apiValue !== undefined && f.apiValue !== null && f.apiValue !== ''){
+                            item.apiValue = f.apiValue;
+                        }
+                    }
+                    return item;
+                }),
+            }));
+        }
+
+        async function saveConfig(){
+            const err = validateWorkflowsBeforeSave();
+            if(err){ alert(err); return; }
+            setStatus(tr('rh.saving'));
+            try {
+                const res = await fetch('/api/runninghub/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workflows: serializeWorkflowsForSave() })
+                });
+                const body = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(apiErrorMessage(res, body));
+                const data = body;
+                config.has_key = data.has_key;
+                config.key_preview = data.key_preview;
+                config.workflows = data.workflows || [];
+                applyKeyHint();
+                hydrateAllWorkflowSelectFields();
+                renderWorkflowList();
+                renderEditor();
+                setStatus(tr('rh.saved'));
+                try { new BroadcastChannel('studio-api').postMessage({ type: 'runninghub-changed' }); } catch(e) {}
+            } catch(err) {
+                setStatus('');
+                alert(err.message || '保存失败');
+            }
+        }
+
+        async function loadConfig(){
+            try {
+                const data = await fetch('/api/runninghub/config').then(r => r.json());
+                config.has_key = data.has_key;
+                config.key_preview = data.key_preview;
+                config.workflows = data.workflows || [];
+                applyKeyHint();
+                hydrateAllWorkflowSelectFields();
+                selectedId = (config.workflows || [])[0]?.id || '';
+                renderWorkflowList();
+                renderEditor();
+            } catch(err) {
+                setStatus('加载失败');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if(window.StudioI18n) StudioI18n.apply();
+            loadConfig();
+            refreshIcons();
+        });
+    </script>
+</body>
+</html>

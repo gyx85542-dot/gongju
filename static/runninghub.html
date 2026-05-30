@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunningHub</title>
+    <script>
+        (function(){
+            try {
+                localStorage.setItem('studio_theme', 'light');
+                localStorage.setItem('canvas_theme', 'light');
+            } catch(e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260520-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260529-runninghub-page"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260529-runninghub"></script>
+    <script src="/static/image-preview.js?v=20260516"></script>
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260526-comfyui-spacing">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
+        :root { --accent:#ff4d94; --bg:#1a1a1a; --easing:cubic-bezier(0.22,1,0.36,1); }
+        html, body { height:100%; overflow:hidden; }
+        body { background:var(--bg); font-family:'Inter',-apple-system,sans-serif; color:#f5f5f5; margin:0; }
+        .container-box { max-width:1680px; margin:0 auto; padding:8px 14px 10px; height:100%; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; }
+        .page-main { flex:1; min-height:0; overflow:hidden; }
+        body.board-pick-active .output-grid-cell img.draggable-output { cursor:pointer; }
+        body.board-pick-active .output-grid-cell[data-ts]:hover { border-color:rgba(255,77,148,.55); box-shadow:0 0 0 2px rgba(255,77,148,.28); }
+        body.board-pick-active .output-grid-cell .cell-actions { opacity:0 !important; pointer-events:none !important; }
+        .output-grid-cell img.draggable-output { cursor:grab; user-select:none; -webkit-user-drag:element; }
+        .empty-hint { padding:12px; border:1px dashed rgba(255,255,255,.12); border-radius:12px; font-size:11px; color:#737373; line-height:1.5; text-align:center; background:#313131; }
+        .empty-hint a { color:#ff4d94; font-weight:700; text-decoration:underline; cursor:pointer; }
+        .result-frame { background:#262626; border-radius:24px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
+        .result-frame.has-outputs { justify-content:flex-start; }
+        .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
+        .output-cols-slider { width:100%; max-width:140px; height:4px; accent-color:#ff4d94; }
+        .output-scroll-wrap { flex:1; min-height:0; overflow-y:auto; }
+        .output-grid { display:grid; gap:12px; width:100%; padding:12px; align-content:start; }
+        .output-grid-cell { position:relative; aspect-ratio:1; border-radius:14px; overflow:hidden; background:#141414; border:1px solid rgba(255,255,255,.06); }
+        .output-grid-cell img, .output-grid-cell video { width:100%; height:100%; object-fit:contain; border-radius:14px; }
+        .output-grid-cell .cell-actions { position:absolute; left:0; right:0; bottom:0; height:20%; min-height:36px; z-index:5; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 8px 5px; opacity:0; transition:opacity .18s; pointer-events:none; background:linear-gradient(to top,rgba(38,38,38,.92),transparent); }
+        .output-grid-cell:hover .cell-actions { opacity:1; pointer-events:auto; }
+        .cell-action-btn { width:24px; height:24px; border:none; border-radius:999px; background:rgba(49,49,49,.96); display:flex; align-items:center; justify-content:center; cursor:pointer; border:1px solid rgba(255,255,255,.08); color:#a3a3a3; padding:0; }
+        .cell-action-btn:hover, .cell-action-btn.active { background:#ff4d94; color:#fff; border-color:#ff4d94; }
+        .cell-action-btn.fav-active { background:#ffaa00; color:#fff; border-color:#ffaa00; }
+        .output-grid-cell.is-pending { background:#141414; }
+        .cell-pending { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#94a3b8; }
+        .pending-spin { width:28px; height:28px; border:2px solid #e5e7eb; border-top-color:#ff4d94; border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .gallery-lightbox { background:rgba(26,26,26,.96); backdrop-filter:blur(22px); }
+        html.embed-panel { --bg:#1e1e1e; }
+        html.embed-panel body { background:#1e1e1e !important; }
+        html.embed-panel .container-box { padding:8px; max-width:none; }
+        html.embed-panel .studio-output-col { display:none !important; }
+        html.embed-panel .studio-panel-col { grid-column:1 / -1 !important; max-width:none !important; }
+        html.embed-panel .page-main { grid-template-columns:minmax(0,1fr) !important; }
+    </style>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-bg-1a">
+    <link rel="stylesheet" href="/static/theme.css?v=20260520-bg-1a">
+</head>
+<body class="mg-studio">
+    <div class="container-box">
+        <main class="page-main grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 h-full">
+            <div class="lg:col-span-3 options-panel h-full min-h-0 studio-panel-col">
+                <section class="tool-panel">
+                    <label class="block">
+                        <div class="control-label mb-1"><i data-lucide="zap" class="w-3 h-3"></i><span data-i18n="rhPage.workflow">工作流</span></div>
+                        <select id="workflowSelect" class="size-select" onchange="selectWorkflow(this.value)"></select>
+                    </label>
+                </section>
+                <section class="tool-panel" id="globalPromptSection">
+                    <div>
+                        <div class="control-label mb-1"><i data-lucide="terminal" class="w-3 h-3"></i><span data-i18n="rhPage.mainPrompt">提示词</span></div>
+                        <textarea id="globalPromptInput" class="nano-input w-full outline-none resize-none" rows="4" placeholder="" oninput="onGlobalPromptInput()"></textarea>
+                        <p class="text-[10px] text-[#737373] mt-1 leading-relaxed" data-i18n="rhPage.mainPromptHint">将填入工作流中的文本参数；请在设置里配置 nodeId 与 fieldName（如 6 / text）。</p>
+                    </div>
+                </section>
+                <div id="dynamicPanel"></div>
+                <button id="genBtn" onclick="submitGenerate()" class="glass-btn w-full py-3 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg" disabled>
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i>
+                    <span class="tracking-[0.2em] text-[11px] uppercase" data-i18n="rhPage.generate">生成</span>
+                </button>
+            </div>
+            <div class="lg:col-span-9 flex flex-col gap-2 min-h-0 h-full studio-output-col">
+                <div class="output-toolbar shrink-0">
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest" data-i18n="online.colsPerRow">每行</span>
+                    <input type="range" id="outputColsSlider" class="output-cols-slider" min="1" max="6" value="2">
+                    <span id="outputColsValue" class="text-[12px] font-black tabular-nums min-w-[1.25rem] text-center">2</span>
+                </div>
+                <div id="resultBox" class="result-frame relative">
+                    <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center space-y-4 opacity-20 pointer-events-none">
+                        <i data-lucide="zap" class="w-12 h-12 stroke-[1px]"></i>
+                        <p class="text-[10px] font-black tracking-[0.5em] uppercase" data-i18n="rhPage.ready">RunningHub 就绪</p>
+                    </div>
+                    <div id="outputScroll" class="output-scroll-wrap">
+                        <div id="outputGrid" class="output-grid hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <div id="lightbox" onclick="if(event.target.id==='lightbox')closeLightbox()" class="hidden fixed inset-0 z-50 gallery-lightbox flex flex-col items-center justify-center p-8">
+        <button onclick="closeLightbox()" class="absolute top-10 right-10 text-gray-400 hover:text-white"><i data-lucide="x" class="w-8 h-8"></i></button>
+        <div class="w-full flex flex-col items-center" style="max-width:min(1280px,92vw)">
+            <div id="lightboxFrame" class="relative bg-[#262626] rounded-3xl overflow-hidden shadow-xl" style="max-height:70vh">
+                <img id="lightboxImg" class="max-w-full max-h-[70vh] object-contain hidden" alt="">
+                <video id="lightboxVideo" class="max-w-full max-h-[70vh] object-contain hidden" controls></video>
+            </div>
+            <div class="w-full mt-8 bg-[#262626] border border-white/10 rounded-3xl p-6">
+                <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Prompt</span>
+                <p id="lightboxPrompt" class="text-gray-200 text-sm leading-relaxed max-h-24 overflow-y-auto"></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        lucide.createIcons();
+        function tr(k){ return window.StudioI18n ? StudioI18n.t(k) : k; }
+        function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function escapeAttr(s){ return escapeHtml(s); }
+
+        const HISTORY_TYPE = 'runninghub';
+        const CLIENT_ID = localStorage.getItem('client_id') || (()=>{ const id=crypto.randomUUID?.()||String(Date.now()); localStorage.setItem('client_id',id); return id; })();
+        const META_PIN = 'rh_pinned', META_FAV = 'rh_favorites', META_ORDER = 'rh_display_order';
+
+        let workflows = [], selectedId = '', currentWorkflow = null;
+        const RH_SDXL_DIMENSIONS = [
+            '1536 x 640 (landscape)', '1344 x 768 (landscape)', '1216 x 832 (landscape)',
+            '1152 x 896 (landscape)', '1024 x 1024 (square)', '896 x 1152 (portrait)',
+            '832 x 1216 (portrait)', '768 x 1344 (portrait)', '640 x 1536 (portrait)',
+        ];
+        const RH_SAMPLER_NAMES = [
+            'euler', 'euler_ancestral', 'heun', 'heunpp2', 'dpm_2', 'dpm_2_ancestral', 'lms',
+            'dpm_fast', 'dpm_adaptive', 'dpmpp_2s_ancestral', 'dpmpp_sde', 'dpmpp_2m',
+            'dpmpp_sde_gpu', 'dpmpp_3m_sde', 'dpmpp_3m_sde_gpu', 'ddpm', 'lcm', 'uni_pc', 'uni_pc_bh2',
+        ];
+        const RH_SCHEDULERS = ['normal', 'karras', 'exponential', 'sgm_uniform', 'simple', 'ddim_uniform', 'beta'];
+        const RH_SELECT_PRESETS = {
+            dimensions: RH_SDXL_DIMENSIONS,
+            resolution: RH_SDXL_DIMENSIONS,
+            preset: RH_SDXL_DIMENSIONS,
+            sampler_name: RH_SAMPLER_NAMES,
+            scheduler: RH_SCHEDULERS,
+        };
+        function rhNormSpaces(text){ return String(text || '').trim().replace(/\s+/g, ' '); }
+        function rhCanonicalOption(options, value){
+            if(value === null || value === undefined || value === '') return value;
+            const sv = String(value);
+            const opts = options || [];
+            if(opts.some(o => String(o) === sv)) return sv;
+            const nv = rhNormSpaces(sv);
+            const hit = opts.find(o => rhNormSpaces(o) === nv);
+            return hit || sv;
+        }
+        function rhSelectMatch(options, value){
+            const canonical = rhCanonicalOption(options, value);
+            return (options || []).map(o => ({
+                value: String(o),
+                selected: rhNormSpaces(o) === rhNormSpaces(canonical) || String(o) === String(canonical),
+            }));
+        }
+        let fieldValues = {}, fieldImageUrls = {}, batchCount = 1, outputCols = 2;
+        let boardPickFieldId = '';
+        let allHistory = [], pendingJobs = [], historyLoading = false, currentLightboxData = null;
+        let pinnedIds = [], favoriteIds = [], displayOrder = [];
+
+        function openRhSettings(){
+            try { window.parent.postMessage({ type:'studio-navigate', page:'runninghub-settings' }, '*'); } catch(e) {}
+        }
+        window.openRhSettings = openRhSettings;
+
+        function rhFieldKind(f){
+            const t = String(f.type||'text').toLowerCase();
+            if(t === 'image') return 'image';
+            if(t === 'text' || t === 'textarea') return 'prompt';
+            const key = `${f.fieldName||''} ${f.name||''}`.toLowerCase();
+            if(/prompt|text|提示|正向|负向|caption|value/.test(key)) return 'prompt';
+            return 'setting';
+        }
+        function promptFields(){ return effectiveFields().filter(f => rhFieldKind(f) === 'prompt'); }
+        function promptFieldLabel(f, prompts){
+            const name = String(f.name || '').trim();
+            if(name) return name;
+            if((prompts || promptFields()).length === 1) return tr('rhPage.mainPrompt');
+            return String(f.fieldName || '').trim() || tr('rhPage.mainPrompt');
+        }
+        function syncPromptSectionVisibility(){
+            const section = document.getElementById('globalPromptSection');
+            if(!section) return;
+            const hasExposedPrompt = promptFields().length > 0;
+            section.style.display = hasExposedPrompt ? 'none' : '';
+        }
+        function onGlobalPromptInput(){
+            const v = document.getElementById('globalPromptInput')?.value || '';
+            promptFields().forEach(f => { fieldValues[f.id] = v; });
+        }
+        function effectiveFields(){ return currentWorkflow?.fields || []; }
+        function rhEnsureOptions(options, value){
+            const opts = (options || []).map(o => String(o)).filter(Boolean);
+            if(value === null || value === undefined || value === '') return opts;
+            const canonical = rhCanonicalOption(opts, value);
+            return opts.includes(canonical) ? opts : [String(canonical), ...opts];
+        }
+        function hydrateRhFieldOptions(field){
+            if(!field || String(field.type || '').toLowerCase() !== 'select') return;
+            const fn = String(field.fieldName || '').toLowerCase();
+            const presets = RH_SELECT_PRESETS[fn];
+            const existing = field.options || [];
+            if(presets && existing.length <= 1){
+                field.options = rhEnsureOptions(presets, field.apiValue ?? field.default ?? existing[0]);
+            } else if(!existing.length && (field.apiValue || field.default)){
+                field.options = [String(field.apiValue ?? field.default)];
+            }
+            if(field.apiValue && !field.options.includes(field.apiValue)){
+                field.options = [String(field.apiValue), ...(field.options || [])];
+            }
+            if(field.default !== undefined && field.default !== null && field.default !== ''){
+                field.default = rhCanonicalOption(field.options || [], field.default);
+            }
+        }
+        function hydrateWorkflowFields(wf){
+            (wf?.fields || []).forEach(hydrateRhFieldOptions);
+        }
+
+        async function loadWorkflowList(){
+            try {
+                const data = await fetch('/api/runninghub/workflows').then(r=>r.json());
+                workflows = (data.workflows || []).filter(w => String(w.workflow_id||'').trim());
+                const sel = document.getElementById('workflowSelect');
+                if(!workflows.length){
+                    sel.innerHTML = `<option value="">${tr('rhPage.noWorkflows')}</option>`;
+                    document.getElementById('dynamicPanel').innerHTML = `<div class="empty-hint">${tr('rhPage.noWorkflowsHint')} <a onclick="openRhSettings()">${tr('common.runninghubSettings')}</a></div>`;
+                    document.getElementById('genBtn').disabled = true;
+                    return;
+                }
+                sel.innerHTML = workflows.map(w => `<option value="${escapeAttr(w.id)}" ${w.id===selectedId?'selected':''}>${escapeHtml(w.name || w.id)}</option>`).join('');
+                if(!selectedId || !workflows.some(w => w.id === selectedId)) await selectWorkflow(workflows[0].id);
+            } catch(e){ console.error(e); }
+        }
+
+        async function selectWorkflow(id){
+            if(!id) return;
+            selectedId = id;
+            document.getElementById('workflowSelect').value = id;
+            try {
+                const data = await fetch(`/api/runninghub/workflows/${encodeURIComponent(id)}`).then(r=>r.json());
+                currentWorkflow = data.workflow;
+                hydrateWorkflowFields(currentWorkflow);
+                fieldValues = {}; fieldImageUrls = {};
+                (currentWorkflow?.fields||[]).forEach(f => {
+                    if(f.default === undefined || f.default === null || f.default === '') return;
+                    if(String(f.type||'').toLowerCase() === 'select' && (f.options||[]).length){
+                        fieldValues[f.id] = rhCanonicalOption(f.options, f.default);
+                    } else {
+                        fieldValues[f.id] = f.default;
+                    }
+                });
+                renderDynamicPanel();
+                syncPromptSectionVisibility();
+                document.getElementById('genBtn').disabled = !String(currentWorkflow?.workflow_id||'').trim();
+            } catch(e){
+                alert(tr('rhPage.loadFailed'));
+            }
+        }
+
+        function renderDynamicPanel(){
+            const panel = document.getElementById('dynamicPanel');
+            const fields = effectiveFields();
+            if(!fields.length){
+                panel.innerHTML = `<div class="empty-hint">${tr('rhPage.noFieldsHint')}</div>`;
+                return;
+            }
+            const prompts = fields.filter(f => rhFieldKind(f) === 'prompt');
+            const images = fields.filter(f => rhFieldKind(f) === 'image');
+            const settings = fields.filter(f => rhFieldKind(f) === 'setting');
+            let html = '';
+            if(prompts.length || images.length){
+                html += `<section class="tool-panel">`;
+                prompts.forEach(f => {
+                    const rows = prompts.length === 1 ? 4 : (f.type === 'textarea' ? 4 : 2);
+                    html += `<div>
+                        <div class="control-label mb-1"><i data-lucide="terminal" class="w-3 h-3"></i><span>${escapeHtml(promptFieldLabel(f, prompts))}</span></div>
+                        <textarea class="nano-input w-full outline-none resize-none" rows="${rows}" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value)">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
+                    </div>`;
+                });
+                if(images.length){
+                    html += `<div>
+                        <div class="control-label mb-1"><i data-lucide="images" class="w-3 h-3"></i><span data-i18n="online.referenceImages">参考图片</span></div>
+                        <div class="ref-grid">${images.map((f,i) => renderImageSlot(f, i)).join('')}</div>
+                    </div>`;
+                }
+                html += `</section>`;
+            }
+            if(settings.length){
+                html += `<section class="tool-panel">`;
+                settings.forEach(f => { html += renderSettingField(f); });
+                html += `</section>`;
+            }
+            html += `<section class="tool-panel">
+                <div>
+                    <div class="control-label mb-1"><i data-lucide="layers" class="w-3 h-3"></i><span data-i18n="online.batchCount">批次</span></div>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="batchSlider" class="batch-slider" min="1" max="4" value="${batchCount}" oninput="setBatchCount(this.value)">
+                        <span id="batchValue" class="batch-value">${batchCount}</span>
+                    </div>
+                </div>
+            </section>`;
+            panel.innerHTML = html;
+            bindImageSlots();
+            lucide.createIcons();
+            updateBoardPickUI();
+            syncPromptSectionVisibility();
+        }
+
+        function renderSettingField(f){
+            const t = String(f.type||'text').toLowerCase();
+            const v = fieldValues[f.id] ?? f.default ?? (t==='boolean'?false:'');
+            const label = `<div class="control-label mb-1"><span>${escapeHtml(f.name || f.fieldName)}</span></div>`;
+            if(t === 'number'){
+                return `<label class="block">${label}<input class="size-select" type="number" value="${escapeAttr(v)}" oninput="setFieldValue('${escapeAttr(f.id)}', this.value)"></label>`;
+            }
+            if(t === 'boolean'){
+                return `<label class="block flex items-center gap-2">${label}<input type="checkbox" ${v?'checked':''} onchange="setFieldValue('${escapeAttr(f.id)}', this.checked)"></label>`;
+            }
+            if(t === 'select'){
+                const options = f.options || [];
+                if(!options.length){
+                    return `<label class="block">${label}<input class="size-select" type="text" value="${escapeAttr(v)}" oninput="setFieldValue('${escapeAttr(f.id)}', this.value)"></label>`;
+                }
+                const opts = rhSelectMatch(options, v).map(o => `<option value="${escapeAttr(o.value)}" ${o.selected?'selected':''}>${escapeHtml(o.value)}</option>`).join('');
+                return `<label class="block">${label}<select class="size-select" onchange="setFieldValue('${escapeAttr(f.id)}', this.value)">${opts}</select></label>`;
+            }
+            return `<label class="block">${label}<input class="size-select" type="text" value="${escapeAttr(v)}" oninput="setFieldValue('${escapeAttr(f.id)}', this.value)"></label>`;
+        }
+
+        function renderImageSlot(f, index){
+            const url = fieldImageUrls[f.id] || '';
+            const label = String(index + 1).padStart(2, '0');
+            const filled = !!url;
+            return `<div class="upload-item group${filled?' has-image':''}${boardPickFieldId===f.id?' is-board-target':''}" data-image-field-id="${escapeAttr(f.id)}">
+                <input type="file" accept="image/*" class="hidden">
+                ${filled?'':'<i data-lucide="plus" class="w-5 h-5 text-[#737373]"></i>'}
+                <span class="ref-slot-label mt-2 uppercase">${label}</span>
+                <img class="preview-img${filled?'':' hidden'}" ${filled?`src="${escapeAttr(url)}"`:''} alt="" draggable="false">
+                <button type="button" data-rh-board class="cell-action-btn ref-slot-btn ref-board-btn" title="board">board</button>
+                <button type="button" data-rh-del class="cell-action-btn ref-slot-btn ref-del-btn"><i data-lucide="trash-2"></i></button>
+            </div>`;
+        }
+
+        function setFieldValue(id, value){ fieldValues[id] = value; }
+        function setBatchCount(n){
+            batchCount = Math.min(4, Math.max(1, Number(n)||1));
+            try { localStorage.setItem('rh_batch_count', String(batchCount)); } catch(e){}
+            const label = document.getElementById('batchValue');
+            const slider = document.getElementById('batchSlider');
+            if(label) label.textContent = batchCount;
+            if(slider) slider.value = batchCount;
+        }
+
+        function normalizeImageUrl(url){
+            const raw = String(url||'').trim();
+            if(!raw) return '';
+            try {
+                if(/^https?:\/\//i.test(raw)){
+                    const p = new URL(raw);
+                    if(p.pathname.startsWith('/assets/') || p.pathname.startsWith('/output/')) return p.pathname;
+                }
+            } catch(e){}
+            if(raw.startsWith('/assets/') || raw.startsWith('/output/')) return raw.split('?')[0];
+            return raw;
+        }
+        function imageUrlFromSlotDrop(dt){
+            if(!dt) return '';
+            const custom = dt.getData('application/x-online-output-image');
+            if(custom) return normalizeImageUrl(custom);
+            const values = (dt.getData('text/uri-list')||dt.getData('text/plain')||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+            for(const v of values){
+                const n = normalizeImageUrl(v);
+                if(n.startsWith('/assets/') || n.startsWith('/output/')) return n;
+            }
+            return '';
+        }
+        function setImageDragData(e, url){
+            const n = normalizeImageUrl(url);
+            if(!n) return;
+            e.dataTransfer.setData('application/x-online-output-image', n);
+            e.dataTransfer.setData('text/uri-list', n);
+            e.dataTransfer.setData('text/plain', n);
+        }
+        function syncBoardPickWindow(){ window.boardPickSlotId = boardPickFieldId; }
+        function updateBoardPickUI(){
+            document.body.classList.toggle('board-pick-active', !!boardPickFieldId);
+            document.querySelectorAll('.upload-item.is-board-target').forEach(el => el.classList.remove('is-board-target'));
+            if(boardPickFieldId) document.querySelector(`[data-image-field-id="${boardPickFieldId}"]`)?.classList.add('is-board-target');
+            document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => { img.draggable = !boardPickFieldId; });
+        }
+        function cancelBoardPick(){
+            if(!boardPickFieldId) return;
+            boardPickFieldId = '';
+            syncBoardPickWindow();
+            updateBoardPickUI();
+            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick('');
+        }
+        function startBoardPick(fieldId, ev){
+            ev?.preventDefault(); ev?.stopPropagation();
+            if(boardPickFieldId === fieldId){ cancelBoardPick(); return; }
+            boardPickFieldId = fieldId;
+            syncBoardPickWindow();
+            updateBoardPickUI();
+            if(window.StudioPanelBridge) StudioPanelBridge.notifyBoardPick(fieldId);
+        }
+        async function uploadImageFile(file, fieldId){
+            if(!file || !fieldId) return;
+            const preview = URL.createObjectURL(file);
+            fieldImageUrls[fieldId] = preview;
+            const form = new FormData();
+            form.append('files', file);
+            try {
+                const data = await fetch('/api/upload', { method:'POST', body:form }).then(r=>r.json());
+                const savedUrl = normalizeImageUrl(data.files?.[0]?.url || '');
+                if(savedUrl){
+                    if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
+                    fieldImageUrls[fieldId] = savedUrl;
+                    fieldValues[fieldId] = savedUrl;
+                }
+                renderDynamicPanel();
+            } catch(e){
+                alert(tr('comfy.imageUploadFailed'));
+                delete fieldValues[fieldId];
+                delete fieldImageUrls[fieldId];
+                renderDynamicPanel();
+            }
+        }
+        async function assignImageFromUrl(url, fieldId){
+            const normalized = normalizeImageUrl(url);
+            if(!normalized || !fieldId) return;
+            fieldImageUrls[fieldId] = normalized;
+            fieldValues[fieldId] = normalized;
+            try {
+                const resp = await fetch(normalized);
+                if(!resp.ok) throw new Error('fetch');
+                const blob = await resp.blob();
+                const name = normalized.split('/').pop() || 'image.png';
+                await uploadImageFile(new File([blob], name, { type: blob.type || 'image/png' }), fieldId);
+            } catch(e){
+                fieldValues[fieldId] = normalized;
+                renderDynamicPanel();
+            }
+            cancelBoardPick();
+        }
+        function bindImageSlots(){
+            document.querySelectorAll('[data-image-field-id]').forEach(cell => {
+                const fieldId = cell.dataset.imageFieldId;
+                const input = cell.querySelector('input[type="file"]');
+                cell.onclick = e => {
+                    if(e.target.closest('[data-rh-del],[data-rh-board]')) return;
+                    if(!fieldValues[fieldId]) input?.click();
+                };
+                input.onchange = () => { const f = input.files?.[0]; if(f) uploadImageFile(f, fieldId); input.value=''; };
+                cell.querySelector('[data-rh-del]')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    delete fieldValues[fieldId];
+                    if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(err){}
+                    delete fieldImageUrls[fieldId];
+                    if(boardPickFieldId === fieldId) cancelBoardPick();
+                    renderDynamicPanel();
+                });
+                cell.querySelector('[data-rh-board]')?.addEventListener('click', e => startBoardPick(fieldId, e));
+                cell.ondragover = e => { if(e.dataTransfer?.types?.length){ e.preventDefault(); cell.classList.add('drag-over'); } };
+                cell.ondragleave = () => cell.classList.remove('drag-over');
+                cell.ondrop = e => {
+                    e.preventDefault();
+                    cell.classList.remove('drag-over');
+                    const file = e.dataTransfer.files?.[0];
+                    if(file?.type?.startsWith('image/')){ uploadImageFile(file, fieldId); return; }
+                    const dropUrl = imageUrlFromSlotDrop(e.dataTransfer);
+                    if(dropUrl) assignImageFromUrl(dropUrl, fieldId);
+                };
+            });
+        }
+
+        function collectRunFields(){
+            if(!promptFields().length) onGlobalPromptInput();
+            const out = { ...fieldValues };
+            effectiveFields().forEach(f => {
+                const t = String(f.type || '').toLowerCase();
+                if(t === 'number' && out[f.id] !== undefined && out[f.id] !== ''){
+                    out[f.id] = Number(out[f.id]);
+                } else if(t === 'select' && out[f.id] !== undefined && out[f.id] !== null){
+                    out[f.id] = String(out[f.id]);
+                }
+            });
+            return out;
+        }
+        function collectPrimaryPrompt(){
+            const exposed = promptFields();
+            if(exposed.length){
+                for(const f of exposed){
+                    const v = String(fieldValues[f.id] ?? '').trim();
+                    if(v) return v;
+                }
+                return '';
+            }
+            return String(document.getElementById('globalPromptInput')?.value || '').trim();
+        }
+        function collectReferenceImages(){
+            return effectiveFields().filter(f => rhFieldKind(f)==='image').map(f => {
+                const url = normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
+                if(!url || url.startsWith('blob:')) return null;
+                return { url, name: f.name || f.fieldName || '', role: '' };
+            }).filter(Boolean);
+        }
+        async function validateBeforeRun(){
+            if(!selectedId){ alert(tr('rhPage.selectWorkflow')); return false; }
+            const cfg = await fetch('/api/runninghub/config').then(r=>r.json()).catch(()=>({}));
+            if(!cfg.has_key){ alert(tr('rhPage.noApiKey')); openRhSettings(); return false; }
+            if(!collectPrimaryPrompt()){ alert(tr('rhPage.promptRequired')); return false; }
+            for(const f of effectiveFields().filter(x => rhFieldKind(x)==='image')){
+                const url = normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
+                if(!url || url.startsWith('blob:')){ alert(tr('rhPage.imageRequired')); return false; }
+            }
+            return true;
+        }
+
+        async function runGenerateJob(jobId){
+            try {
+                const res = await fetch('/api/runninghub/run', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        workflow_id: selectedId,
+                        fields: collectRunFields(),
+                        prompt: collectPrimaryPrompt(),
+                        reference_images: collectReferenceImages(),
+                        client_id: CLIENT_ID,
+                    })
+                });
+                const data = await res.json();
+                if(!res.ok){
+                    const d = data.detail;
+                    const msg = typeof d === 'string' ? d : (Array.isArray(d) ? (d[0]?.msg || String(d[0])) : '') || data.msg;
+                    throw new Error(msg || tr('rhPage.generateFailed'));
+                }
+                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
+                if(images?.length){
+                    upsertHistoryItem({
+                        prompt: data.prompt || collectPrimaryPrompt(),
+                        images,
+                        videos: data.videos || [],
+                        timestamp: data.timestamp || Date.now()/1000,
+                        type: HISTORY_TYPE,
+                        workflow_id: selectedId,
+                        params: { fields: collectRunFields(), reference_images: collectReferenceImages() },
+                    });
+                } else throw new Error(tr('rhPage.noOutput'));
+                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                renderOutputGrid();
+            } catch(err){
+                const job = pendingJobs.find(j => j.id === jobId);
+                if(job) job.error = err.message || 'Failed';
+                renderOutputGrid();
+                setTimeout(() => {
+                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+                    renderOutputGrid();
+                }, 3200);
+            }
+        }
+
+        async function submitGenerate(){
+            if(!(await validateBeforeRun())) return;
+            document.getElementById('placeholder')?.classList.add('hidden');
+            const promptText = collectPrimaryPrompt() || currentWorkflow?.name || tr('rhPage.generate');
+            const jobs = [];
+            for(let i=0; i<batchCount; i++){
+                const jobId = `rh_${Date.now()}_${i}`;
+                const jobObj = { id: jobId, prompt: promptText, mediaKind: 'image' };
+                pendingJobs.unshift(jobObj);
+                if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
+                jobs.push(runGenerateJob(jobId));
+            }
+            renderOutputGrid();
+            await Promise.allSettled(jobs);
+        }
+
+        function historyKey(item){ return String(item?.timestamp ?? ''); }
+        function loadMeta(){
+            try {
+                pinnedIds = JSON.parse(localStorage.getItem(META_PIN)||'[]').map(String);
+                favoriteIds = JSON.parse(localStorage.getItem(META_FAV)||'[]').map(String);
+                displayOrder = JSON.parse(localStorage.getItem(META_ORDER)||'[]').map(String);
+            } catch(e){ pinnedIds=[]; favoriteIds=[]; displayOrder=[]; }
+        }
+        function saveMeta(){
+            try {
+                localStorage.setItem(META_PIN, JSON.stringify(pinnedIds));
+                localStorage.setItem(META_FAV, JSON.stringify(favoriteIds));
+                localStorage.setItem(META_ORDER, JSON.stringify(displayOrder));
+            } catch(e){}
+        }
+        function syncDisplayOrder(){
+            const keys = new Set(allHistory.map(historyKey));
+            displayOrder = displayOrder.filter(id => keys.has(id));
+            allHistory.forEach(item => { const k = historyKey(item); if(k && !displayOrder.includes(k)) displayOrder.unshift(k); });
+            saveMeta();
+        }
+        function sortedHistory(){
+            syncDisplayOrder();
+            const pinSet = new Set(pinnedIds);
+            const pinned = displayOrder.filter(id => pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
+            const rest = displayOrder.filter(id => !pinSet.has(id)).map(id => allHistory.find(h => historyKey(h)===id)).filter(Boolean);
+            return [...pinned, ...rest];
+        }
+        function upsertHistoryItem(item){
+            if(!item?.images?.[0] && !(item?.videos?.[0])) return;
+            const key = historyKey(item);
+            const idx = allHistory.findIndex(h => historyKey(h) === key);
+            if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
+            if(key && !displayOrder.includes(key)) displayOrder.unshift(key);
+            saveMeta();
+        }
+        function mediaPreview(item){
+            if(item?.videos?.[0]) return { kind:'video', url: item.videos[0] };
+            return { kind:'image', url: item.images?.[0] || '' };
+        }
+        function renderOutputGrid(){
+            const grid = document.getElementById('outputGrid');
+            const box = document.getElementById('resultBox');
+            const placeholder = document.getElementById('placeholder');
+            const items = sortedHistory();
+            const hasContent = items.length || pendingJobs.length;
+            if(!hasContent){
+                grid.classList.add('hidden'); grid.innerHTML = '';
+                box.classList.remove('has-outputs');
+                placeholder.classList.remove('hidden');
+                return;
+            }
+            placeholder.classList.add('hidden');
+            box.classList.add('has-outputs');
+            grid.classList.remove('hidden');
+            grid.style.gridTemplateColumns = `repeat(${outputCols}, minmax(0,1fr))`;
+            grid.innerHTML = pendingJobs.map(j => `<div class="output-grid-cell is-pending"><div class="cell-pending">${j.error?`<p>${escapeHtml(j.error)}</p>`:`<div class="pending-spin"></div><p>${tr('online.generating')}</p>`}</div></div>`).join('')
+                + items.map(d => {
+                    const key = historyKey(d), pinned = pinnedIds.includes(key), fav = favoriteIds.includes(key);
+                    const media = mediaPreview(d);
+                    const inner = media.kind === 'video'
+                        ? `<video src="${escapeHtml(media.url)}" muted loop playsinline></video>`
+                        : `<img src="${escapeHtml(media.url)}" alt="" class="draggable-output" draggable="true" loading="lazy">`;
+                    return `<div class="output-grid-cell${pinned?' is-pinned':''}${fav?' is-favorite':''}" data-ts="${escapeHtml(key)}" data-img-url="${escapeAttr(media.url)}">${inner}
+                        <div class="cell-actions">
+                            <button type="button" class="cell-action-btn${pinned?' active':''}" onclick="togglePin('${escapeHtml(key)}',event)"><i data-lucide="arrow-up-to-line"></i></button>
+                            <button type="button" class="cell-action-btn${fav?' fav-active active':''}" onclick="toggleFavorite('${escapeHtml(key)}',event)"><i data-lucide="heart"></i></button>
+                            <button type="button" class="cell-action-btn" onclick="applyRecordParams(historyItem('${escapeHtml(key)}'),event)"><i data-lucide="clipboard-copy"></i></button>
+                            <a href="${escapeHtml(media.url)}" download class="cell-action-btn" onclick="event.stopPropagation()"><i data-lucide="download"></i></a>
+                            <button type="button" class="cell-action-btn" onclick="deleteHistoryItem('${escapeHtml(key)}',event)"><i data-lucide="trash-2"></i></button>
+                        </div></div>`;
+                }).join('');
+            bindOutputGridCells(items);
+            lucide.createIcons();
+            updateBoardPickUI();
+        }
+        function bindOutputGridCells(items){
+            const itemMap = new Map(items.map(item => [historyKey(item), item]));
+            document.querySelectorAll('#outputGrid .output-grid-cell[data-ts]').forEach(cell => {
+                const data = itemMap.get(cell.dataset.ts);
+                if(!data) return;
+                const media = mediaPreview(data);
+                const img = cell.querySelector('img.draggable-output');
+                if(img && media.kind === 'image'){
+                    img.draggable = !boardPickFieldId;
+                    img.ondragstart = e => {
+                        if(boardPickFieldId){ e.preventDefault(); return; }
+                        e.stopPropagation();
+                        setImageDragData(e, media.url);
+                    };
+                }
+                cell.onclick = e => {
+                    if(boardPickFieldId && !e.target.closest('.cell-actions') && media.kind === 'image'){
+                        assignImageFromUrl(media.url, boardPickFieldId);
+                        return;
+                    }
+                    if(!e.target.closest('.cell-actions')) openLightbox(data);
+                };
+            });
+        }
+        function historyItem(key){ return allHistory.find(h => historyKey(h) === key); }
+        function togglePin(key, ev){ ev?.stopPropagation(); pinnedIds = pinnedIds.includes(key) ? pinnedIds.filter(x=>x!==key) : [...pinnedIds,key]; saveMeta(); renderOutputGrid(); }
+        function toggleFavorite(key, ev){ ev?.stopPropagation(); favoriteIds = favoriteIds.includes(key) ? favoriteIds.filter(x=>x!==key) : [key,...favoriteIds]; saveMeta(); renderOutputGrid(); }
+        async function deleteHistoryItem(key, ev){
+            ev?.stopPropagation();
+            if(!confirm(tr('online.deleteConfirm'))) return;
+            const item = historyItem(key); if(!item) return;
+            await fetch('/api/history/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({timestamp:item.timestamp}) });
+            allHistory = allHistory.filter(h => historyKey(h) !== key);
+            pinnedIds = pinnedIds.filter(x => x !== key); favoriteIds = favoriteIds.filter(x => x !== key); displayOrder = displayOrder.filter(x => x !== key);
+            saveMeta(); renderOutputGrid();
+        }
+        async function applyRecordParams(data, ev){
+            ev?.stopPropagation();
+            if(!data) return;
+            if(data.workflow_id && workflows.some(w => w.id === data.workflow_id)) await selectWorkflow(data.workflow_id);
+            const saved = data.params?.fields || {};
+            Object.entries(saved).forEach(([fid, val]) => { fieldValues[fid] = val; });
+            const refs = data.params?.reference_images || [];
+            effectiveFields().filter(f => rhFieldKind(f)==='image').forEach((f, i) => {
+                const ref = refs[i];
+                if(ref?.url){
+                    const url = normalizeImageUrl(ref.url);
+                    fieldImageUrls[f.id] = url;
+                    fieldValues[f.id] = url;
+                }
+            });
+            renderDynamicPanel();
+        }
+        async function loadAllHistory(){
+            if(historyLoading) return; historyLoading = true;
+            try {
+                allHistory = await fetch(`/api/history?type=${HISTORY_TYPE}`).then(r=>r.json());
+                if(!Array.isArray(allHistory)) allHistory = [];
+                syncDisplayOrder(); renderOutputGrid();
+            } finally { historyLoading = false; }
+        }
+        function setOutputCols(n){
+            outputCols = Math.min(6, Math.max(1, Number(n)||2));
+            try { localStorage.setItem('rh_output_cols', String(outputCols)); } catch(e){}
+            document.getElementById('outputColsValue').textContent = outputCols;
+            document.getElementById('outputColsSlider').value = outputCols;
+            renderOutputGrid();
+        }
+        function openLightbox(data){
+            currentLightboxData = data;
+            const media = mediaPreview(data);
+            const img = document.getElementById('lightboxImg');
+            const vid = document.getElementById('lightboxVideo');
+            if(media.kind === 'video'){
+                img.classList.add('hidden');
+                vid.classList.remove('hidden');
+                vid.src = media.url;
+            } else {
+                vid.classList.add('hidden');
+                vid.pause?.();
+                img.classList.remove('hidden');
+                img.src = media.url;
+            }
+            document.getElementById('lightboxPrompt').textContent = data.prompt || '';
+            document.getElementById('lightbox').classList.replace('hidden','flex');
+        }
+        function closeLightbox(){
+            document.getElementById('lightbox').classList.replace('flex','hidden');
+            document.getElementById('lightboxVideo').pause?.();
+        }
+
+        window.handleImageUrl = assignImageFromUrl;
+        window.cancelBoardPick = cancelBoardPick;
+
+        window.addEventListener('message', e => { if(e.data?.type === 'studio-lang') window.StudioI18n?.set(e.data.lang); });
+        window.addEventListener('keydown', e => { if(e.key === 'Escape') cancelBoardPick(); });
+        try {
+            new BroadcastChannel('studio-api').onmessage = e => { if(e.data?.type === 'runninghub-changed') loadWorkflowList(); };
+        } catch(e){}
+
+        const socket = new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws/stats?client_id=${encodeURIComponent(CLIENT_ID)}`);
+        socket.onmessage = e => {
+            try {
+                const msg = JSON.parse(e.data);
+                if(msg.type === 'new_image' && msg.data?.type === HISTORY_TYPE){
+                    upsertHistoryItem(msg.data);
+                    renderOutputGrid();
+                }
+            } catch(err){}
+        };
+
+        window.onload = async () => {
+            if(window.StudioI18n){ StudioI18n.apply(); document.title = tr('rhPage.title'); }
+            lucide.createIcons();
+            loadMeta();
+            try { const s = parseInt(localStorage.getItem('rh_batch_count')||'1',10); if(s>=1&&s<=4) batchCount=s; } catch(e){}
+            try { const s = parseInt(localStorage.getItem('rh_output_cols')||'2',10); if(s>=1&&s<=6) outputCols=s; } catch(e){}
+            setOutputCols(outputCols);
+            document.getElementById('outputColsSlider').oninput = e => setOutputCols(e.target.value);
+            await loadWorkflowList();
+            await loadAllHistory();
+            if(window.StudioPanelBridge){
+                const bridge = StudioPanelBridge;
+                renderOutputGrid = function(){ bridge.notifyPending(pendingJobs); bridge.notifyRefresh(); };
+                loadAllHistory = async function(){ bridge.notifyRefresh(); };
+                upsertHistoryItem = function(item){
+                    if(!item?.images?.[0] && !item?.videos?.[0]) return;
+                    bridge.notifyAddItem(item);
+                };
+            }
+        };
+    </script>
+</body>
+</html>
