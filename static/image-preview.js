@@ -12,7 +12,7 @@
                 width: min(1280px, 92vw);
                 height: min(820px, 78vh);
                 max-width: 100%;
-                border-radius: 24px;
+                border-radius: 10px;
                 overflow: hidden;
                 background: rgba(241,245,249,.72);
                 border: 1px solid rgba(15,23,42,.08);

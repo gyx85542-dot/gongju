@@ -1,16 +1,16 @@
 /* Canvas — sync with AI Image Magnific dark theme */
 body.mg-studio {
-    background: #1a1a1a !important;
+    background: #101010 !important;
     color: #f5f5f5 !important;
 }
 
 .mg-studio .canvas-gate {
-    background: #1a1a1a !important;
+    background: #101010 !important;
     background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px) !important;
 }
 
 .mg-studio .gate-panel {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
     backdrop-filter: none !important;
@@ -41,7 +41,7 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #a3a3a3 !important;
-    border-radius: 10px !important;
+    border-radius: 5px !important;
 }
 
 .mg-studio .gate-icon-btn:hover,
@@ -58,7 +58,7 @@ body.mg-studio {
     background: #ff4d94 !important;
     color: #fff !important;
     border: none !important;
-    border-radius: 999px !important;
+    border-radius: 4px !important;
     box-shadow: 0 4px 14px rgba(255, 77, 148, 0.28) !important;
 }
 
@@ -70,13 +70,13 @@ body.mg-studio {
 .mg-studio .gate-trash-badge {
     background: #ff4d94 !important;
     color: #fff !important;
-    border-color: #262626 !important;
+    border-color: #1a1a1a !important;
 }
 
 .mg-studio .gate-create-row {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .gate-create-row:focus-within {
@@ -91,20 +91,20 @@ body.mg-studio {
 .mg-studio .gate-list {
     background: #141414 !important;
     border: 1px solid rgba(255, 255, 255, 0.06) !important;
-    border-radius: 18px !important;
+    border-radius: 8px !important;
 }
 
 .mg-studio .gate-list-empty-icon {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #737373 !important;
     box-shadow: none !important;
 }
 
 .mg-studio .canvas-item {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .canvas-item:hover {
@@ -143,7 +143,7 @@ body.mg-studio {
     background: rgba(49, 49, 49, 0.96) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #a3a3a3 !important;
-    border-radius: 999px !important;
+    border-radius: 4px !important;
 }
 
 .mg-studio .canvas-preview-mark:hover,
@@ -175,12 +175,12 @@ body.mg-studio {
 }
 
 .mg-studio .board {
-    background-color: #1a1a1a !important;
+    background-color: #101010 !important;
     background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px) !important;
 }
 
 .mg-studio .panel {
-    background: rgba(38, 38, 38, 0.94) !important;
+    background: rgba(26, 26, 26, 0.94) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
 }
@@ -199,7 +199,7 @@ body.mg-studio {
 }
 
 .mg-studio .node {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
 }
@@ -245,7 +245,7 @@ body.mg-studio {
 }
 
 .mg-studio .output-lightbox {
-    background: rgba(26, 26, 26, 0.96) !important;
+    background: rgba(16, 16, 16, 0.96) !important;
 }
 
 .mg-studio .output-preview,
@@ -253,13 +253,13 @@ body.mg-studio {
 .mg-studio .error-panel,
 .mg-studio .model-panel,
 .mg-studio .image-edit-panel {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .mg-studio .create-menu,
 .mg-studio .selection-hub {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 

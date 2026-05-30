@@ -1,12 +1,12 @@
 /* Settings pages — sync with AI Image Magnific dark theme */
 body.mg-studio {
-    background: #1a1a1a !important;
+    background: #101010 !important;
     color: #f5f5f5 !important;
 }
 
 .mg-studio {
-    --bg: #1a1a1a;
-    --panel: #262626;
+    --bg: #101010;
+    --panel: #1a1a1a;
     --soft: #313131;
     --line: rgba(255, 255, 255, 0.08);
     --line-strong: rgba(255, 255, 255, 0.12);
@@ -23,9 +23,9 @@ body.mg-studio {
 .mg-studio .graph-card,
 .mg-studio .picker-modal,
 .mg-studio .popup-panel {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 22px !important;
+    border-radius: 10px !important;
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
 }
 
@@ -57,7 +57,7 @@ body.mg-studio {
 
 .mg-studio .provider-card,
 .mg-studio .workflow-card {
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .provider-card:hover,
@@ -77,7 +77,7 @@ body.mg-studio {
 .mg-studio .workflow-icon {
     background: #313131 !important;
     color: #a3a3a3 !important;
-    border-radius: 10px !important;
+    border-radius: 5px !important;
 }
 
 .mg-studio .provider-card.active .provider-mark,
@@ -96,7 +96,7 @@ body.mg-studio {
 .mg-studio .lora-field select {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 10px !important;
+    border-radius: 5px !important;
     color: #f5f5f5 !important;
 }
 
@@ -122,7 +122,7 @@ body.mg-studio {
 .mg-studio .upload-btn {
     border-color: rgba(255, 255, 255, 0.12) !important;
     color: #a3a3a3 !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .add-btn:hover,
@@ -136,7 +136,7 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #f5f5f5 !important;
-    border-radius: 999px !important;
+    border-radius: 8px !important;
     box-shadow: none !important;
 }
 
@@ -153,7 +153,7 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
     color: #a3a3a3 !important;
-    border-radius: 999px !important;
+    border-radius: 8px !important;
 }
 
 .mg-studio .action-btn:hover,
@@ -203,7 +203,7 @@ body.mg-studio {
 }
 
 .mg-studio .picker-overlay {
-    background: rgba(26, 26, 26, 0.92) !important;
+    background: rgba(16, 16, 16, 0.92) !important;
 }
 
 .mg-studio .picker-row:hover,
@@ -220,11 +220,11 @@ body.mg-studio {
 .mg-studio .graph-svg-wrap {
     background: #141414 !important;
     border: 1px solid rgba(255, 255, 255, 0.06) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .gnode rect {
-    fill: #262626 !important;
+    fill: #1a1a1a !important;
     stroke: rgba(255, 255, 255, 0.12) !important;
 }
 
@@ -235,7 +235,7 @@ body.mg-studio {
 }
 
 .mg-studio .popup-backdrop {
-    background: rgba(26, 26, 26, 0.72) !important;
+    background: rgba(16, 16, 16, 0.72) !important;
 }
 
 .mg-studio .popup-head {
@@ -248,13 +248,13 @@ body.mg-studio {
     background: #313131 !important;
     border: 1px dashed rgba(255, 255, 255, 0.12) !important;
     color: #737373 !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .advanced-endpoints {
     background: #313131 !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .picker-cat-tabs {
@@ -286,11 +286,11 @@ body.mg-studio {
 }
 
 .mg-studio .image-lightbox {
-    background: rgba(26, 26, 26, 0.96) !important;
+    background: rgba(16, 16, 16, 0.96) !important;
 }
 
 .mg-studio .image-lightbox img {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -391,7 +391,7 @@ html.studio-theme-dark .mg-studio .picker-summary-title {
 html.studio-theme-dark .mg-studio .picker-sum-chip,
 .mg-studio.studio-theme-dark .picker-sum-chip-empty,
 html.studio-theme-dark .mg-studio .picker-sum-chip-empty {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     color: #f5f5f5 !important;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
 }
@@ -428,7 +428,7 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 .mg-studio .run-btn {
     background: #ff4d94 !important;
     color: #fff !important;
-    border-radius: 999px !important;
+    border-radius: 8px !important;
     box-shadow: 0 4px 14px rgba(255, 77, 148, 0.28) !important;
 }
 
@@ -444,7 +444,7 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 .mg-studio .small-select {
     background: #313131 !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
-    border-radius: 10px !important;
+    border-radius: 5px !important;
     color: #f5f5f5 !important;
 }
 
@@ -461,9 +461,9 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 .mg-studio .workspace-mode-tabs,
 .mg-studio .run-result,
 .mg-studio .pfield-image-drop {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
-    border-radius: 14px !important;
+    border-radius: 6px !important;
 }
 
 .mg-studio .workspace-mode-tabs {
@@ -471,7 +471,7 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 }
 
 .mg-studio .workspace-mode-tabs button.active {
-    background: #262626 !important;
+    background: #1a1a1a !important;
     color: #f5f5f5 !important;
 }
 
@@ -491,7 +491,7 @@ html.studio-theme-dark .mg-studio .pfield-bool-thumb {
 }
 
 .mg-studio .gnode rect {
-    fill: #262626 !important;
+    fill: #1a1a1a !important;
 }
 
 .mg-studio .gnode.cat-prompt rect { fill: #2e2818 !important; stroke: #eab308 !important; }

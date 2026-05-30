@@ -253,7 +253,7 @@ function renderRefGrid(){
     grid.innerHTML = refSlots.map((slot, idx) => {
         const filled = !!slot.ref;
         const preview = filled ? slot.ref.url : '';
-        return `<div class="upload-item group aspect-square rounded-2xl flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
+        return `<div class="upload-item group aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
             <input type="file" accept="image/*" class="hidden">
             ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
             <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2, '0')}</span>

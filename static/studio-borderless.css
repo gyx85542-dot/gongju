@@ -1,0 +1,354 @@
+/* 全站去线化 — 仅保留 Prompt 文本框 (textarea.nano-input) 与参考图上传格 (.upload-item) 描边 */
+
+/* ── 布局容器 ── */
+.studio-workspace-card,
+.studio-panels,
+.mg-studio .result-frame,
+.result-frame,
+.tool-panel,
+.control-panel,
+.console-card,
+.work-panel,
+.masonry-item,
+.setting-row,
+.gate-panel,
+.composer-wrap,
+.panel,
+.side-card,
+.content-head,
+.graph-card,
+.node-card,
+.history-popover,
+.bubble.assistant,
+.composer-body,
+.model-pill,
+.ratio-select-menu,
+.empty-hint,
+.nano-monitor,
+.logo-ring {
+    border: none !important;
+}
+
+.studio-panels {
+    border-right: none !important;
+    background: var(--workspace-card-bg, #161616) !important;
+}
+
+.studio-gallery-wrap {
+    background: #1a1a1a !important;
+}
+
+.studio-workspace-card {
+    box-shadow: none !important;
+}
+
+html.embed-gallery,
+html.embed-gallery body,
+html.embed-gallery .gallery-shell {
+    background: #1a1a1a !important;
+}
+
+.mg-studio .result-frame,
+.gallery-shell .result-frame,
+.result-frame {
+    background: #1a1a1a !important;
+    box-shadow: none !important;
+}
+
+.mg-studio .result-frame.import-drag-over,
+.result-frame.import-drag-over {
+    border: none !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
+/* ── 侧栏导航 ── */
+.sidebar-toggle,
+.nav-item,
+.side-pill {
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.nav-item:hover,
+.sidebar-toggle:hover,
+.side-pill:hover {
+    border-color: transparent !important;
+}
+
+.nav-item.active,
+.side-pill.active {
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+/* ── 参数面板控件（色块区分，无描边） ── */
+.size-select,
+.size-custom,
+.size-fit-btn,
+.ratio-select-trigger,
+.ratio-select-item,
+.wf-input,
+.wf-textarea,
+.wf-select,
+.output-import-btn,
+.filter-tab,
+.tool-icon-btn,
+.provider-select,
+.select-shell,
+.small-input,
+.small-select,
+.action-btn,
+.ref-chip,
+.secondary-btn,
+.mg-studio .size-select,
+.mg-studio .size-custom,
+.mg-studio .size-fit-btn,
+.mg-studio .wf-input,
+.mg-studio .output-import-btn {
+    border: none !important;
+}
+
+.size-select:focus,
+.size-custom:focus,
+.ratio-select-trigger:focus,
+.wf-input:focus,
+.wf-select:focus {
+    border: none !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+    outline: none !important;
+}
+
+.filter-tab.active,
+.tool-icon-btn.active {
+    border: none !important;
+}
+
+.filter-tab:hover,
+.tool-icon-btn:hover,
+.output-import-btn:hover {
+    border: none !important;
+}
+
+/* ── 画廊网格（无边框，背景区分） ── */
+.output-grid-cell,
+.mg-studio .output-grid-cell {
+    border: none !important;
+    background: #141414 !important;
+}
+
+.output-grid-cell:hover,
+.output-grid-cell.is-pending {
+    border: none !important;
+    background: #181818 !important;
+}
+
+.output-grid-cell.is-pinned,
+.output-grid-cell.is-new-highlight::after,
+body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):hover,
+body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected {
+    border: none !important;
+}
+
+.output-grid-cell.is-pinned {
+    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.35) !important;
+}
+
+body.board-pick-active .output-grid-cell[data-ts]:not(.is-video):not(.is-audio):hover {
+    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.35) !important;
+}
+
+body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected {
+    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.28) !important;
+}
+
+.output-grid-cell.is-new-highlight::after {
+    border: none !important;
+    box-shadow: inset 0 0 0 2px #ff4d94 !important;
+}
+
+/* ── 图片格内操作按钮 ── */
+.cell-action-btn,
+.upload-item .ref-slot-btn.cell-action-btn {
+    border: none !important;
+}
+
+.cell-action-btn:hover,
+.cell-action-btn.active,
+.cell-action-btn.fav-active {
+    border: none !important;
+}
+
+.bulk-check-mark {
+    border: none !important;
+    background: rgba(15, 15, 15, 0.85) !important;
+}
+
+body.bulk-select-mode .output-grid-cell[data-ts].bulk-selected .bulk-check-mark {
+    border: none !important;
+}
+
+.bulk-select-box {
+    border: none !important;
+    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.55) !important;
+}
+
+/* ── 按钮：纯色块 ── */
+.glass-btn,
+.options-panel .glass-btn,
+.mg-studio .glass-btn,
+.mg-studio .options-panel .glass-btn,
+.gen-btn,
+.primary-btn {
+    border: none !important;
+}
+
+/* Generate 按钮饱和度 */
+.options-panel .glass-btn,
+.mg-studio .options-panel .glass-btn {
+    background: #4e6aef !important;
+    box-shadow: 0 4px 16px rgba(78, 106, 239, 0.42) !important;
+}
+
+.options-panel .glass-btn:hover:not(:disabled),
+.mg-studio .options-panel .glass-btn:hover:not(:disabled) {
+    background: #4358d4 !important;
+    box-shadow: 0 6px 22px rgba(78, 106, 239, 0.48) !important;
+}
+
+/* ── 滑块：仅色块轨道 ── */
+.batch-slider,
+.output-cols-slider,
+input[type="range"],
+.ios-slider {
+    border: none !important;
+    accent-color: #ffffff !important;
+}
+
+.batch-slider,
+.output-cols-slider,
+.wf-slider-row input[type="range"],
+.gallery-shell input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+}
+
+.batch-slider::-webkit-slider-runnable-track,
+.output-cols-slider::-webkit-slider-runnable-track,
+.wf-slider-row input[type="range"]::-webkit-slider-runnable-track,
+.gallery-shell input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.batch-slider::-webkit-slider-thumb,
+.output-cols-slider::-webkit-slider-thumb,
+.wf-slider-row input[type="range"]::-webkit-slider-thumb,
+.gallery-shell input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: #ffffff !important;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+.batch-slider::-moz-range-track,
+.output-cols-slider::-moz-range-track,
+.wf-slider-row input[type="range"]::-moz-range-track,
+.gallery-shell input[type="range"]::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.batch-slider::-moz-range-progress,
+.output-cols-slider::-moz-range-progress,
+.wf-slider-row input[type="range"]::-moz-range-progress,
+.gallery-shell input[type="range"]::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: #ffffff;
+}
+
+.batch-slider::-moz-range-thumb,
+.output-cols-slider::-moz-range-thumb,
+.wf-slider-row input[type="range"]::-moz-range-thumb,
+.gallery-shell input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+}
+
+/* ── 保留：Prompt 文本框 ── */
+textarea.nano-input,
+.options-panel textarea.nano-input,
+.mg-studio textarea.nano-input {
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-style: solid !important;
+}
+
+textarea.nano-input:focus,
+.options-panel textarea.nano-input:focus,
+.mg-studio textarea.nano-input:focus {
+    border: 1px solid rgba(255, 77, 148, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
+/* 非 textarea 的 nano-input 不保留描边 */
+input.nano-input,
+select.nano-input {
+    border: none !important;
+}
+
+/* ── 保留：参考图上传占位框 ── */
+.upload-item,
+.mg-studio .upload-item,
+.options-panel .upload-item {
+    border: 1px dashed rgba(255, 255, 255, 0.12) !important;
+}
+
+.upload-item:hover,
+.upload-item.drag-over,
+.mg-studio .upload-item:hover,
+.mg-studio .upload-item.drag-over {
+    border: 1px dashed rgba(255, 77, 148, 0.4) !important;
+}
+
+.upload-item.is-board-target,
+.mg-studio .upload-item.is-board-target {
+    border: 1px dashed rgba(255, 77, 148, 0.55) !important;
+    box-shadow: 0 0 0 2px rgba(255, 77, 148, 0.22) !important;
+}
+
+.options-panel {
+    box-shadow: none !important;
+}
+
+.mg-studio .ratio-select-trigger,
+.ratio-select-trigger {
+    border: none !important;
+}
+
+.mg-studio .empty-hint {
+    border: none !important;
+}
+
+.mg-studio .viewer-sidebar {
+    border-left: none !important;
+}
+
+.mg-studio .viewer-meta-cell,
+.mg-studio .viewer-prompt,
+.mg-studio .viewer-edit-cell {
+    border: none !important;
+}

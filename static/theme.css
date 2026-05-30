@@ -34,7 +34,7 @@ body {
     border: 3px solid transparent !important;
     border-right-width: 3px !important;
     background-clip: padding-box !important;
-    border-radius: 999px !important;
+    border-radius: 4px !important;
 }
 
 *::-webkit-scrollbar-thumb:hover {
@@ -557,16 +557,16 @@ body.studio-theme-dark .shell .comfy-random-btn.active svg {
 html:not(.studio-theme-dark):not(.theme-dark),
 html:not(.studio-theme-dark):not(.theme-dark) body {
     --accent: #ff4d94;
-    --bg-base: #1a1a1a;
-    --card: #262626;
-    --panel: #262626;
-    --card-solid: #262626;
-    --page: #1a1a1a;
-    --mg-bg: #1a1a1a;
-    --mg-surface: #262626;
+    --bg-base: #101010;
+    --card: #1a1a1a;
+    --panel: #1a1a1a;
+    --card-solid: #1a1a1a;
+    --page: #101010;
+    --mg-bg: #101010;
+    --mg-surface: #1a1a1a;
     --mg-accent: #ff4d94;
     --mg-accent-hover: #e8437f;
-    background: #1a1a1a !important;
+    background: #101010 !important;
     color: #f5f5f5;
 }
 
@@ -581,7 +581,7 @@ html:not(.studio-theme-dark):not(.theme-dark) body .create-confirm {
     background: #ff4d94 !important;
     color: #ffffff !important;
     border: none !important;
-    border-radius: 999px !important;
+    border-radius: 12px !important;
     box-shadow: 0 4px 14px rgba(255, 77, 148, 0.28) !important;
 }
 
@@ -614,36 +614,65 @@ html:not(.studio-theme-dark):not(.theme-dark) body .node-card,
 html:not(.studio-theme-dark):not(.theme-dark) body .history-popover,
 html:not(.studio-theme-dark):not(.theme-dark) body .bubble.assistant,
 html:not(.studio-theme-dark):not(.theme-dark) body .composer-body {
-    background: #262626 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 22px !important;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.24) !important;
+    background: #1a1a1a !important;
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
     color: #f5f5f5 !important;
 }
 
-html:not(.studio-theme-dark):not(.theme-dark) body .nano-input,
-html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea,
+html:not(.studio-theme-dark):not(.theme-dark) body .result-frame {
+    background: #1a1a1a !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input,
+html:not(.studio-theme-dark):not(.theme-dark) body .upload-item {
+    border-radius: 12px !important;
+    color: #f5f5f5 !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input {
+    background: #313131 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body .upload-item {
+    background: #262626 !important;
+    border: 1px dashed rgba(255, 255, 255, 0.12) !important;
+}
+
 html:not(.studio-theme-dark):not(.theme-dark) body .size-select,
+html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea,
 html:not(.studio-theme-dark):not(.theme-dark) body .wf-input,
-html:not(.studio-theme-dark):not(.theme-dark) body .upload-item,
 html:not(.studio-theme-dark):not(.theme-dark) body .select-shell,
 html:not(.studio-theme-dark):not(.theme-dark) body .small-input,
 html:not(.studio-theme-dark):not(.theme-dark) body .small-select,
 html:not(.studio-theme-dark):not(.theme-dark) body .action-btn,
 html:not(.studio-theme-dark):not(.theme-dark) body .provider-select,
 html:not(.studio-theme-dark):not(.theme-dark) body .ref-chip {
-    background: #313131 !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: #262626 !important;
+    border: none !important;
     border-radius: 12px !important;
     color: #f5f5f5 !important;
 }
 
-html:not(.studio-theme-dark):not(.theme-dark) body .nano-input:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body .upload-item:hover,
+html:not(.studio-theme-dark):not(.theme-dark) body .upload-item.drag-over {
+    outline: none !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body textarea.nano-input:focus {
+    border: 1px solid rgba(255, 77, 148, 0.35) !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body .size-select:focus,
 html:not(.studio-theme-dark):not(.theme-dark) body .wf-textarea:focus,
-html:not(.studio-theme-dark):not(.theme-dark) body textarea:focus,
+html:not(.studio-theme-dark):not(.theme-dark) body textarea:focus:not(.nano-input),
 html:not(.studio-theme-dark):not(.theme-dark) body input:focus,
 html:not(.studio-theme-dark):not(.theme-dark) body select:focus {
-    border-color: rgba(255, 77, 148, 0.35) !important;
+    border: none !important;
     box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
     outline: none !important;
 }
@@ -657,7 +686,7 @@ html:not(.studio-theme-dark):not(.theme-dark) body input[type="range"],
 html:not(.studio-theme-dark):not(.theme-dark) body .batch-slider,
 html:not(.studio-theme-dark):not(.theme-dark) body .output-cols-slider,
 html:not(.studio-theme-dark):not(.theme-dark) body .ios-slider {
-    accent-color: #ff4d94 !important;
+    accent-color: #ffffff !important;
 }
 
 html:not(.studio-theme-dark):not(.theme-dark) body .model-option.active,
@@ -686,4 +715,63 @@ html:not(.studio-theme-dark):not(.theme-dark) body h2,
 html:not(.studio-theme-dark):not(.theme-dark) body h3,
 html:not(.studio-theme-dark):not(.theme-dark) body .setting-title {
     color: #f5f5f5 !important;
+}
+
+/* 参数面板控件填充（下拉、参考图上传格等） */
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .size-select,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .size-custom,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .size-fit-btn,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .ratio-select-trigger,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .upload-item,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .wf-input,
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .wf-select {
+    background: #262626 !important;
+}
+
+/* 参数面板 Generate 按钮 */
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .glass-btn,
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn {
+    background: #4e6aef !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(78, 106, 239, 0.32) !important;
+}
+
+html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .glass-btn:hover:not(:disabled),
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .glass-btn:hover:not(:disabled) {
+    background: #4358d4 !important;
+    box-shadow: 0 6px 20px rgba(78, 106, 239, 0.38) !important;
+}
+
+/* 参数面板：整体单卡片，内部分组无独立背景 */
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel,
+body.mg-studio .options-panel {
+    background: #1a1a1a !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    padding: var(--panel-padding) !important;
+    border: none !important;
+}
+
+html.embed-panel body .options-panel,
+html.embed-panel .options-panel {
+    border-radius: 0 !important;
+    min-height: 100% !important;
+    height: 100% !important;
+}
+
+/* 参数面板内部分组：无描边、无独立卡片 */
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .tool-panel,
+html:not(.studio-theme-dark):not(.theme-dark) body .options-panel .control-panel,
+html.studio-theme-dark body .options-panel .tool-panel,
+html.studio-theme-dark body .options-panel .control-panel,
+body.studio-theme-dark .options-panel .tool-panel,
+body.studio-theme-dark .options-panel .control-panel,
+body.mg-studio .options-panel .tool-panel,
+body.mg-studio .options-panel .control-panel {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
 }

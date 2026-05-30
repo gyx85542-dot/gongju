@@ -2,8 +2,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --mg-bg: #1a1a1a;
-    --mg-surface: #262626;
+    --mg-bg: #101010;
+    --mg-panel-bg: #161616;
+    --mg-surface: #1a1a1a;
     --mg-surface-2: #313131;
     --mg-surface-hover: #333333;
     --mg-border: rgba(255, 255, 255, 0.08);
@@ -16,11 +17,11 @@
     --mg-accent-fg: #ffffff;
     --mg-orange: #ffaa00;
     --mg-success: #22c55e;
-    --mg-radius-sm: 10px;
-    --mg-radius: 14px;
-    --mg-radius-lg: 22px;
-    --mg-radius-xl: 24px;
-    --mg-radius-full: 999px;
+    --mg-radius-sm: 12px;
+    --mg-radius: 12px;
+    --mg-radius-lg: 12px;
+    --mg-radius-xl: 12px;
+    --mg-radius-full: 12px;
     --mg-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --mg-display: 'Inter', var(--mg-font);
     --mg-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -35,37 +36,69 @@
     -webkit-font-smoothing: antialiased;
 }
 
-.mg-studio .nano-input,
+html.embed-panel,
+html.embed-panel body,
+body.mg-studio.embed-panel {
+    background: var(--mg-panel-bg) !important;
+    --mg-bg: #161616;
+}
+
+.mg-studio .options-panel {
+    background: var(--mg-surface) !important;
+    border-radius: var(--mg-radius-lg) !important;
+    box-shadow: none !important;
+}
+
+.mg-studio .options-panel .tool-panel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.mg-studio textarea.nano-input,
 .mg-studio .wf-textarea {
     background: var(--mg-surface-2) !important;
-    border: 1px solid var(--mg-border) !important;
     color: var(--mg-text) !important;
     border-radius: var(--mg-radius) !important;
 }
 
-.mg-studio .nano-input:focus,
-.mg-studio .wf-textarea:focus {
+.mg-studio textarea.nano-input {
+    border: 1px solid var(--mg-border) !important;
+}
+
+.mg-studio .wf-textarea {
+    border: none !important;
+}
+
+.mg-studio textarea.nano-input:focus {
     border-color: rgba(255, 77, 148, 0.35) !important;
     box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
 }
 
+.mg-studio .wf-textarea:focus {
+    border: none !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
+}
+
 .mg-studio .tool-panel {
-    background: var(--mg-surface) !important;
-    border: 1px solid var(--mg-border) !important;
-    border-radius: var(--mg-radius-lg) !important;
-    box-shadow: var(--mg-shadow) !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
 .mg-studio .result-frame {
-    background: var(--mg-surface) !important;
-    border: 1px solid var(--mg-border) !important;
+    background: #1a1a1a !important;
+    border: none !important;
     border-radius: var(--mg-radius-xl) !important;
-    box-shadow: var(--mg-shadow) !important;
+    box-shadow: none !important;
 }
 
 .mg-studio .result-frame.import-drag-over {
-    border-color: rgba(255, 77, 148, 0.35) !important;
-    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.1) !important;
+    border: none !important;
+    box-shadow: 0 0 0 3px rgba(255, 77, 148, 0.12) !important;
 }
 
 .mg-studio .size-select,
@@ -73,7 +106,7 @@
 .mg-studio .wf-input,
 .mg-studio .size-fit-btn {
     background: var(--mg-surface-2) !important;
-    border: 1px solid var(--mg-border) !important;
+    border: none !important;
     color: var(--mg-text) !important;
     border-radius: var(--mg-radius-sm) !important;
 }
@@ -126,7 +159,7 @@
 
 .mg-studio .output-import-btn {
     background: var(--mg-surface) !important;
-    border: 1px solid var(--mg-border) !important;
+    border: none !important;
     color: var(--mg-text-secondary) !important;
     border-radius: var(--mg-radius-full) !important;
 }
@@ -134,22 +167,20 @@
 .mg-studio .output-import-btn:hover {
     background: var(--mg-accent) !important;
     color: var(--mg-accent-fg) !important;
-    border-color: var(--mg-accent) !important;
 }
 
 .mg-studio .batch-slider,
 .mg-studio .output-cols-slider {
-    accent-color: var(--mg-accent) !important;
+    accent-color: #ffffff !important;
 }
 
 .mg-studio .output-grid-cell {
     background: #141414 !important;
-    border: 1px solid var(--mg-border) !important;
+    border: none !important;
 }
 
 .mg-studio .output-grid-cell:hover {
     background: #181818 !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .mg-studio .output-grid-cell.is-pending {
@@ -157,16 +188,16 @@
 }
 
 .mg-studio .output-grid-cell .cell-actions {
-    background: linear-gradient(to top, rgba(38, 38, 38, 0.92) 0%, transparent 100%) !important;
+    background: linear-gradient(to top, rgba(26, 26, 26, 0.92) 0%, transparent 100%) !important;
 }
 
 .mg-studio .cell-action-btn {
     width: 24px !important;
     height: 24px !important;
-    border-radius: 999px !important;
+    border-radius: 4px !important;
     background: rgba(49, 49, 49, 0.95) !important;
     color: var(--mg-text) !important;
-    border: 1px solid var(--mg-border) !important;
+    border: none !important;
     box-shadow: var(--mg-shadow) !important;
     padding: 0 !important;
 }
@@ -183,17 +214,15 @@
 .mg-studio .cell-action-btn.active {
     background: var(--mg-accent) !important;
     color: #fff !important;
-    border-color: var(--mg-accent) !important;
 }
 
 .mg-studio .cell-action-btn.fav-active {
     background: var(--mg-orange) !important;
     color: #fff !important;
-    border-color: var(--mg-orange) !important;
 }
 
 .mg-studio .viewer-overlay {
-    background: rgba(26, 26, 26, 0.96) !important;
+    background: rgba(16, 16, 16, 0.96) !important;
 }
 
 .mg-studio .viewer-main {
@@ -259,6 +288,106 @@
 
 .mg-studio .empty-hint {
     background: var(--mg-surface-2) !important;
-    border: 1px dashed var(--mg-border) !important;
+    border: none !important;
     color: var(--mg-muted) !important;
+}
+
+/* 按钮 / 胶囊控件统一圆角（避免局部 999px 被二次缩小） */
+.mg-studio .glass-btn,
+.mg-studio .send-btn,
+.mg-studio .primary-btn,
+.mg-studio .create-confirm,
+.mg-studio .run-btn,
+.mg-studio .output-import-btn,
+.mg-studio .viewer-reedit,
+.mg-studio .viewer-edit-action,
+.mg-studio .viewer-crop-ratio,
+.mg-studio .mode-switch,
+.mg-studio .mode-switch button,
+.mg-studio .provider-switch,
+.mg-studio .provider-switch button,
+.mg-studio .provider-select,
+.mg-studio .mini-ratio,
+.mg-studio .mini-ratio button,
+.mg-studio .resolution-toggle,
+.mg-studio .resolution-option,
+.mg-studio .action-btn,
+.mg-studio .ghost-btn,
+.mg-studio .key-btn,
+.mg-studio .api-link-btn,
+.mg-studio .graph-ctrl-btn,
+.mg-studio .model-pill,
+.mg-studio .model-option,
+.mg-studio .ref-board-btn,
+.mg-studio .tool-btn,
+.mg-studio .canvas-confirm-btn,
+.mg-studio .canvas-cancel-btn,
+.mg-studio .gen-count-row,
+.mg-studio .loop-toggle,
+.mg-studio .loop-token-btn,
+.mg-studio .setting-check,
+.mg-studio .llm-provider,
+.mg-studio .llm-provider button,
+.mg-studio .llm-mode,
+.mg-studio .llm-mode button,
+.mg-studio .seg,
+.mg-studio .seg button,
+.mg-studio .select-lite,
+.mg-studio .selection-hub,
+.mg-studio .hub-port,
+.mg-studio .llm-sys-toggle,
+.mg-studio .ms-badge,
+.options-panel .glass-btn,
+.glass-btn,
+.send-btn {
+    border-radius: var(--mg-radius-full) !important;
+}
+
+.mg-studio .cell-action-btn,
+.mg-studio .viewer-nav,
+.mg-studio .viewer-hue-thumb,
+.mg-studio .viewer-crop-handle,
+.mg-studio .viewer-brush-cursor,
+.mg-studio .canvas-preview-mark,
+.mg-studio .canvas-card-edit,
+.mg-studio .canvas-delete,
+.mg-studio .link-delete,
+.mg-studio .output-compare-handle {
+    border-radius: var(--mg-radius-sm) !important;
+}
+
+.mg-studio .viewer-hue-bar {
+    border-radius: var(--mg-radius-sm) !important;
+}
+
+/* 参数面板 Generate 按钮 */
+.mg-studio .options-panel .glass-btn,
+.options-panel .glass-btn {
+    background: #4e6aef !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(78, 106, 239, 0.32) !important;
+}
+
+.mg-studio .options-panel .glass-btn:hover:not(:disabled),
+.options-panel .glass-btn:hover:not(:disabled) {
+    background: #4358d4 !important;
+    box-shadow: 0 6px 20px rgba(78, 106, 239, 0.38) !important;
+}
+
+.mg-studio .options-panel .glass-btn:disabled,
+.options-panel .glass-btn:disabled {
+    opacity: 0.45;
+    box-shadow: none !important;
+}
+
+/* 参数面板：下拉框、参考图格等控件填充 */
+.mg-studio .options-panel .size-select,
+.mg-studio .options-panel .size-custom,
+.mg-studio .options-panel .size-fit-btn,
+.mg-studio .options-panel .ratio-select-trigger,
+.mg-studio .options-panel .upload-item,
+.mg-studio .options-panel .wf-input,
+.mg-studio .options-panel .wf-select {
+    background: #262626 !important;
 }

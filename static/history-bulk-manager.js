@@ -26,7 +26,7 @@
             .history-bulk-surface.is-selecting{cursor:crosshair}
             .history-bulk-toolbar{display:flex;align-items:center;gap:10px;margin:-4px 0 18px;min-height:34px}
             .history-bulk-toolbar .bulk-spacer{flex:1}
-            .history-bulk-btn{height:32px;border-radius:999px;border:1px solid rgba(148,163,184,.28);background:rgba(255,255,255,.9);color:#475569;padding:0 12px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;display:inline-flex;align-items:center;gap:7px;transition:all .18s ease}
+            .history-bulk-btn{height:32px;border-radius: 4px;border:1px solid rgba(148,163,184,.28);background:rgba(255,255,255,.9);color:#475569;padding:0 12px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;display:inline-flex;align-items:center;gap:7px;transition:all .18s ease}
             .history-bulk-btn:hover{background:#111827;color:#fff;border-color:#111827}
             .history-bulk-btn.danger{background:#111827;color:#fff;border-color:#111827}
             .history-bulk-btn.danger:disabled{opacity:.38;cursor:not-allowed}
@@ -42,12 +42,12 @@
             .history-bulk-selecting .masonry-item:hover::after{opacity:1}
             .masonry-item.bulk-selected::after{opacity:1;background:rgba(255,255,255,.42);box-shadow:inset 0 0 0 2px rgba(17,24,39,.9)}
             .masonry-item.bulk-selected{outline:2px solid rgba(17,24,39,.9);outline-offset:3px}
-            .bulk-check{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:999px;background:#fff;color:#111827;border:2px solid rgba(17,24,39,.9);display:none;align-items:center;justify-content:center;z-index:12;box-shadow:0 10px 24px rgba(15,23,42,.18)}
+            .bulk-check{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius: 4px;background:#fff;color:#111827;border:2px solid rgba(17,24,39,.9);display:none;align-items:center;justify-content:center;z-index:12;box-shadow:0 10px 24px rgba(15,23,42,.18)}
             .history-bulk-selecting .bulk-check{display:flex}
             .bulk-check::before{content:"";width:8px;height:5px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);opacity:0}
             .masonry-item.bulk-selected .bulk-check{background:#111827;color:#fff}
             .masonry-item.bulk-selected .bulk-check::before{opacity:1}
-            .history-select-box{position:fixed;z-index:9999;border:1px solid rgba(17,24,39,.72);background:rgba(17,24,39,.09);pointer-events:none;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.5) inset}
+            .history-select-box{position:fixed;z-index:9999;border:1px solid rgba(17,24,39,.72);background:rgba(17,24,39,.09);pointer-events:none;border-radius:5px;box-shadow:0 0 0 1px rgba(255,255,255,.5) inset}
             html.studio-theme-dark .history-bulk-btn,body.studio-theme-dark .history-bulk-btn{background:#111722;border-color:#2a3444;color:#d8dee9}
             html.studio-theme-dark .history-bulk-btn:hover,body.studio-theme-dark .history-bulk-btn:hover{background:#d8dee9;color:#10141d;border-color:#d8dee9}
             html.studio-theme-dark .masonry-item.bulk-selected::after,body.studio-theme-dark .masonry-item.bulk-selected::after{background:rgba(15,23,42,.38);box-shadow:inset 0 0 0 2px rgba(226,232,240,.88)}
