@@ -18,12 +18,14 @@ gongju 是一个面向 AI 创作的工作流工具，把图像生成、视频生
 ## 运行环境
 
 - Python 3（项目提供 Windows / macOS 启动脚本）
-- 依赖见 `requirements.txt`，首次使用可运行安装依赖脚本后再启动服务
+- 依赖见 `requirements.txt`，首次启动时会自动安装
 
 ## 目录说明
 
 | 目录/文件 | 说明 |
 |-----------|------|
+| `mac-启动.command` | macOS 一键启动（双击运行） |
+| `win-启动.bat` | Windows 一键启动（双击运行） |
 | `main.py` | 后端服务入口 |
 | `static/` | 前端页面与脚本 |
 | `workflows/` | ComfyUI 工作流定义 |
@@ -33,10 +35,9 @@ gongju 是一个面向 AI 创作的工作流工具，把图像生成、视频生
 
 ## 快速开始
 
-1. 安装依赖（Windows 运行 `安装依赖.bat`，macOS 参考对应 shell 脚本）
-2. 在 `API/.env` 中配置所需的 API 密钥
-3. 运行 `run.bat` 或 `windows-启动服务.bat` 启动服务
-4. 在浏览器中打开本地服务（默认端口 3000），从侧边栏进入各功能模块
+1. 在 `API/.env` 中配置所需的 API 密钥
+2. 双击 `win-启动.bat`（Windows）或 `mac-启动.command`（macOS）启动服务
+3. 在浏览器中打开本地服务（默认端口 3000），从侧边栏进入各功能模块
 
 ## 说明
 
