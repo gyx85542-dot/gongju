@@ -1354,11 +1354,6 @@
                     if (iframe && iframe.contentWindow) {
                         iframe.contentWindow.postMessage(data, '*');
                     }
-                } else if (data.type === 'canvas_updated') {
-                    const iframe = getActiveMessageFrame();
-                    if (iframe && iframe.contentWindow) {
-                        iframe.contentWindow.postMessage(data, '*');
-                    }
                 }
             };
             setInterval(syncStatus, 2000);

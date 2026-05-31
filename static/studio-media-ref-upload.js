@@ -442,5 +442,4 @@ const StudioMediaRefUpload = {
 };
 
 global.StudioMediaRefUpload = StudioMediaRefUpload;
-global.StudioMediaRefGrid = StudioMediaRefUpload;
 })(window);
