@@ -34,12 +34,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 QUIET_ACCESS_PATHS = {
     "/api/queue_status",
-    "/api/canvases",
-    "/api/canvases/trash",
 }
-QUIET_ACCESS_PREFIXES = (
-    "/api/canvases/",
-)
+QUIET_ACCESS_PREFIXES = ()
 
 class QuietAccessLogFilter(logging.Filter):
     def filter(self, record):
@@ -52,8 +48,6 @@ class QuietAccessLogFilter(logging.Filter):
                 return False
         message = record.getMessage()
         if any(f'"GET {path}' in message and '" 200' in message for path in QUIET_ACCESS_PATHS):
-            return False
-        if 'GET /api/canvases/' in message and '/meta' in message and '" 200' in message:
             return False
         return True
 
@@ -119,20 +113,6 @@ class ConnectionManager:
                 print(f"Broadcast image error: {e}")
                 self.active_connections.remove(connection)
 
-    async def broadcast_canvas_updated(self, canvas_id: str, updated_at: int, client_id: str = ""):
-        data = json.dumps({
-            "type": "canvas_updated",
-            "canvas_id": canvas_id,
-            "updated_at": updated_at,
-            "client_id": client_id or "",
-        })
-        for connection in self.active_connections[:]:
-            try:
-                await connection.send_text(data)
-            except Exception as e:
-                print(f"Broadcast canvas error: {e}")
-                self.active_connections.remove(connection)
-
     async def send_personal_message(self, message: dict, client_id: str):
         ws = self.user_connections.get(client_id)
         if ws:
@@ -160,7 +140,6 @@ async def startup_event():
         DATA_DIR,
         HISTORY_FILE,
         API_PROVIDERS_FILE,
-        CANVAS_DIR,
         CONVERSATION_DIR,
     )
 
@@ -193,10 +172,8 @@ HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 API_ENV_FILE = os.path.join(BASE_DIR, "API", ".env")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CONVERSATION_DIR = os.path.join(DATA_DIR, "conversations")
-CANVAS_DIR = os.path.join(DATA_DIR, "canvases")
 API_PROVIDERS_FILE = os.path.join(DATA_DIR, "api_providers.json")
 GLOBAL_CONFIG_FILE = os.path.join(BASE_DIR, "global_config.json")
-CANVAS_TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 QUEUE = []
 QUEUE_LOCK = Lock()
@@ -245,7 +222,6 @@ def prune_pending_jobs(now=None):
 HISTORY_LOCK = Lock()
 GLOBAL_CONFIG_LOCK = Lock()
 CONVERSATION_LOCK = Lock()
-CANVAS_LOCK = Lock()
 LOAD_LOCK = Lock()
 NEXT_TASK_ID = 1
 
@@ -679,7 +655,6 @@ os.makedirs(OUTPUT_OUTPUT_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(WORKFLOW_DIR, exist_ok=True)
 os.makedirs(CONVERSATION_DIR, exist_ok=True)
-os.makedirs(CANVAS_DIR, exist_ok=True)
 
 def send_bytes_range_requests(file_obj, start: int, end: int, chunk_size: int = 10000):
     """Send a file in chunks using Range Requests specification RFC7233"""
@@ -958,33 +933,8 @@ class ChatRequest(BaseModel):
     reference_images: List[AIReference] = []
     provider: str = "comfly"
 
-class CanvasLLMRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=LLM_MESSAGE_MAX_LENGTH)
-    system_prompt: str = "You are a helpful assistant."
-    model: str = ""
-    messages: List[Dict[str, Any]] = []
-    provider: str = "comfly"
-    images: List[str] = []   # 可以是 /output/*.png、/assets/*.png 本地路径 或 http(s) URL 或 data URL
-
 class ConversationCreateRequest(BaseModel):
     title: str = "新对话"
-
-class CanvasCreateRequest(BaseModel):
-    title: str = "未命名画布"
-    icon: str = "🧩"
-
-class CanvasSaveRequest(BaseModel):
-    title: str = "未命名画布"
-    icon: str = "🧩"
-    nodes: List[Dict[str, Any]] = []
-    connections: List[Dict[str, Any]] = []
-    viewport: Dict[str, Any] = {}
-    logs: List[Dict[str, Any]] = []
-    client_id: str = ""
-    base_updated_at: int = 0
-
-class CanvasAssetCheckRequest(BaseModel):
-    urls: List[str] = []
 
 class CanvasAssetDownloadRequest(BaseModel):
     urls: List[str] = []
@@ -1154,80 +1104,6 @@ def load_conversation(user_id, conversation_id):
 
 def list_conversations(user_id):
     return db.list_conversation_summaries(user_id)
-
-def canvas_path(canvas_id):
-    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", canvas_id or "")
-    if not cleaned:
-        raise HTTPException(status_code=400, detail="无效的画布 ID")
-    return os.path.join(CANVAS_DIR, f"{cleaned}.json")
-
-def save_canvas(canvas):
-    canvas["updated_at"] = now_ms()
-    with CANVAS_LOCK:
-        db.save_canvas_record(canvas)
-
-def new_canvas(title="未命名画布", icon="layers"):
-    timestamp = now_ms()
-    canvas = {
-        "id": uuid.uuid4().hex,
-        "title": (title or "未命名画布")[:80],
-        "icon": (icon or "🧩")[:4],
-        "created_at": timestamp,
-        "updated_at": timestamp,
-        "nodes": [],
-        "connections": [],
-        "viewport": {"x": 0, "y": 0, "scale": 1},
-    }
-    save_canvas(canvas)
-    return canvas
-
-def load_canvas(canvas_id):
-    canvas = db.load_canvas_record(canvas_id)
-    if not canvas:
-        raise HTTPException(status_code=404, detail="画布不存在")
-    if canvas.get("deleted_at"):
-        raise HTTPException(status_code=404, detail="画布已在回收站")
-    return canvas
-
-def load_canvas_any(canvas_id):
-    canvas = db.load_canvas_record(canvas_id)
-    if not canvas:
-        raise HTTPException(status_code=404, detail="画布不存在")
-    return canvas
-
-def canvas_record(data):
-    return {
-        "id": data.get("id"),
-        "title": data.get("title", "未命名画布"),
-        "icon": data.get("icon", "🧩"),
-        "created_at": data.get("created_at", 0),
-        "updated_at": data.get("updated_at", 0),
-        "deleted_at": data.get("deleted_at", 0),
-        "node_count": len(data.get("nodes", [])),
-    }
-
-def cleanup_expired_canvas_trash():
-    cutoff = now_ms() - CANVAS_TRASH_RETENTION_MS
-    with CANVAS_LOCK:
-        db.purge_expired_canvas_trash(cutoff)
-
-def iter_canvas_records(include_deleted=False):
-    cleanup_expired_canvas_trash()
-    records = []
-    for data in db.list_all_canvas_records():
-        is_deleted = bool(data.get("deleted_at"))
-        if include_deleted != is_deleted:
-            continue
-        records.append(canvas_record(data))
-    return records
-
-def list_canvases():
-    records = iter_canvas_records(include_deleted=False)
-    return sorted(records, key=lambda item: item["updated_at"], reverse=True)
-
-def list_deleted_canvases():
-    records = iter_canvas_records(include_deleted=True)
-    return sorted(records, key=lambda item: item["deleted_at"], reverse=True)
 
 def display_title(text):
     title = re.sub(r"\s+", " ", text or "").strip()
@@ -2757,8 +2633,7 @@ def apimart_video_size(size):
     allowed = {"16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"}
     return value if value in allowed else "16:9"
 
-@app.post("/api/canvas-video")
-async def canvas_video(payload: CanvasVideoRequest):
+async def submit_video_generation(payload: CanvasVideoRequest):
     provider = get_api_provider(payload.provider_id)
     base_url = video_api_root(provider)
     if not base_url:
@@ -2982,7 +2857,7 @@ async def build_online_video_result(payload: OnlineVideoRequest):
         generate_audio=payload.generate_audio,
     )
     provider = get_api_provider(payload.provider_id)
-    result = await canvas_video(canvas_payload)
+    result = await submit_video_generation(canvas_payload)
     videos = result.get("videos") or []
     record = {
         "prompt": payload.prompt,
@@ -3067,72 +2942,6 @@ async def get_canvas_video_task(task_id: str):
         raise HTTPException(status_code=404, detail="视频任务不存在，可能服务已重启或任务已过期")
     return task
 
-# --- Canvas LLM ---
-
-@app.post("/api/canvas-llm")
-async def canvas_llm(payload: CanvasLLMRequest):
-    chat_base, chat_hdrs, model = resolve_chat_provider(payload.provider, payload.model)
-    # 判断协议：APIMart 异步 vs 标准 OpenAI
-    _llm_provider = get_api_provider(payload.provider)
-    _is_apimart = is_apimart_provider(_llm_provider)
-    upstream_messages = [{"role": "system", "content": payload.system_prompt or SYSTEM_PROMPT}]
-    for item in payload.messages[-MAX_HISTORY_MESSAGES:]:
-        role = item.get("role")
-        content = item.get("content")
-        if role in {"user", "assistant"} and content:
-            upstream_messages.append({"role": role, "content": content})
-    # 构造用户消息：有图片时用 OpenAI vision 多模态格式
-    if payload.images:
-        content_parts = [{"type": "text", "text": payload.message}]
-        ok_imgs = 0
-        for img in payload.images[:8]:
-            if not img or not isinstance(img, str):
-                continue
-            # 本地 /output/* 或 /assets/* 路径转为 data URL；http(s) 或 data URL 直接用
-            if img.startswith("/output/") or img.startswith("/assets/"):
-                ref_url = reference_to_data_url({"url": img}, max_size=1024)
-            else:
-                ref_url = img
-            if not ref_url:
-                continue
-            content_parts.append({"type": "image_url", "image_url": {"url": ref_url}})
-            ok_imgs += 1
-        print(f"[canvas-llm] model={model} provider={payload.provider} text_len={len(payload.message)} images={ok_imgs}/{len(payload.images)}")
-        upstream_messages.append({"role": "user", "content": content_parts})
-    else:
-        upstream_messages.append({"role": "user", "content": payload.message})
-    raw = None
-    try:
-        async with httpx.AsyncClient(timeout=AI_REQUEST_TIMEOUT) as client:
-            req_body = {"model": model, "messages": upstream_messages}
-            if _is_apimart:
-                req_body["stream"] = False   # APIMart 默认流式，强制关闭
-            response = await client.post(
-                f"{chat_base}/chat/completions",
-                headers=chat_hdrs,
-                json=req_body,
-            )
-            response.raise_for_status()
-            if not response.content:
-                raise HTTPException(status_code=502, detail="上游接口返回了空响应")
-            raw = response.json()
-    except httpx.HTTPStatusError as exc:
-        body = exc.response.text or ""
-        raise HTTPException(status_code=exc.response.status_code, detail=f"上游接口错误：{body}") from exc
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"请求上游接口失败：{exc}") from exc
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"解析上游响应失败：{exc}") from exc
-    try:
-        text = text_from_chat_response(raw).strip() if isinstance(raw, dict) else ""
-        text = text or "接口返回了空回复。"
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"解析回复内容失败：{exc}") from exc
-    raw_data = unwrap_apimart_response(raw) if isinstance(raw, dict) else {}
-    return {"text": text, "model": model, "raw_usage": raw_data.get("usage")}
-
 # --- 对话管理 ---
 
 @app.get("/api/conversations")
@@ -3155,47 +2964,6 @@ async def delete_conversation(conversation_id: str, request: Request, x_user_id:
     user_id = safe_user_id(x_user_id, request)
     db.delete_conversation_record(user_id, conversation_id)
     return {"ok": True}
-
-# --- 画布管理 ---
-
-@app.get("/api/canvases")
-async def canvases():
-    return {"canvases": list_canvases()}
-
-@app.get("/api/canvases/trash")
-async def trashed_canvases():
-    return {"canvases": list_deleted_canvases(), "retention_days": 30}
-
-@app.post("/api/canvases")
-async def create_canvas(payload: CanvasCreateRequest):
-    return {"canvas": new_canvas(payload.title, payload.icon)}
-
-@app.get("/api/canvases/{canvas_id}/meta")
-async def get_canvas_meta(canvas_id: str):
-    canvas = load_canvas(canvas_id)
-    return {
-        "id": canvas.get("id"),
-        "updated_at": canvas.get("updated_at", 0),
-        "title": canvas.get("title", "未命名画布"),
-        "icon": canvas.get("icon", "layers"),
-    }
-
-@app.get("/api/canvases/{canvas_id}")
-async def get_canvas(canvas_id: str):
-    return {"canvas": load_canvas(canvas_id)}
-
-@app.post("/api/canvas-assets/check")
-async def check_canvas_assets(payload: CanvasAssetCheckRequest):
-    result = {}
-    for url in payload.urls[:3000]:
-        text = str(url or "").strip()
-        if not text:
-            continue
-        if text.startswith("/output/") or text.startswith("/assets/"):
-            result[text] = bool(output_file_from_url(text))
-        else:
-            result[text] = True
-    return {"exists": result}
 
 @app.post("/api/canvas-assets/download")
 async def download_canvas_assets(payload: CanvasAssetDownloadRequest):
@@ -3223,53 +2991,12 @@ async def download_canvas_assets(payload: CanvasAssetDownloadRequest):
     if count <= 0:
         raise HTTPException(status_code=404, detail="没有可下载的本地图片")
     buffer.seek(0)
-    filename = re.sub(r'[\\/:*?"<>|]+', "_", payload.filename or "canvas-output-images.zip")
+    filename = re.sub(r'[\\/:*?"<>|]+', "_", payload.filename or "gallery-download.zip")
     if not filename.lower().endswith(".zip"):
         filename += ".zip"
     encoded = urllib.parse.quote(filename)
     headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"}
     return Response(buffer.getvalue(), media_type="application/zip", headers=headers)
-
-@app.put("/api/canvases/{canvas_id}")
-async def update_canvas(canvas_id: str, payload: CanvasSaveRequest):
-    canvas = load_canvas(canvas_id)
-    current_updated_at = int(canvas.get("updated_at") or 0)
-    if payload.base_updated_at and current_updated_at and int(payload.base_updated_at) < current_updated_at:
-        raise HTTPException(status_code=409, detail={
-            "message": "画布已被其他页面更新，已拒绝旧版本覆盖。",
-            "canvas": canvas,
-            "updated_at": current_updated_at,
-        })
-    canvas["title"] = (payload.title or canvas.get("title") or "未命名画布")[:80]
-    canvas["icon"] = (payload.icon or canvas.get("icon") or "layers")[:32]
-    canvas["nodes"] = payload.nodes
-    canvas["connections"] = payload.connections
-    canvas["viewport"] = payload.viewport
-    canvas["logs"] = payload.logs[-500:]
-    save_canvas(canvas)
-    await manager.broadcast_canvas_updated(canvas_id, int(canvas.get("updated_at") or now_ms()), payload.client_id)
-    return {"canvas": canvas}
-
-@app.delete("/api/canvases/{canvas_id}")
-async def delete_canvas(canvas_id: str):
-    canvas = load_canvas_any(canvas_id)
-    if not canvas.get("deleted_at"):
-        canvas["deleted_at"] = now_ms()
-        save_canvas(canvas)
-    return {"ok": True}
-
-@app.post("/api/canvases/{canvas_id}/restore")
-async def restore_canvas(canvas_id: str):
-    canvas = load_canvas_any(canvas_id)
-    if canvas.get("deleted_at"):
-        canvas.pop("deleted_at", None)
-        save_canvas(canvas)
-    return {"canvas": canvas}
-
-@app.delete("/api/canvases/{canvas_id}/purge")
-async def purge_canvas(canvas_id: str):
-    db.delete_canvas_record(canvas_id)
-    return {"ok": True}
 
 # --- GPT 对话 ---
 
@@ -3800,7 +3527,6 @@ class WorkflowField(BaseModel):
 class WorkflowConfig(BaseModel):
     title: str = ""
     fields: List[WorkflowField] = []
-    mini_cards: Dict[str, Any] = {}
 
 class WorkflowUploadRequest(BaseModel):
     name: str

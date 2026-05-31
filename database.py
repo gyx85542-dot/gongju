@@ -81,7 +81,6 @@ def init_database(
     data_dir: str,
     history_file: str,
     api_providers_file: str,
-    canvas_dir: str,
     conversation_dir: str,
 ) -> None:
     global DB_PATH
@@ -98,7 +97,6 @@ def init_database(
                 conn,
                 history_file=history_file,
                 api_providers_file=api_providers_file,
-                canvas_dir=canvas_dir,
                 conversation_dir=conversation_dir,
             )
             conn.execute(
@@ -111,7 +109,6 @@ def init_database(
                 conn,
                 history_file=history_file,
                 api_providers_file=api_providers_file,
-                canvas_dir=canvas_dir,
                 conversation_dir=conversation_dir,
             )
             conn.commit()
@@ -140,7 +137,6 @@ def _migrate_from_json_if_empty(
     *,
     history_file: str,
     api_providers_file: str,
-    canvas_dir: str,
     conversation_dir: str,
 ) -> None:
     history_count = conn.execute("SELECT COUNT(*) AS c FROM history_records").fetchone()["c"]
@@ -152,12 +148,6 @@ def _migrate_from_json_if_empty(
     if provider_count == 0 and os.path.isfile(api_providers_file):
         _import_api_providers_json(conn, api_providers_file)
         _backup_path(api_providers_file)
-
-    canvas_count = conn.execute("SELECT COUNT(*) AS c FROM canvases").fetchone()["c"]
-    if canvas_count == 0 and os.path.isdir(canvas_dir):
-        imported = _import_canvas_dir(conn, canvas_dir)
-        if imported:
-            _backup_path(canvas_dir)
 
     conv_count = conn.execute("SELECT COUNT(*) AS c FROM conversations").fetchone()["c"]
     if conv_count == 0 and os.path.isdir(conversation_dir):
@@ -171,14 +161,12 @@ def _migrate_from_json(
     *,
     history_file: str,
     api_providers_file: str,
-    canvas_dir: str,
     conversation_dir: str,
 ) -> None:
     _migrate_from_json_if_empty(
         conn,
         history_file=history_file,
         api_providers_file=api_providers_file,
-        canvas_dir=canvas_dir,
         conversation_dir=conversation_dir,
     )
 
@@ -220,28 +208,6 @@ def _import_api_providers_json(conn: sqlite3.Connection, path: str) -> None:
         (json.dumps(data, ensure_ascii=False),),
     )
     print(f"[db] 已迁移 API 平台配置 ({len(data)} 项)")
-
-
-def _import_canvas_dir(conn: sqlite3.Connection, canvas_dir: str) -> int:
-    count = 0
-    for filename in os.listdir(canvas_dir):
-        if not filename.endswith(".json"):
-            continue
-        path = os.path.join(canvas_dir, filename)
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            continue
-        canvas_id = str(data.get("id") or filename[:-5])
-        conn.execute(
-            "INSERT OR REPLACE INTO canvases(id, record_json) VALUES (?, ?)",
-            (canvas_id, json.dumps(data, ensure_ascii=False)),
-        )
-        count += 1
-    if count:
-        print(f"[db] 已迁移 {count} 个画布")
-    return count
 
 
 def _import_conversation_dir(conn: sqlite3.Connection, conversation_dir: str) -> int:
@@ -513,71 +479,6 @@ def save_api_providers_raw(providers: List[Any]) -> None:
             (payload,),
         )
         conn.commit()
-
-
-# --- Canvases ---
-
-def save_canvas_record(canvas: Dict[str, Any]) -> None:
-    canvas_id = str(canvas["id"])
-    payload = json.dumps(canvas, ensure_ascii=False, indent=2)
-    with DB_LOCK:
-        conn = _connect()
-        conn.execute(
-            "INSERT OR REPLACE INTO canvases(id, record_json) VALUES (?, ?)",
-            (canvas_id, payload),
-        )
-        conn.commit()
-
-
-def load_canvas_record(canvas_id: str) -> Optional[Dict[str, Any]]:
-    with DB_LOCK:
-        conn = _connect()
-        row = conn.execute(
-            "SELECT record_json FROM canvases WHERE id = ?",
-            (canvas_id,),
-        ).fetchone()
-    if not row:
-        return None
-    return json.loads(row["record_json"])
-
-
-def delete_canvas_record(canvas_id: str) -> None:
-    with DB_LOCK:
-        conn = _connect()
-        conn.execute("DELETE FROM canvases WHERE id = ?", (canvas_id,))
-        conn.commit()
-
-
-def list_all_canvas_records() -> List[Dict[str, Any]]:
-    with DB_LOCK:
-        conn = _connect()
-        rows = conn.execute("SELECT record_json FROM canvases").fetchall()
-    out = []
-    for row in rows:
-        try:
-            out.append(json.loads(row["record_json"]))
-        except Exception:
-            continue
-    return out
-
-
-def purge_expired_canvas_trash(cutoff_ms: int) -> int:
-    removed = 0
-    with DB_LOCK:
-        conn = _connect()
-        rows = conn.execute("SELECT id, record_json FROM canvases").fetchall()
-        for row in rows:
-            try:
-                data = json.loads(row["record_json"])
-            except Exception:
-                continue
-            deleted_at = int(data.get("deleted_at") or 0)
-            if deleted_at and deleted_at < cutoff_ms:
-                conn.execute("DELETE FROM canvases WHERE id = ?", (row["id"],))
-                removed += 1
-        if removed:
-            conn.commit()
-    return removed
 
 
 # --- Conversations ---
