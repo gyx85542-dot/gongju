@@ -17,11 +17,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260530-rh-options"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260529-runninghub"></script>
-    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-rh-resume"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-ref-upload-fix"></script>
+    <script src="/static/studio-media-ref-upload.js?v=20260530-global"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-media-ref">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -35,6 +36,7 @@
         .output-grid-cell img.draggable-output { cursor:grab; user-select:none; -webkit-user-drag:element; }
         .empty-hint { padding:12px; border:1px dashed rgba(255,255,255,.12); font-size:11px; color:#737373; line-height:1.5; text-align:center; background:#313131; }
         .empty-hint a { color:#ff4d94; font-weight:700; text-decoration:underline; cursor:pointer; }
+        .rh-media-field-block + .rh-media-field-block { margin-top: 12px; }
         .result-frame { background:#1a1a1a; border-radius:10px; border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; min-height:0; flex:1; overflow:hidden; }
         .result-frame.has-outputs { justify-content:flex-start; }
         .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; }
@@ -139,6 +141,19 @@
         const CLIENT_ID = localStorage.getItem('client_id') || (()=>{ const id=crypto.randomUUID?.()||String(Date.now()); localStorage.setItem('client_id',id); return id; })();
         const META_SCOPE = 'runninghub';
         const META_PIN = 'rh_pinned', META_FAV = 'rh_favorites', META_ORDER = 'rh_display_order';
+        const RH_MAX_CONCURRENT = 5;
+
+        function activePendingCount(){
+            return pendingJobs.filter(j => !j.error).length;
+        }
+        function buildRunSnapshot(){
+            return {
+                workflow_id: selectedId,
+                fields: collectRunFields(),
+                prompt: collectPrimaryPrompt(),
+                reference_images: collectReferenceImages(),
+            };
+        }
 
         let workflows = [], selectedId = '', currentWorkflow = null;
         const RH_SDXL_DIMENSIONS = [
@@ -176,7 +191,8 @@
                 selected: rhNormSpaces(o) === rhNormSpaces(canonical) || String(o) === String(canonical),
             }));
         }
-        let fieldValues = {}, fieldImageUrls = {}, batchCount = 1, outputCols = 2;
+        let fieldValues = {}, fieldImageUrls = {}, fieldMediaUrls = {}, batchCount = 1, outputCols = 2;
+        let rhMediaGrids = {}, rhMediaRelay = null;
         let allHistory = [], pendingJobs = [], historyLoading = false, currentLightboxData = null;
         let pinnedIds = [], favoriteIds = [], displayOrder = [];
 
@@ -201,7 +217,7 @@
             if(!dt || !im){
                 if(legacy === 'select'){ dt = dt || 'text'; im = im || 'dropdown'; }
                 else if(legacy === 'textarea'){ dt = 'textarea'; im = 'manual'; }
-                else if(['text','number','image','textarea'].includes(legacy)){ dt = legacy; im = 'manual'; }
+                else if(['text','number','image','video','audio','textarea'].includes(legacy)){ dt = legacy; im = 'manual'; }
                 else { dt = 'text'; im = 'manual'; }
             }
             f.dataType = dt;
@@ -214,6 +230,8 @@
             if(rhEffectiveFieldType(f) === 'select') return 'setting';
             const t = rhEffectiveFieldType(f);
             if(t === 'image') return 'image';
+            if(t === 'video') return 'video';
+            if(t === 'audio') return 'audio';
             if(t === 'text' || t === 'textarea') return 'prompt';
             const key = `${f.fieldName||''} ${f.name||''}`.toLowerCase();
             if(/prompt|text|description|caption|提示|正向|负向/.test(key)) return 'prompt';
@@ -248,8 +266,12 @@
             if(!btn) return;
             const wfReady = workflows.length > 0 && selectedId && String(currentWorkflow?.workflow_id || '').trim();
             const promptMissing = !collectPrimaryPrompt();
-            btn.disabled = !wfReady || promptMissing;
-            syncGenBtnTip(wfReady && promptMissing);
+            const atCapacity = activePendingCount() >= RH_MAX_CONCURRENT;
+            btn.disabled = !wfReady || promptMissing || atCapacity;
+            const wrap = document.getElementById('genBtnWrap');
+            if(!wrap) return;
+            if(atCapacity) wrap.setAttribute('data-tip', tr('rhPage.concurrentLimit'));
+            else syncGenBtnTip(wfReady && promptMissing);
         }
         function effectiveFields(){ return currentWorkflow?.fields || []; }
         function rhEnsureOptions(options, value){
@@ -306,10 +328,19 @@
                 const data = await fetch(`/api/runninghub/workflows/${encodeURIComponent(id)}`).then(r=>r.json());
                 currentWorkflow = data.workflow;
                 hydrateWorkflowFields(currentWorkflow);
-                fieldValues = {}; fieldImageUrls = {};
+                fieldValues = {}; fieldImageUrls = {}; fieldMediaUrls = {}; rhMediaGrids = {};
                 (currentWorkflow?.fields||[]).forEach(f => {
                     rhNormalizeFieldSchema(f);
                     if(f.default === undefined || f.default === null || f.default === '') return;
+                    const dt = rhEffectiveFieldType(f);
+                    if(dt === 'video' || dt === 'audio'){
+                        const url = StudioMediaRefUpload.normalizeUrl(String(f.default));
+                        if(url){
+                            fieldMediaUrls[f.id] = url;
+                            fieldValues[f.id] = url;
+                        }
+                        return;
+                    }
                     const eff = rhEffectiveFieldType(f);
                     if(eff === 'select' && (f.options||[]).length){
                         fieldValues[f.id] = rhCanonicalOption(f.options, f.default);
@@ -335,9 +366,11 @@
             }
             const prompts = fields.filter(f => rhFieldKind(f) === 'prompt');
             const images = fields.filter(f => rhFieldKind(f) === 'image');
+            const videos = fields.filter(f => rhFieldKind(f) === 'video');
+            const audios = fields.filter(f => rhFieldKind(f) === 'audio');
             const settings = fields.filter(f => rhFieldKind(f) === 'setting');
             let html = '';
-            if(prompts.length || images.length){
+            if(prompts.length || images.length || videos.length || audios.length){
                 html += `<section class="tool-panel">`;
                 prompts.forEach(f => {
                     const rows = prompts.length === 1 ? 4 : (f.type === 'textarea' ? 4 : 2);
@@ -352,6 +385,22 @@
                         <div id="rhRefGrid" class="ref-grid"></div>
                     </div>`;
                 }
+                videos.forEach(f => {
+                    html += `<div class="rh-media-field-block">
+                        <div class="control-label mb-1"><span>${escapeHtml(f.name || f.fieldName || tr('video.referenceVideos'))}</span></div>
+                        <div id="rhMediaDrop_${escapeAttr(f.id)}" class="media-ref-drop-zone" data-media-kind="video">
+                            <div id="rhMediaGrid_${escapeAttr(f.id)}" class="ref-grid"></div>
+                        </div>
+                    </div>`;
+                });
+                audios.forEach(f => {
+                    html += `<div class="rh-media-field-block">
+                        <div class="control-label mb-1"><span>${escapeHtml(f.name || f.fieldName || tr('video.referenceAudio'))}</span></div>
+                        <div id="rhMediaDrop_${escapeAttr(f.id)}" class="media-ref-drop-zone" data-media-kind="audio">
+                            <div id="rhMediaGrid_${escapeAttr(f.id)}" class="ref-grid"></div>
+                        </div>
+                    </div>`;
+                });
                 html += `</section>`;
             }
             if(settings.length){
@@ -369,13 +418,69 @@
                 </div>
             </section>`;
             panel.innerHTML = html;
+            rhMediaGrids = {};
             if(images.length){
                 mountWorkflowRefGrid(images);
             }
+            [...videos, ...audios].forEach(f => mountRhMediaField(f));
             lucide.createIcons();
             syncOutputDragState();
             syncPromptSectionVisibility();
             syncGenBtnState();
+        }
+
+        function ensureRhMediaRelay(){
+            if(rhMediaRelay) return rhMediaRelay;
+            rhMediaRelay = StudioMediaRefUpload.createGalleryRelay({
+                isEnabled: () => true,
+                onDropAccepted: () => {
+                    try { window.parent.postMessage({ type:'studio-gallery-drag-result', accepted:true }, '*'); } catch(e){}
+                },
+                onDropRejected: () => {
+                    try { window.parent.postMessage({ type:'studio-gallery-drag-result', accepted:false }, '*'); } catch(e){}
+                },
+            });
+            rhMediaRelay.bind();
+            return rhMediaRelay;
+        }
+        function syncRhMediaFieldValue(fieldId){
+            const urls = rhMediaGrids[fieldId]?.getUrls?.() || [];
+            const url = urls[0] || '';
+            if(url){
+                fieldMediaUrls[fieldId] = url;
+                fieldValues[fieldId] = url;
+            } else {
+                delete fieldMediaUrls[fieldId];
+                delete fieldValues[fieldId];
+            }
+        }
+        function mountRhMediaField(field){
+            if(!field?.id || !window.StudioMediaRefUpload) return;
+            const kind = rhEffectiveFieldType(field);
+            if(kind !== 'video' && kind !== 'audio') return;
+            const gridId = `rhMediaGrid_${field.id}`;
+            const dropZoneId = `rhMediaDrop_${field.id}`;
+            rhMediaGrids[field.id] = StudioMediaRefUpload.mount({
+                gridId,
+                dropZoneId,
+                kind,
+                maxSlots: 1,
+                tr,
+                galleryRelay: ensureRhMediaRelay(),
+                onGalleryDrop: ok => {
+                    if(ok) syncRhMediaFieldValue(field.id);
+                },
+                onUrlsChange: () => syncRhMediaFieldValue(field.id),
+            });
+            const saved = fieldMediaUrls[field.id] || fieldValues[field.id] || '';
+            if(saved) rhMediaGrids[field.id].setUrls([saved]);
+        }
+        function rhMediaFieldUrl(field){
+            const id = field?.id;
+            if(!id) return '';
+            const fromGrid = rhMediaGrids[id]?.getUrls?.()?.[0] || '';
+            const raw = fromGrid || fieldMediaUrls[id] || fieldValues[id] || '';
+            return StudioMediaRefUpload.normalizeUrl(raw);
         }
 
         function mountWorkflowRefGrid(images){
@@ -397,6 +502,15 @@
                 },
                 onBoardPickUI: syncOutputDragState
             });
+        }
+        function refreshRefGrid(){
+            const images = effectiveFields().filter(f => rhFieldKind(f) === 'image');
+            if(!images.length) return;
+            mountWorkflowRefGrid(images);
+        }
+        function isServerAssetUrl(url){
+            const n = StudioRefUpload.normalizeImageUrl(url);
+            return n.startsWith('/assets/') || n.startsWith('/output/');
         }
         function syncOutputDragState(){
             const pickId = StudioRefUpload.getBoardPickSlotId();
@@ -447,22 +561,25 @@
             if(!file || !fieldId) return;
             const preview = URL.createObjectURL(file);
             fieldImageUrls[fieldId] = preview;
+            refreshRefGrid();
             const form = new FormData();
             form.append('files', file);
             try {
-                const data = await fetch('/api/upload', { method:'POST', body:form }).then(r=>r.json());
+                const data = await fetch('/api/ai/upload', { method:'POST', body:form }).then(r=>r.json());
                 const savedUrl = StudioRefUpload.normalizeImageUrl(data.files?.[0]?.url || '');
                 if(savedUrl){
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     fieldImageUrls[fieldId] = savedUrl;
                     fieldValues[fieldId] = savedUrl;
                 }
-                renderDynamicPanel();
+                refreshRefGrid();
+                syncGenBtnState();
             } catch(e){
                 alert(tr('comfy.imageUploadFailed'));
                 delete fieldValues[fieldId];
                 delete fieldImageUrls[fieldId];
-                renderDynamicPanel();
+                refreshRefGrid();
+                syncGenBtnState();
             }
         }
         async function assignImageFromUrl(url, fieldId){
@@ -470,16 +587,8 @@
             if(!normalized || !fieldId) return;
             fieldImageUrls[fieldId] = normalized;
             fieldValues[fieldId] = normalized;
-            try {
-                const resp = await fetch(normalized);
-                if(!resp.ok) throw new Error('fetch');
-                const blob = await resp.blob();
-                const name = normalized.split('/').pop() || 'image.png';
-                await uploadImageFile(new File([blob], name, { type: blob.type || 'image/png' }), fieldId);
-            } catch(e){
-                fieldValues[fieldId] = normalized;
-                renderDynamicPanel();
-            }
+            refreshRefGrid();
+            syncGenBtnState();
             cancelBoardPick();
         }
 
@@ -488,6 +597,12 @@
             const out = { ...fieldValues };
             effectiveFields().forEach(f => {
                 const t = rhEffectiveFieldType(f);
+                if(t === 'video' || t === 'audio'){
+                    const url = rhMediaFieldUrl(f);
+                    if(url) out[f.id] = url;
+                    else delete out[f.id];
+                    return;
+                }
                 if(t === 'number' && out[f.id] !== undefined && out[f.id] !== ''){
                     out[f.id] = Number(out[f.id]);
                 } else if(t === 'select' && out[f.id] !== undefined && out[f.id] !== null){
@@ -523,69 +638,162 @@
                 const url = StudioRefUpload.normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
                 if(!url || url.startsWith('blob:')){ alert(tr('rhPage.imageRequired')); return false; }
             }
+            for(const f of effectiveFields().filter(x => rhFieldKind(x)==='video')){
+                const url = rhMediaFieldUrl(f);
+                if(!url || url.startsWith('blob:')){ alert(tr('rhPage.videoRequired')); return false; }
+            }
+            for(const f of effectiveFields().filter(x => rhFieldKind(x)==='audio')){
+                const url = rhMediaFieldUrl(f);
+                if(!url || url.startsWith('blob:')){ alert(tr('rhPage.audioRequired')); return false; }
+            }
             return true;
         }
 
-        async function runGenerateJob(jobId){
+        async function clearPendingJob(jobId){
+            pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+            if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+            renderOutputGrid();
+            syncGenBtnState();
+        }
+
+        function failPendingJob(jobId, message, delay = 3200){
+            const job = pendingJobs.find(j => j.id === jobId);
+            if(job) job.error = message || tr('rhPage.generateFailed');
+            renderOutputGrid();
+            syncGenBtnState();
+            if(delay > 0){
+                setTimeout(() => { clearPendingJob(jobId); }, delay);
+            } else {
+                clearPendingJob(jobId);
+            }
+        }
+
+        const resumingJobIds = new Set();
+
+        async function resumePendingJobPoll(job){
+            if(!job?.id || !job.task_id || resumingJobIds.has(job.id)) return;
+            resumingJobIds.add(job.id);
             try {
-                const res = await fetch('/api/runninghub/run', {
+                const data = await pollCanvasRunningHubTask(job.task_id);
+                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
+                if(!images?.length) throw new Error(tr('rhPage.noOutput'));
+                upsertHistoryItem({
+                    prompt: data.prompt || job.prompt || '',
+                    images,
+                    videos: data.videos || [],
+                    timestamp: data.timestamp || Date.now()/1000,
+                    type: HISTORY_TYPE,
+                    workflow_id: data.workflow_id || selectedId,
+                    params: data.params || {},
+                });
+                resumingJobIds.delete(job.id);
+                await clearPendingJob(job.id);
+            } catch(err){
+                resumingJobIds.delete(job.id);
+                failPendingJob(job.id, err.message || tr('rhPage.generateFailed'));
+            }
+        }
+
+        async function resumePendingJobs(){
+            try {
+                const jobs = await fetch('/api/online-pending').then(r => r.json());
+                if(!Array.isArray(jobs) || !jobs.length) return;
+                const now = Date.now() / 1000;
+                let changed = false;
+                for(const serverJob of jobs){
+                    if(serverJob.error) continue;
+                    if(serverJob.mediaKind && serverJob.mediaKind !== 'runninghub') continue;
+                    if(!serverJob.task_id){
+                        if(serverJob.timestamp && now - serverJob.timestamp > 120){
+                            fetch('/api/online-pending/' + encodeURIComponent(serverJob.id), { method:'DELETE' }).catch(()=>{});
+                        }
+                        continue;
+                    }
+                    let local = pendingJobs.find(j => j.id === serverJob.id);
+                    if(!local){
+                        local = { ...serverJob };
+                        pendingJobs.unshift(local);
+                        changed = true;
+                    } else {
+                        Object.assign(local, serverJob);
+                    }
+                    resumePendingJobPoll(local);
+                }
+                if(changed) renderOutputGrid();
+                syncGenBtnState();
+            } catch(e){
+                console.error('Resume pending jobs failed:', e);
+            }
+        }
+
+        async function runGenerateJob(jobId, snapshot){
+            const snap = snapshot || buildRunSnapshot();
+            try {
+                const createRes = await fetch('/api/canvas-runninghub-tasks', {
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                        workflow_id: selectedId,
-                        fields: collectRunFields(),
-                        prompt: collectPrimaryPrompt(),
-                        reference_images: collectReferenceImages(),
+                    body:JSON.stringify({
+                        workflow_id: snap.workflow_id,
+                        fields: snap.fields,
+                        prompt: snap.prompt,
+                        reference_images: snap.reference_images,
                         client_id: CLIENT_ID,
                     })
+                }).then(async r => {
+                    if(!r.ok){
+                        const data = await r.json().catch(() => ({}));
+                        const d = data.detail;
+                        const msg = typeof d === 'string' ? d : (Array.isArray(d) ? (d[0]?.msg || String(d[0])) : '') || data.msg;
+                        throw new Error(msg || tr('rhPage.generateFailed'));
+                    }
+                    return r.json();
                 });
-                const data = await res.json();
-                if(!res.ok){
-                    const d = data.detail;
-                    const msg = typeof d === 'string' ? d : (Array.isArray(d) ? (d[0]?.msg || String(d[0])) : '') || data.msg;
-                    throw new Error(msg || tr('rhPage.generateFailed'));
-                }
-                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
-                if(images?.length){
-                    upsertHistoryItem({
-                        prompt: data.prompt || collectPrimaryPrompt(),
-                        images,
-                        videos: data.videos || [],
-                        timestamp: data.timestamp || Date.now()/1000,
-                        type: HISTORY_TYPE,
-                        workflow_id: selectedId,
-                        params: { fields: collectRunFields(), reference_images: collectReferenceImages() },
-                    });
-                } else throw new Error(tr('rhPage.noOutput'));
-                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                renderOutputGrid();
-            } catch(err){
+                const taskId = createRes.task_id;
                 const job = pendingJobs.find(j => j.id === jobId);
-                if(job) job.error = err.message || 'Failed';
+                if(job) job.task_id = taskId;
+                if(window.updatePendingJobOnServer) updatePendingJobOnServer(jobId, { task_id: taskId });
                 renderOutputGrid();
-                setTimeout(() => {
-                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                    renderOutputGrid();
-                }, 3200);
+
+                const data = await pollCanvasRunningHubTask(taskId);
+                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
+                if(!images?.length) throw new Error(tr('rhPage.noOutput'));
+                upsertHistoryItem({
+                    prompt: data.prompt || snap.prompt || '',
+                    images,
+                    videos: data.videos || [],
+                    timestamp: data.timestamp || Date.now()/1000,
+                    type: HISTORY_TYPE,
+                    workflow_id: data.workflow_id || snap.workflow_id,
+                    params: data.params || { fields: snap.fields, reference_images: snap.reference_images },
+                });
+                await clearPendingJob(jobId);
+            } catch(err){
+                const msg = typeof err.message === 'string' ? err.message : tr('rhPage.generateFailed');
+                failPendingJob(jobId, msg);
             }
         }
 
         async function submitGenerate(){
+            if(activePendingCount() >= RH_MAX_CONCURRENT){
+                alert(tr('rhPage.concurrentLimit'));
+                return;
+            }
             if(!(await validateBeforeRun())) return;
             document.getElementById('placeholder')?.classList.add('hidden');
             const promptText = collectPrimaryPrompt() || currentWorkflow?.name || tr('rhPage.generate');
-            const jobs = [];
-            for(let i=0; i<batchCount; i++){
-                const jobId = `rh_${Date.now()}_${i}`;
-                const jobObj = { id: jobId, prompt: promptText, mediaKind: 'image' };
+            const snapshot = { ...buildRunSnapshot(), prompt: promptText };
+            const slotsLeft = RH_MAX_CONCURRENT - activePendingCount();
+            const launches = Math.min(batchCount, slotsLeft);
+            if(!launches) return;
+            for(let i=0; i<launches; i++){
+                const jobId = `rh_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`;
+                const jobObj = { id: jobId, prompt: promptText, mediaKind: 'runninghub' };
                 pendingJobs.unshift(jobObj);
                 if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
-                jobs.push(runGenerateJob(jobId));
+                void runGenerateJob(jobId, snapshot);
             }
             renderOutputGrid();
-            await Promise.allSettled(jobs);
+            syncGenBtnState();
         }
 
         function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
@@ -766,9 +974,16 @@
                     fieldValues[f.id] = url;
                 }
             });
+            effectiveFields().filter(f => rhFieldKind(f)==='video' || rhFieldKind(f)==='audio').forEach(f => {
+                const url = StudioMediaRefUpload.normalizeUrl(fieldValues[f.id] || '');
+                if(url){
+                    fieldMediaUrls[f.id] = url;
+                }
+            });
             renderDynamicPanel();
             syncGenBtnState();
         }
+        window.applyRecordParams = applyRecordParams;
         async function loadAllHistory(){
             if(historyLoading) return; historyLoading = true;
             try {
@@ -812,6 +1027,9 @@
                 window.StudioI18n?.set(e.data.lang);
                 syncGenBtnState();
             }
+            if(e.data?.type === 'runninghub-changed'){
+                loadWorkflowList();
+            }
         });
         try {
             new BroadcastChannel('studio-api').onmessage = e => { if(e.data?.type === 'runninghub-changed') loadWorkflowList(); };
@@ -838,6 +1056,7 @@
             document.getElementById('outputColsSlider').oninput = e => setOutputCols(e.target.value);
             await loadWorkflowList();
             await loadAllHistory();
+            await resumePendingJobs();
             if(window.StudioPanelBridge){
                 const bridge = StudioPanelBridge;
                 renderOutputGrid = function(){ bridge.notifyPending(pendingJobs); bridge.notifyRefresh(); };

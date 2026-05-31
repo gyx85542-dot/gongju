@@ -152,6 +152,9 @@ async def startup_event():
     global GLOBAL_LOOP
     GLOBAL_LOOP = asyncio.get_running_loop()
     ensure_runtime_config_files()
+    load_pending_jobs_from_disk()
+    prune_pending_jobs()
+    save_pending_jobs_to_disk()
     db.init_database(
         BASE_DIR,
         DATA_DIR,
@@ -199,6 +202,46 @@ QUEUE = []
 QUEUE_LOCK = Lock()
 ACTIVE_PENDING_JOBS = []
 ACTIVE_PENDING_JOBS_LOCK = Lock()
+PENDING_JOBS_FILE = os.path.join(DATA_DIR, "pending_jobs.json")
+PENDING_JOB_TTL_SECONDS = {
+    "video": 7200,
+    "local-comfy": 3600,
+    "runninghub": 3600,
+    "image": 900,
+}
+DEFAULT_PENDING_JOB_TTL = 600
+
+def pending_job_ttl_seconds(job):
+    kind = str((job or {}).get("mediaKind") or "").strip()
+    return PENDING_JOB_TTL_SECONDS.get(kind, DEFAULT_PENDING_JOB_TTL)
+
+def load_pending_jobs_from_disk():
+    global ACTIVE_PENDING_JOBS
+    try:
+        if not os.path.exists(PENDING_JOBS_FILE):
+            return
+        with open(PENDING_JOBS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            ACTIVE_PENDING_JOBS = data
+    except Exception as e:
+        print(f"加载 pending jobs 失败: {e}")
+
+def save_pending_jobs_to_disk():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(PENDING_JOBS_FILE, "w", encoding="utf-8") as f:
+            json.dump(ACTIVE_PENDING_JOBS, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"保存 pending jobs 失败: {e}")
+
+def prune_pending_jobs(now=None):
+    global ACTIVE_PENDING_JOBS
+    now = now or time.time()
+    ACTIVE_PENDING_JOBS = [
+        job for job in ACTIVE_PENDING_JOBS
+        if now - float(job.get("timestamp") or 0) < pending_job_ttl_seconds(job)
+    ]
 HISTORY_LOCK = Lock()
 GLOBAL_CONFIG_LOCK = Lock()
 CONVERSATION_LOCK = Lock()
@@ -803,7 +846,12 @@ class OnlinePendingJob(BaseModel):
     id: str
     prompt: str
     mediaKind: str
-    timestamp: float
+    timestamp: float = Field(default_factory=lambda: time.time())
+    error: Optional[str] = None
+    task_id: Optional[str] = None
+
+class OnlinePendingJobPatch(BaseModel):
+    task_id: Optional[str] = None
     error: Optional[str] = None
 
 class TokenRequest(BaseModel):
@@ -846,6 +894,8 @@ class OnlineVideoRequest(BaseModel):
     aspect_ratio: str = "16:9"
     resolution: str = "720p"
     reference_images: List[AIReference] = []
+    reference_videos: List[str] = []
+    reference_audios: List[str] = []
     enhance_prompt: bool = False
     enable_upsample: bool = False
     watermark: bool = False
@@ -873,6 +923,7 @@ class CanvasVideoRequest(BaseModel):
     size: str = ""
     images: List[AIReference] = []
     videos: List[str] = []
+    audios: List[str] = []
     enhance_prompt: bool = False
     enable_upsample: bool = False
     watermark: bool = False
@@ -1540,18 +1591,30 @@ def apimart_video_aspect_ratio(aspect: str) -> str:
     allowed = {"16:9", "9:16", "1:1", "4:3", "3:4", "21:9"}
     return value if value in allowed else "16:9"
 
+def apimart_seedance_20_supports_1080p(model: str) -> bool:
+    """文档：1080p 仅 doubao-seedance-2.0 与 doubao-seedance-2.0-face 支持（不含 fast 版）。"""
+    normalized = apimart_video_model(model).lower()
+    return normalized in {"doubao-seedance-2.0", "doubao-seedance-2.0-face"}
+
 def apimart_seedance_20_resolution(model: str, resolution: str) -> str:
     res = str(resolution or "480p").strip().lower()
-    if res == "1080p" and "-face" not in apimart_video_model(model).lower():
+    if res == "1080p" and not apimart_seedance_20_supports_1080p(model):
         return "720p"
     return res if res in {"480p", "720p", "1080p"} else "480p"
+
+def apimart_seedance_20_duration(duration: int) -> int:
+    try:
+        value = int(duration or 5)
+    except (TypeError, ValueError):
+        value = 5
+    return max(4, min(15, value))
 
 def build_apimart_video_body(payload, model, image_with_roles, image_payload):
     """按 APIMart 文档构造 /v1/videos/generations 请求体（Seedance 2.0 / 1.5 / 其他）。"""
     body = {
         "prompt": payload.prompt,
         "model": model,
-        "duration": payload.duration,
+        "duration": apimart_seedance_20_duration(payload.duration) if is_apimart_seedance_20_model(model) else payload.duration,
     }
     if is_apimart_seedance_20_model(model):
         body["size"] = apimart_video_size(payload.aspect_ratio or payload.size)
@@ -1570,12 +1633,20 @@ def build_apimart_video_body(payload, model, image_with_roles, image_payload):
                 body["generate_audio"] = True
         if payload.camerafixed:
             body["camerafixed"] = True
+    has_frame_roles = any(
+        str(item.get("role") or "").strip() in {"first_frame", "last_frame"}
+        for item in (image_with_roles or [])
+        if isinstance(item, dict)
+    )
     if image_with_roles:
         body["image_with_roles"] = image_with_roles
     elif image_payload:
         body["image_urls"] = image_payload[:9]
-    if payload.videos:
-        body["video_urls"] = [v for v in payload.videos if v][:3]
+    if not has_frame_roles:
+        if payload.videos:
+            body["video_urls"] = [v for v in payload.videos if v][:3]
+        if payload.audios:
+            body["audio_urls"] = [a for a in payload.audios if a][:3]
     if payload.seed is not None:
         body["seed"] = payload.seed
     if payload.return_last_frame and is_apimart_seedance_20_model(model):
@@ -1723,6 +1794,34 @@ async def upload_image_for_apimart(client, provider, ref_url: str) -> str:
             print(f"APIMart 文件上传异常: {e}")
             return f"ERR:上传异常 {e}"
     return "ERR:不支持的图片来源（仅支持 http/https/asset/data 或本地 /output/ /assets/ 路径）"
+
+async def upload_media_for_apimart(client, provider, ref_url: str, media_kind: str = "video") -> str:
+    """Upload local video/audio via RunningHub, return download_url for APIMart APIs."""
+    ref_url = str(ref_url or "").strip()
+    if not ref_url:
+        return "ERR:空地址"
+    if ref_url.startswith("http://") or ref_url.startswith("https://") or ref_url.startswith("asset://"):
+        return ref_url
+    if ref_url.startswith("/output/") or ref_url.startswith("/assets/"):
+        path = output_file_from_url(ref_url)
+        if not path:
+            return "ERR:本地文件不存在或已被删除"
+        api_key = runninghub_api_key()
+        if not api_key:
+            return "ERR:未配置 RunningHub API Key，无法上传视频/音频"
+        try:
+            result = await asyncio.to_thread(runninghub_upload_media_binary, path, api_key)
+            url = str(result.get("download_url") or "").strip()
+            if valid_apimart_video_image_input(url):
+                return url
+            return "ERR:RunningHub 上传未返回可用 download_url"
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+            return f"ERR:{detail}"
+        except Exception as e:
+            print(f"RunningHub {media_kind} upload exception: {e}")
+            return f"ERR:上传异常 {e}"
+    return "ERR:不支持的媒体来源（仅支持 http/https/asset 或本地 /output/ /assets/ 路径）"
 
 async def save_ai_image_to_output(image_data, prefix="online_", category="output"):
     filename = f"{prefix}{uuid.uuid4().hex[:10]}.png"
@@ -2041,58 +2140,103 @@ def download_output(url: str, name: str = ""):
     filename = os.path.basename(name) if name else os.path.basename(path)
     return FileResponse(path, media_type=content_type_for_path(path), filename=filename)
 
+def comfy_upload_image_bytes(content: bytes, filename: str, content_type: str = "image/png"):
+    """Upload to the first available ComfyUI instance and persist a local input copy."""
+    last_result = None
+    for addr in COMFYUI_INSTANCES:
+        try:
+            files_data = {"image": (filename, content, content_type)}
+            response = requests.post(f"http://{addr}/upload/image", files=files_data, timeout=5)
+            if response.status_code == 200:
+                last_result = response.json()
+                break
+        except Exception as e:
+            print(f"Upload error for {addr}: {e}")
+    if not last_result:
+        raise HTTPException(status_code=500, detail="Failed to upload to any backend")
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        ct = (content_type or "").lower()
+        ext = ".jpg" if "jpeg" in ct else ".webp" if "webp" in ct else ".png"
+    local_filename = f"comfy_ref_{uuid.uuid4().hex[:12]}{ext}"
+    local_path = output_path_for(local_filename, "input")
+    with open(local_path, "wb") as f:
+        f.write(content)
+    return {
+        "comfy_name": last_result.get("name", filename),
+        "url": output_url_for(local_filename, "input"),
+        "name": filename or local_filename,
+    }
+
+class UploadReuseRequest(BaseModel):
+    url: str
+
 @app.post("/api/upload")
 async def upload_image(files: List[UploadFile] = File(...)):
     uploaded_files = []
-    files_content = []
     for file in files:
         content = await file.read()
-        files_content.append((file, content))
-
-    for file, content in files_content:
-        success_count = 0
-        last_result = None
-        for addr in COMFYUI_INSTANCES:
-            try:
-                files_data = {'image': (file.filename, content, file.content_type)}
-                response = requests.post(f"http://{addr}/upload/image", files=files_data, timeout=5)
-                if response.status_code == 200:
-                    last_result = response.json()
-                    success_count += 1
-            except Exception as e:
-                print(f"Upload error for {addr}: {e}")
-
-        if success_count > 0 and last_result:
-            ext = os.path.splitext(file.filename or "")[1].lower()
-            if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
-                content_type = (file.content_type or "").lower()
-                ext = ".jpg" if "jpeg" in content_type else ".webp" if "webp" in content_type else ".png"
-            local_filename = f"comfy_ref_{uuid.uuid4().hex[:12]}{ext}"
-            local_path = output_path_for(local_filename, "input")
-            with open(local_path, "wb") as f:
-                f.write(content)
-            uploaded_files.append({
-                "comfy_name": last_result.get("name", file.filename),
-                "url": output_url_for(local_filename, "input"),
-                "name": file.filename or local_filename,
-            })
-        else:
-            raise HTTPException(status_code=500, detail="Failed to upload to any backend")
-
+        uploaded_files.append(comfy_upload_image_bytes(content, file.filename or "image.png", file.content_type or "image/png"))
     return {"files": uploaded_files}
+
+@app.post("/api/upload/reuse")
+def upload_reuse_image(payload: UploadReuseRequest):
+    path = output_file_from_url(payload.url)
+    if not path:
+        raise HTTPException(status_code=404, detail="Image not found")
+    with open(path, "rb") as f:
+        content = f.read()
+    filename = os.path.basename(path)
+    return {"files": [comfy_upload_image_bytes(content, filename, content_type_for_path(path))]}
 
 @app.post("/api/ai/upload")
 async def upload_ai_reference(files: List[UploadFile] = File(...)):
     uploaded = []
+    image_exts = {".png", ".jpg", ".jpeg", ".webp"}
+    video_exts = {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"}
+    audio_exts = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus", ".weba"}
     for file in files:
         content = await file.read()
         if not content:
             continue
         ext = os.path.splitext(file.filename or "")[1].lower()
-        if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
-            content_type = (file.content_type or "").lower()
-            ext = ".jpg" if "jpeg" in content_type else ".webp" if "webp" in content_type else ".png"
-        filename = f"ai_ref_{uuid.uuid4().hex[:12]}{ext}"
+        content_type = (file.content_type or "").lower()
+        is_video = ext in video_exts or "video" in content_type
+        is_audio = ext in audio_exts or ("audio" in content_type and not is_video)
+        if is_video and ext not in video_exts:
+            ext = ".mp4"
+        elif is_audio and ext not in audio_exts:
+            ext = ".mp3"
+        elif not is_video and not is_audio:
+            if ext not in image_exts:
+                if "jpeg" in content_type:
+                    ext = ".jpg"
+                elif "webp" in content_type:
+                    ext = ".webp"
+                else:
+                    ext = ".png"
+        if is_video or is_audio:
+            api_key = runninghub_api_key()
+            if not api_key:
+                raise HTTPException(status_code=400, detail="未配置 RunningHub API Key，无法上传视频/音频")
+            upload_name = file.filename or f"{'video' if is_video else 'audio'}{ext}"
+            try:
+                result = runninghub_upload_media_binary_bytes(content, upload_name, api_key)
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"RunningHub 上传失败：{exc}") from exc
+            download_url = str(result.get("download_url") or "").strip()
+            if not download_url:
+                raise HTTPException(status_code=502, detail="RunningHub 上传未返回 download_url")
+            uploaded.append({
+                "url": download_url,
+                "name": file.filename or upload_name,
+                "fileName": result.get("fileName") or "",
+            })
+            continue
+        prefix = "ai_ref"
+        filename = f"{prefix}_{uuid.uuid4().hex[:12]}{ext}"
         path = output_path_for(filename, "input")
         with open(path, "wb") as f:
             f.write(content)
@@ -2476,7 +2620,6 @@ async def run_canvas_image_task(task_id: str, payload: OnlineImageRequest):
                 "status_code": status_code,
                 "updated_at": time.time(),
             })
-
 @app.post("/api/canvas-image-tasks")
 async def create_canvas_image_task(payload: OnlineImageRequest):
     task_id = f"canvas_img_{uuid.uuid4().hex}"
@@ -2687,7 +2830,50 @@ async def canvas_video(payload: CanvasVideoRequest):
                         body["official_fallback"] = False
                 else:
                     apimart_model = apimart_video_model(selected_model(payload.model, "doubao-seedance-2.0"))
-                    body = build_apimart_video_body(payload, apimart_model, image_with_roles, image_payload)
+                    uploaded_videos = list(payload.videos or [])
+                    uploaded_audios = list(payload.audios or [])
+                    if is_apimart_seedance_20_model(apimart_model):
+                        uploaded_videos = []
+                        upload_errors = []
+                        for ref_url in (payload.videos or [])[:3]:
+                            if not ref_url:
+                                continue
+                            up_url = await upload_media_for_apimart(client, provider, ref_url, "video")
+                            if valid_apimart_video_image_input(up_url):
+                                uploaded_videos.append(up_url)
+                            else:
+                                reason = up_url[4:] if isinstance(up_url, str) and up_url.startswith("ERR:") else "上传失败"
+                                upload_errors.append(f"参考视频：{reason}")
+                        uploaded_audios = []
+                        for ref_url in (payload.audios or [])[:3]:
+                            if not ref_url:
+                                continue
+                            up_url = await upload_media_for_apimart(client, provider, ref_url, "audio")
+                            if valid_apimart_video_image_input(up_url):
+                                uploaded_audios.append(up_url)
+                            else:
+                                reason = up_url[4:] if isinstance(up_url, str) and up_url.startswith("ERR:") else "上传失败"
+                                upload_errors.append(f"参考音频：{reason}")
+                        if upload_errors:
+                            raise HTTPException(status_code=400, detail="\n".join(upload_errors))
+                        has_images = bool(image_with_roles or image_payload)
+                        if uploaded_audios and not has_images and not uploaded_videos:
+                            raise HTTPException(
+                                status_code=400,
+                                detail="参考音频需与参考图片或参考视频同时使用（见 APIMart Seedance 2.0 文档）。",
+                            )
+                        has_frame_roles = any(
+                            str(ref.role or "").strip() in {"first_frame", "last_frame"}
+                            for ref in (payload.images or [])
+                        )
+                        if has_frame_roles and ((payload.videos or []) or (payload.audios or [])):
+                            raise HTTPException(
+                                status_code=400,
+                                detail="使用首帧/尾帧图片时，不能同时提交参考视频或参考音频（见 APIMart Seedance 2.0 文档）。",
+                            )
+                    merged = {**payload.dict(), "videos": uploaded_videos, "audios": uploaded_audios}
+                    apimart_payload = CanvasVideoRequest(**merged)
+                    body = build_apimart_video_body(apimart_payload, apimart_model, image_with_roles, image_payload)
             else:
                 # 非 APIMart：data URL 方式（OpenAI / ComflyAI 接口）
                 image_payload = []
@@ -2776,6 +2962,10 @@ async def canvas_video(payload: CanvasVideoRequest):
 
 @app.post("/api/online-video")
 async def online_video(payload: OnlineVideoRequest):
+    return await build_online_video_result(payload)
+
+async def build_online_video_result(payload: OnlineVideoRequest):
+    seedance_20 = is_apimart_seedance_20_model(payload.model)
     canvas_payload = CanvasVideoRequest(
         prompt=payload.prompt,
         provider_id=payload.provider_id,
@@ -2784,6 +2974,8 @@ async def online_video(payload: OnlineVideoRequest):
         aspect_ratio=payload.aspect_ratio,
         resolution=payload.resolution,
         images=payload.reference_images,
+        videos=[v for v in payload.reference_videos if v] if seedance_20 else [],
+        audios=[a for a in payload.reference_audios if a] if seedance_20 else [],
         enhance_prompt=payload.enhance_prompt,
         enable_upsample=payload.enable_upsample,
         watermark=payload.watermark,
@@ -2809,6 +3001,9 @@ async def online_video(payload: OnlineVideoRequest):
             "aspect_ratio": payload.aspect_ratio,
             "resolution": payload.resolution,
             "reference_images": [ref.dict() for ref in payload.reference_images],
+            "reference_videos": [v for v in payload.reference_videos if v] if seedance_20 else [],
+            "reference_audios": [a for a in payload.reference_audios if a] if seedance_20 else [],
+            "generate_audio": payload.generate_audio,
             "job_id": payload.job_id,
         },
     }
@@ -2816,6 +3011,61 @@ async def online_video(payload: OnlineVideoRequest):
     if GLOBAL_LOOP:
         asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(record), GLOBAL_LOOP)
     return record
+
+async def run_canvas_video_task(task_id: str, payload: OnlineVideoRequest):
+    with CANVAS_TASK_LOCK:
+        if task_id in CANVAS_TASKS:
+            CANVAS_TASKS[task_id]["status"] = "running"
+            CANVAS_TASKS[task_id]["updated_at"] = time.time()
+    try:
+        result = await build_online_video_result(payload)
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "succeeded",
+                "result": result,
+                "error": "",
+                "updated_at": time.time(),
+            })
+    except HTTPException as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+                "updated_at": time.time(),
+            })
+    except Exception as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc),
+                "status_code": 500,
+                "updated_at": time.time(),
+            })
+
+@app.post("/api/canvas-video-tasks")
+async def create_canvas_video_task(payload: OnlineVideoRequest):
+    task_id = f"canvas_vid_{uuid.uuid4().hex}"
+    with CANVAS_TASK_LOCK:
+        CANVAS_TASKS[task_id] = {
+            "id": task_id,
+            "type": "online-video",
+            "status": "queued",
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "result": None,
+            "error": "",
+        }
+    asyncio.create_task(run_canvas_video_task(task_id, payload))
+    return {"task_id": task_id, "status": "queued"}
+
+@app.get("/api/canvas-video-tasks/{task_id}")
+async def get_canvas_video_task(task_id: str):
+    with CANVAS_TASK_LOCK:
+        task = dict(CANVAS_TASKS.get(task_id) or {})
+    if not task:
+        raise HTTPException(status_code=404, detail="视频任务不存在，可能服务已重启或任务已过期")
+    return task
 
 # --- Canvas LLM ---
 
@@ -3315,21 +3565,42 @@ async def get_online_pending():
     now = time.time()
     with ACTIVE_PENDING_JOBS_LOCK:
         global ACTIVE_PENDING_JOBS
-        ACTIVE_PENDING_JOBS = [job for job in ACTIVE_PENDING_JOBS if now - job.get("timestamp", 0) < 600]
-        return ACTIVE_PENDING_JOBS
+        prune_pending_jobs(now)
+        save_pending_jobs_to_disk()
+        return list(ACTIVE_PENDING_JOBS)
 
 @app.post("/api/online-pending")
 async def create_online_pending(job: OnlinePendingJob):
+    payload = job.dict()
+    if not payload.get("timestamp"):
+        payload["timestamp"] = time.time()
     with ACTIVE_PENDING_JOBS_LOCK:
-        if not any(j["id"] == job.id for j in ACTIVE_PENDING_JOBS):
-            ACTIVE_PENDING_JOBS.append(job.dict())
+        for index, existing in enumerate(ACTIVE_PENDING_JOBS):
+            if existing.get("id") == job.id:
+                ACTIVE_PENDING_JOBS[index] = {**existing, **{k: v for k, v in payload.items() if v is not None}}
+                save_pending_jobs_to_disk()
+                return {"success": True}
+        ACTIVE_PENDING_JOBS.append(payload)
+        save_pending_jobs_to_disk()
     return {"success": True}
+
+@app.patch("/api/online-pending/{job_id}")
+async def patch_online_pending(job_id: str, patch: OnlinePendingJobPatch):
+    updates = {k: v for k, v in patch.dict(exclude_unset=True).items() if v is not None or k == "error"}
+    with ACTIVE_PENDING_JOBS_LOCK:
+        for index, existing in enumerate(ACTIVE_PENDING_JOBS):
+            if existing.get("id") == job_id:
+                ACTIVE_PENDING_JOBS[index] = {**existing, **updates}
+                save_pending_jobs_to_disk()
+                return {"success": True}
+    raise HTTPException(status_code=404, detail="Pending job not found")
 
 @app.delete("/api/online-pending/{job_id}")
 async def delete_online_pending(job_id: str):
     with ACTIVE_PENDING_JOBS_LOCK:
         global ACTIVE_PENDING_JOBS
         ACTIVE_PENDING_JOBS = [job for job in ACTIVE_PENDING_JOBS if job["id"] != job_id]
+        save_pending_jobs_to_disk()
     return {"success": True}
 
 # --- 本地 ComfyUI 生图 ---
@@ -3750,20 +4021,17 @@ def delete_workflow(name: str):
         os.remove(cfg_path)
     return {"ok": True}
 
-@app.post("/api/workflows/{name:path}/run")
-def run_workflow(name: str, payload: WorkflowRunRequest):
+def prepare_workflow_generate_request(name: str, payload: WorkflowRunRequest) -> GenerateRequest:
     if not WORKFLOW_NAME_RE.match(name):
         raise HTTPException(status_code=400, detail="Invalid workflow name")
     if not os.path.exists(workflow_path_from_name(name)):
         raise HTTPException(status_code=404, detail="Workflow not found")
-    # 根据 config 的字段把值映射成 params 节点覆盖
     params: Dict[str, Dict[str, Any]] = {}
     for field in payload.config.fields:
         if not field.node or not field.input:
             continue
         if field.id in payload.fields:
             value = payload.fields[field.id]
-            # 类型转换
             if field.type in ("number", "slider"):
                 try:
                     value = float(value) if (field.step and field.step < 1) else int(float(value))
@@ -3772,7 +4040,6 @@ def run_workflow(name: str, payload: WorkflowRunRequest):
             elif field.type == "boolean":
                 value = bool(value)
             elif field.type == "dropdown":
-                # 下拉值如果看起来是数字（如 "1024" / "2048" / "0.8"），自动转成 int/float
                 if isinstance(value, str):
                     s = value.strip()
                     try:
@@ -3784,7 +4051,7 @@ def run_workflow(name: str, payload: WorkflowRunRequest):
                         pass
             params.setdefault(field.node, {})[field.input] = value
     prompt_text = (payload.prompt or "").strip() or extract_workflow_prompt(payload.config, payload.fields)
-    req = GenerateRequest(
+    return GenerateRequest(
         prompt=prompt_text,
         workflow_json=name,
         params=params,
@@ -3792,15 +4059,87 @@ def run_workflow(name: str, payload: WorkflowRunRequest):
         client_id=payload.client_id or str(uuid.uuid4()),
         reference_images=[ref.dict() for ref in payload.reference_images if ref.url],
     )
-    return generate(req)
+
+@app.post("/api/workflows/{name:path}/run")
+def run_workflow(name: str, payload: WorkflowRunRequest):
+    return generate(prepare_workflow_generate_request(name, payload))
+
+def run_workflow_generate(name: str, payload: WorkflowRunRequest):
+    return generate(prepare_workflow_generate_request(name, payload))
+
+async def run_canvas_comfy_task(task_id: str, name: str, payload: WorkflowRunRequest):
+    with CANVAS_TASK_LOCK:
+        if task_id in CANVAS_TASKS:
+            CANVAS_TASKS[task_id]["status"] = "running"
+            CANVAS_TASKS[task_id]["updated_at"] = time.time()
+    try:
+        result = await asyncio.to_thread(run_workflow_generate, name, payload)
+        if result.get("error"):
+            with CANVAS_TASK_LOCK:
+                CANVAS_TASKS[task_id].update({
+                    "status": "failed",
+                    "error": str(result.get("error") or "Generation failed"),
+                    "status_code": 400,
+                    "updated_at": time.time(),
+                })
+        else:
+            with CANVAS_TASK_LOCK:
+                CANVAS_TASKS[task_id].update({
+                    "status": "succeeded",
+                    "result": result,
+                    "error": "",
+                    "updated_at": time.time(),
+                })
+    except HTTPException as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+                "updated_at": time.time(),
+            })
+    except Exception as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc),
+                "status_code": 500,
+                "updated_at": time.time(),
+            })
+
+@app.post("/api/canvas-comfy-tasks/{name:path}")
+async def create_canvas_comfy_task(name: str, payload: WorkflowRunRequest):
+    prepare_workflow_generate_request(name, payload)
+    task_id = f"canvas_comfy_{uuid.uuid4().hex}"
+    with CANVAS_TASK_LOCK:
+        CANVAS_TASKS[task_id] = {
+            "id": task_id,
+            "type": "local-comfy",
+            "status": "queued",
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "result": None,
+            "error": "",
+            "workflow": name,
+        }
+    asyncio.create_task(run_canvas_comfy_task(task_id, name, payload))
+    return {"task_id": task_id, "status": "queued"}
+
+@app.get("/api/canvas-comfy-tasks/{task_id}")
+async def get_canvas_comfy_task(task_id: str):
+    with CANVAS_TASK_LOCK:
+        task = dict(CANVAS_TASKS.get(task_id) or {})
+    if not task:
+        raise HTTPException(status_code=404, detail="ComfyUI 任务不存在，可能服务已重启或任务已过期")
+    return task
 
 # --- RunningHub API ---
 RUNNINGHUB_BASE_URL = "https://www.runninghub.cn"
 RUNNINGHUB_API_KEY_ENV = "RUNNINGHUB_API_KEY"
 RUNNINGHUB_CONFIG_FILE = os.path.join(DATA_DIR, "runninghub.json")
 RUNNINGHUB_LOCK = Lock()
-RUNNINGHUB_FIELD_TYPES = {"text", "textarea", "number", "image", "boolean", "select"}
-RUNNINGHUB_DATA_TYPES = {"text", "textarea", "number", "image"}
+RUNNINGHUB_FIELD_TYPES = {"text", "textarea", "number", "image", "video", "audio", "boolean", "select"}
+RUNNINGHUB_DATA_TYPES = {"text", "textarea", "number", "image", "video", "audio"}
 RUNNINGHUB_INPUT_METHODS = {"manual", "dropdown"}
 
 class RunningHubField(BaseModel):
@@ -3844,7 +4183,7 @@ def runninghub_sync_field_schema(field: dict) -> dict:
             im = im or "dropdown"
         elif legacy == "textarea":
             dt, im = "textarea", "manual"
-        elif legacy in ("number", "image", "text", "boolean"):
+        elif legacy in ("number", "image", "video", "audio", "text", "boolean"):
             dt = dt or ("text" if legacy == "boolean" else legacy)
             im = im or "manual"
         else:
@@ -4261,7 +4600,63 @@ def runninghub_suggest_fields(workflow: Dict[str, Any]) -> List[Dict[str, Any]]:
             suggested.append(item)
     return suggested
 
+RUNNINGHUB_MEDIA_VIDEO_EXTS = {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"}
+RUNNINGHUB_MEDIA_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus", ".weba"}
+
+def runninghub_is_media_path(path: str) -> bool:
+    ext = os.path.splitext(str(path or ""))[1].lower()
+    return ext in RUNNINGHUB_MEDIA_VIDEO_EXTS or ext in RUNNINGHUB_MEDIA_AUDIO_EXTS
+
+def runninghub_parse_media_upload_response(resp: requests.Response) -> dict:
+    try:
+        body = resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail=f"RunningHub 上传失败：{resp.text[:200]}")
+    if body.get("code") != 0:
+        raise HTTPException(status_code=400, detail=body.get("message") or body.get("msg") or "RunningHub 上传失败")
+    data = body.get("data") or {}
+    download_url = str(data.get("download_url") or "").strip()
+    file_name = str(data.get("fileName") or "").strip()
+    if not download_url and not file_name:
+        raise HTTPException(status_code=502, detail="RunningHub 上传未返回 download_url / fileName")
+    return {
+        "download_url": download_url,
+        "fileName": file_name,
+        "type": data.get("type"),
+        "size": data.get("size"),
+    }
+
+def runninghub_upload_media_binary(path: str, api_key: str) -> dict:
+    """Upload image/video/audio/zip via RunningHub v2 binary API."""
+    url = f"{RUNNINGHUB_BASE_URL}/openapi/v2/media/upload/binary"
+    with open(path, "rb") as f:
+        files = {"file": (os.path.basename(path), f, content_type_for_path(path))}
+        resp = requests.post(
+            url,
+            files=files,
+            headers={"Authorization": f"Bearer {api_key}", "Host": "www.runninghub.cn"},
+            timeout=120,
+        )
+    return runninghub_parse_media_upload_response(resp)
+
+def runninghub_upload_media_binary_bytes(content: bytes, filename: str, api_key: str) -> dict:
+    url = f"{RUNNINGHUB_BASE_URL}/openapi/v2/media/upload/binary"
+    files = {"file": (filename, content, content_type_for_path(filename))}
+    resp = requests.post(
+        url,
+        files=files,
+        headers={"Authorization": f"Bearer {api_key}", "Host": "www.runninghub.cn"},
+        timeout=120,
+    )
+    return runninghub_parse_media_upload_response(resp)
+
 def runninghub_upload_file(path: str, api_key: str):
+    if runninghub_is_media_path(path):
+        result = runninghub_upload_media_binary(path, api_key)
+        file_name = result.get("fileName")
+        if not file_name:
+            raise HTTPException(status_code=502, detail="RunningHub 上传未返回 fileName")
+        return file_name
     url = f"{RUNNINGHUB_BASE_URL}/task/openapi/upload"
     with open(path, "rb") as f:
         files = {"file": (os.path.basename(path), f, content_type_for_path(path))}
@@ -4335,7 +4730,7 @@ def runninghub_value_is_empty(field_type: str, value: Any) -> bool:
         return False
     if ftype == "number":
         return value is None or value == ""
-    if ftype == "image":
+    if ftype == "image" or ftype in ("video", "audio"):
         return not str(value or "").strip()
     return not str(value if value is not None else "").strip()
 
@@ -4427,7 +4822,7 @@ def build_runninghub_node_info_list(
     seen = set()
     for item in resolved:
         value = runninghub_field_value(api_key, item["ftype"], item["raw"], refs)
-        if item["ftype"] == "image" and runninghub_value_is_empty("image", value):
+        if item["ftype"] in ("image", "video", "audio") and runninghub_value_is_empty(item["ftype"], value):
             continue
         if runninghub_value_is_empty(item["ftype"], value):
             continue
@@ -4461,7 +4856,7 @@ def build_runninghub_node_info_list(
 def runninghub_field_value(api_key: str, field_type: str, value: Any, references: List[str]):
     if value is None:
         value = ""
-    if field_type == "image":
+    if field_type in ("image", "video", "audio"):
         ref = ""
         if isinstance(value, str) and value.strip():
             ref = value.strip()
@@ -4715,14 +5110,14 @@ async def get_runninghub_workflow(workflow_key: str):
 @app.post("/api/runninghub/run")
 async def run_runninghub_workflow(payload: RunningHubRunRequest):
     try:
-        return _run_runninghub_workflow(payload)
+        return build_runninghub_result(payload)
     except HTTPException:
         raise
     except Exception as exc:
         print(f"RunningHub run 未捕获异常: {exc}")
         raise HTTPException(status_code=500, detail=f"RunningHub 生成失败：{exc}") from exc
 
-def _run_runninghub_workflow(payload: RunningHubRunRequest):
+def build_runninghub_result(payload: RunningHubRunRequest):
     api_key = runninghub_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先在 RunningHub 设置中配置 API Key")
@@ -4801,8 +5196,18 @@ def _run_runninghub_workflow(payload: RunningHubRunRequest):
         "workflow_name": workflow.get("name") or payload.workflow_id,
         "params": {
             "fields": payload.fields or {},
+            "fields_meta": {
+                str(field.get("id") or ""): {
+                    "name": str(field.get("name") or field.get("fieldName") or field.get("id") or "").strip(),
+                    "type": str(field.get("type") or "text").strip(),
+                }
+                for field in (workflow.get("fields") or [])
+                if str(field.get("id") or "").strip()
+            },
             "reference_images": [ref if isinstance(ref, dict) else {"url": ref} for ref in (payload.reference_images or [])],
             "nodeInfoList": node_info_list,
+            "workflow_id": payload.workflow_id,
+            "workflow_name": workflow.get("name") or payload.workflow_id,
         },
         "task_id": task_id,
     }
@@ -4818,7 +5223,65 @@ def _run_runninghub_workflow(payload: RunningHubRunRequest):
         "timestamp": current_timestamp,
         "type": "runninghub",
         "prompt": prompt_text,
+        "workflow_id": payload.workflow_id,
+        "workflow_name": workflow.get("name") or payload.workflow_id,
+        "params": record["params"],
     }
+
+async def run_canvas_runninghub_task(task_id: str, payload: RunningHubRunRequest):
+    with CANVAS_TASK_LOCK:
+        if task_id in CANVAS_TASKS:
+            CANVAS_TASKS[task_id]["status"] = "running"
+            CANVAS_TASKS[task_id]["updated_at"] = time.time()
+    try:
+        result = await asyncio.to_thread(build_runninghub_result, payload)
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "succeeded",
+                "result": result,
+                "error": "",
+                "updated_at": time.time(),
+            })
+    except HTTPException as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+                "updated_at": time.time(),
+            })
+    except Exception as exc:
+        with CANVAS_TASK_LOCK:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(exc),
+                "status_code": 500,
+                "updated_at": time.time(),
+            })
+
+@app.post("/api/canvas-runninghub-tasks")
+async def create_canvas_runninghub_task(payload: RunningHubRunRequest):
+    task_id = f"canvas_rh_{uuid.uuid4().hex}"
+    with CANVAS_TASK_LOCK:
+        CANVAS_TASKS[task_id] = {
+            "id": task_id,
+            "type": "runninghub",
+            "status": "queued",
+            "created_at": time.time(),
+            "updated_at": time.time(),
+            "result": None,
+            "error": "",
+        }
+    asyncio.create_task(run_canvas_runninghub_task(task_id, payload))
+    return {"task_id": task_id, "status": "queued"}
+
+@app.get("/api/canvas-runninghub-tasks/{task_id}")
+async def get_canvas_runninghub_task(task_id: str):
+    with CANVAS_TASK_LOCK:
+        task = dict(CANVAS_TASKS.get(task_id) or {})
+    if not task:
+        raise HTTPException(status_code=404, detail="RunningHub 任务不存在，可能服务已重启或任务已过期")
+    return task
 
 if __name__ == "__main__":
     import uvicorn

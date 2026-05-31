@@ -17,8 +17,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260519-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260530-board-pick-v2"></script>
-    <script src="/static/studio-ref-upload.js?v=20260530-board-pick-v2"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-video-resume"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
     <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
@@ -40,7 +40,6 @@
         .upload-item.drop-after::after { right:-5px; }
         .upload-item.is-dragging { opacity:.45; }
         .ref-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--panel-gap,10px); }
-        .ref-slot-label { font-size:8px; font-weight:800; color:#94a3b8; letter-spacing:.08em; }
         .ref-slot-btn { position:absolute; z-index:10; opacity:0; pointer-events:none; transition:opacity .18s var(--easing), transform .12s var(--easing), background .12s var(--easing), color .12s var(--easing), border-color .12s var(--easing); }
         .upload-item:hover .ref-slot-btn { opacity:1; pointer-events:auto; }
         .upload-item.is-board-target .ref-board-btn { opacity:1; pointer-events:auto; background:#ff4d94; color:#fff; border-color:#ff4d94; }
@@ -1158,28 +1157,93 @@
             }
         }
 
-        async function runGenerateJob(jobId, payload){
+        async function clearPendingJob(jobId){
+            pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+            if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+            renderOutputGrid();
+        }
+
+        function failPendingJob(jobId, message, delay = 2800){
+            const job = pendingJobs.find(j => j.id === jobId);
+            if(job) job.error = message || 'Generation failed';
+            renderOutputGrid();
+            if(delay > 0){
+                setTimeout(() => { clearPendingJob(jobId); }, delay);
+            } else {
+                clearPendingJob(jobId);
+            }
+        }
+
+        const resumingJobIds = new Set();
+
+        async function resumePendingJobPoll(job){
+            if(!job?.id || !job.task_id || resumingJobIds.has(job.id)) return;
+            resumingJobIds.add(job.id);
             try {
-                const result = await fetch('/api/online-image', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify(payload)
-                }).then(async r => { if(!r.ok) throw new Error((await r.json()).detail || '生成失败'); return r.json(); });
+                const result = await pollCanvasImageTask(job.task_id);
                 currentResult = result;
                 upsertHistoryItem(result);
-                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                renderOutputGrid();
-            } catch(err) {
+                resumingJobIds.delete(job.id);
+                await clearPendingJob(job.id);
+            } catch(err){
+                resumingJobIds.delete(job.id);
+                failPendingJob(job.id, err.message || 'Generation failed');
+            }
+        }
+
+        async function resumePendingJobs(){
+            try {
+                const jobs = await fetch('/api/online-pending').then(r => r.json());
+                if(!Array.isArray(jobs) || !jobs.length) return;
+                const now = Date.now() / 1000;
+                let changed = false;
+                for(const serverJob of jobs){
+                    if(serverJob.error) continue;
+                    if(serverJob.mediaKind && serverJob.mediaKind !== 'image') continue;
+                    if(!serverJob.task_id){
+                        if(serverJob.timestamp && now - serverJob.timestamp > 120){
+                            fetch('/api/online-pending/' + encodeURIComponent(serverJob.id), { method:'DELETE' }).catch(()=>{});
+                        }
+                        continue;
+                    }
+                    let local = pendingJobs.find(j => j.id === serverJob.id);
+                    if(!local){
+                        local = { ...serverJob };
+                        pendingJobs.unshift(local);
+                        changed = true;
+                    } else {
+                        Object.assign(local, serverJob);
+                    }
+                    resumePendingJobPoll(local);
+                }
+                if(changed) renderOutputGrid();
+            } catch(e){
+                console.error('Resume pending jobs failed:', e);
+            }
+        }
+
+        async function runGenerateJob(jobId, payload){
+            try {
+                const createRes = await fetch('/api/canvas-image-tasks', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ ...payload, job_id: jobId })
+                }).then(async r => {
+                    if(!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || '生成失败');
+                    return r.json();
+                });
+                const taskId = createRes.task_id;
                 const job = pendingJobs.find(j => j.id === jobId);
-                if(job) job.error = err.message || 'Generation failed';
+                if(job) job.task_id = taskId;
+                if(window.updatePendingJobOnServer) updatePendingJobOnServer(jobId, { task_id: taskId });
                 renderOutputGrid();
-                setTimeout(() => {
-                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                    const placeholder = document.getElementById('placeholder');
-                    if(!allHistory.length && !pendingJobs.length && placeholder) placeholder.classList.remove('hidden');
-                    renderOutputGrid();
-                }, 2800);
+
+                const result = await pollCanvasImageTask(taskId);
+                currentResult = result;
+                upsertHistoryItem(result);
+                await clearPendingJob(jobId);
+            } catch(err) {
+                failPendingJob(jobId, err.message || 'Generation failed');
             }
         }
         function syncGenBtnTip(showTip){
@@ -2135,6 +2199,7 @@
                 }
             }
         }
+        window.applyRecordParams = applyRecordParams;
         function applySameStyle(){
             if(!currentLightboxData) return;
             applyRecordParams(currentLightboxData);
@@ -2194,6 +2259,7 @@
                     bridge.notifyAddItem(item);
                 };
             }
+            await resumePendingJobs();
             StudioApiProviders.onProvidersChanged(refreshApiProviders);
         };
     </script>

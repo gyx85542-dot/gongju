@@ -51,6 +51,11 @@ function setViewerMediaMode(kind){
   if(brush) brush.classList.remove('visible');
   if(editSection) editSection.classList.toggle('hidden', kind !== 'image');
   if(copyBtn) copyBtn.style.display = kind === 'image' ? '' : 'none';
+  const captureBtn = document.getElementById('viewerCaptureFrameBtn');
+  if(captureBtn){
+    captureBtn.classList.toggle('is-visible', kind === 'video');
+    captureBtn.disabled = false;
+  }
 }
 
 
@@ -64,65 +69,317 @@ function isViewerEditedImage(data){
 }
 function viewerProviderSource(data){
     const type = String(data?.type || '').trim().toLowerCase();
-    const model = String(data.params?.model || data.model || '').trim();
     if(type === 'local-comfy') return 'comfyui';
     if(type === 'runninghub') return 'runninghub';
     const onlineTypes = new Set(['online', 'online-video', 'online-audio', 'online-image']);
     if(onlineTypes.has(type)){
-        if(model) return model;
         return data.provider_name
             || providerById(data.params?.provider_id || data.provider_id)?.name
+            || data.params?.provider_id
             || data.provider_id
             || '—';
     }
+    const model = String(data.params?.model || data.model || '').trim();
     if(model) return model;
     return data.provider_name
         || providerById(data.params?.provider_id || data.provider_id)?.name
         || data.provider_id
         || '—';
 }
+function normalizeRefUrl(entry){
+    if(entry == null) return '';
+    if(typeof entry === 'string') return entry.trim();
+    if(typeof entry === 'object') return String(entry.url || entry.value || '').trim();
+    return String(entry).trim();
+}
+function fileNameFromUrl(url){
+    const raw = String(url || '').trim();
+    if(!raw) return 'media';
+    try {
+        const parsed = new URL(raw, location.origin);
+        const base = parsed.pathname.split('/').pop();
+        if(base) return base.split('?')[0] || base;
+    } catch(e){}
+    return raw.split('/').pop()?.split('?')[0] || raw.slice(0, 48);
+}
+function isImageUrl(url){
+    return /\.(png|jpe?g|webp|gif|bmp|svg)(\?|$)/i.test(url) || /\/assets\/|\/output\//i.test(url);
+}
+function isVideoUrl(url){
+    return /\.(mp4|webm|mov|m4v|avi|mkv)(\?|$)/i.test(url);
+}
+function isAudioUrl(url){
+    return /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i.test(url);
+}
+function dedupeUrls(list){
+    const out = [];
+    const seen = new Set();
+    (list || []).forEach(item => {
+        const url = normalizeRefUrl(item);
+        if(!url || seen.has(url)) return;
+        seen.add(url);
+        out.push(url);
+    });
+    return out;
+}
+function urlsFromFields(fields, kind){
+    if(!fields || typeof fields !== 'object') return [];
+    const out = [];
+    Object.values(fields).forEach(value => {
+        const url = normalizeRefUrl(value);
+        if(!url) return;
+        if(kind === 'video' && isVideoUrl(url)) out.push(url);
+        if(kind === 'audio' && isAudioUrl(url)) out.push(url);
+        if(kind === 'image' && isImageUrl(url) && !isVideoUrl(url) && !isAudioUrl(url)) out.push(url);
+    });
+    return out;
+}
+function collectReferenceImages(data){
+    const refs = (data.params?.reference_images || []).filter(ref => normalizeRefUrl(ref));
+    const fromFields = urlsFromFields(data.params?.fields, 'image').map(url => ({ url }));
+    const merged = [...refs];
+    const seen = new Set(refs.map(ref => normalizeRefUrl(ref)).filter(Boolean));
+    fromFields.forEach(ref => {
+        const url = normalizeRefUrl(ref);
+        if(!url || seen.has(url)) return;
+        seen.add(url);
+        merged.push(ref);
+    });
+    return merged;
+}
+function collectReferenceVideos(data){
+    return dedupeUrls([
+        ...(data.params?.reference_videos || []),
+        ...urlsFromFields(data.params?.fields, 'video'),
+    ]);
+}
+function collectReferenceAudios(data){
+    return dedupeUrls([
+        ...(data.params?.reference_audios || []),
+        ...urlsFromFields(data.params?.fields, 'audio'),
+    ]);
+}
+function collectViewerParamRows(data){
+    const rows = [];
+    const params = data.params || {};
+    const type = String(data.type || '').toLowerCase();
+    if(type === 'runninghub'){
+        const wf = data.workflow_name || data.workflow_id || params.workflow_id;
+        if(wf) rows.push({ label: tr('online.viewerWorkflow') || 'Workflow', value: String(wf) });
+    }
+    if(type === 'local-comfy' && (data.workflow || params.workflow)){
+        rows.push({ label: tr('online.viewerWorkflow') || 'Workflow', value: String(data.workflow || params.workflow) });
+    }
+    const refImageUrls = new Set(collectReferenceImages(data).map(ref => normalizeRefUrl(ref)));
+    const refVideoUrls = new Set(collectReferenceVideos(data));
+    const refAudioUrls = new Set(collectReferenceAudios(data));
+    const fields = params.fields;
+    const fieldsMeta = params.fields_meta || {};
+    if(fields && typeof fields === 'object'){
+        Object.entries(fields).forEach(([key, value]) => {
+            const text = value == null ? '' : (typeof value === 'object' ? JSON.stringify(value) : String(value)).trim();
+            if(!text) return;
+            if(refVideoUrls.has(text) || refAudioUrls.has(text) || refImageUrls.has(text)) return;
+            if(isVideoUrl(text) || isAudioUrl(text) || isImageUrl(text)) return;
+            const label = fieldsMeta[key]?.name || key;
+            rows.push({ label, value: text.length > 160 ? `${text.slice(0, 160)}…` : text });
+        });
+    }
+    if(type === 'local-comfy' && params && typeof params === 'object'){
+        Object.entries(params).forEach(([key, value]) => {
+            if(['reference_images', 'fields', 'fields_meta', 'workflow', 'imported', 'job_id', 'provider_id', 'model', 'size', 'quality'].includes(key)) return;
+            if(value == null || typeof value === 'object') return;
+            const text = String(value).trim();
+            if(!text) return;
+            rows.push({ label: key, value: text.length > 160 ? `${text.slice(0, 160)}…` : text });
+        });
+    }
+    return rows;
+}
 function viewerMetaRows(data){
     const rows = [];
     const edited = isViewerEditedImage(data);
     const providerName = viewerProviderSource(data);
-            const kind = getMediaKind(data);
+    const kind = getMediaKind(data);
     const modelName = data.params?.model || data.model || '—';
     const size = data.params?.size || '—';
     if(data._displaySize) rows.unshift({ label: tr('online.viewerResolution') || 'Resolution', value: data._displaySize });
     if(!edited){
         rows.push({ label: tr('api.provider') || 'Platform', value: providerName });
-        rows.push({ label: tr('online.model') || 'Model', value: modelName });
-        rows.push({ label: tr('online.size') || 'Size', value: size });
+        if(modelName !== '—') rows.push({ label: tr('online.model') || 'Model', value: modelName });
+        if(size && size !== '—') rows.push({ label: tr('online.size') || 'Size', value: size });
+        if(paramsQuality(data)) rows.push({ label: tr('online.quality') || 'Quality', value: paramsQuality(data) });
     }
     if(data.seed != null) rows.push({ label: 'Seed', value: String(data.seed) });
     rows.push({ label: tr('online.viewerCreated') || 'Created', value: formatViewerTime(data.timestamp) });
-    
-            if(kind === 'video' && !edited){
-                if(data.params?.duration) rows.push({ label: tr('canvas.videoDuration') || 'Duration', value: String(data.params.duration) + 's' });
-                if(data.params?.aspect_ratio) rows.push({ label: tr('canvas.videoAspect') || 'Aspect', value: data.params.aspect_ratio });
-                if(data.params?.resolution) rows.push({ label: tr('canvas.videoResolution') || 'Resolution', value: data.params.resolution });
-            }
-            if(kind === 'audio' && !edited && modelName !== '—') rows.push({ label: tr('online.model') || 'Model', value: modelName });
 
-            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '✓' });
+    if(kind === 'video' && !edited){
+        if(data.params?.duration) rows.push({ label: tr('canvas.videoDuration') || 'Duration', value: String(data.params.duration) + 's' });
+        if(data.params?.aspect_ratio) rows.push({ label: tr('canvas.videoAspect') || 'Aspect', value: data.params.aspect_ratio });
+        if(data.params?.resolution) rows.push({ label: tr('canvas.videoResolution') || 'Resolution', value: data.params.resolution });
+        if(data.params?.generate_audio) rows.push({ label: tr('online.viewerGenerateAudio') || 'Generated audio', value: '✓' });
+    }
+    if(kind === 'audio' && !edited && modelName !== '—') rows.push({ label: tr('online.model') || 'Model', value: modelName });
+    if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '✓' });
     return rows;
 }
-function renderViewerRefThumbs(data){
-    const wrap = document.getElementById('lightboxRefsWrap');
-    const el = document.getElementById('lightboxRefs');
-    const refs = (data.params?.reference_images || []).filter(ref => ref?.url);
-    if(!wrap || !el) return;
-    if(!refs.length){
-        wrap.classList.add('hidden');
+function paramsQuality(data){
+    const q = data.params?.quality;
+    if(!q || q === '—' || q === 'auto') return '';
+    return String(q);
+}
+function renderRefMediaThumb(url, kind, name, extraHtml = ''){
+    const safeUrl = escapeHtml(url);
+    const safeName = escapeHtml(name || fileNameFromUrl(url));
+    if(kind === 'image'){
+        return `<button type="button" class="viewer-ref-thumb" data-ref-preview="${safeUrl}" data-ref-kind="image" title="${safeName}">
+            <img src="${safeUrl}" alt="">
+            ${extraHtml}
+        </button>`;
+    }
+    if(kind === 'video'){
+        return `<button type="button" class="viewer-ref-thumb viewer-ref-thumb-video" data-ref-preview="${safeUrl}" data-ref-kind="video" title="${safeName}">
+            <video src="${safeUrl}" muted playsinline preload="metadata"></video>
+            <span class="viewer-ref-type-badge"><i data-lucide="clapperboard"></i></span>
+        </button>`;
+    }
+    return `<button type="button" class="viewer-ref-thumb viewer-ref-thumb-audio" data-ref-preview="${safeUrl}" data-ref-kind="audio" title="${safeName}">
+        <span class="viewer-ref-audio-icon"><i data-lucide="music-2"></i></span>
+    </button>`;
+}
+function renderRefImageThumbs(refs){
+    return refs.map((ref, i) => {
+        const url = normalizeRefUrl(ref);
+        const role = String(ref?.role || '').trim();
+        const name = ref?.name || fileNameFromUrl(url) || ('Ref ' + (i + 1));
+        const roleHtml = role ? `<span class="viewer-ref-role">${escapeHtml(role)}</span>` : '';
+        return renderRefMediaThumb(url, 'image', name, roleHtml);
+    }).join('');
+}
+function renderRefVideoThumbs(urls){
+    return urls.map(url => renderRefMediaThumb(url, 'video', fileNameFromUrl(url))).join('');
+}
+function renderRefAudioThumbs(urls){
+    return urls.map(url => renderRefMediaThumb(url, 'audio', fileNameFromUrl(url))).join('');
+}
+function ensureViewerRefPreview(){
+    if(document.getElementById('viewerRefPreview')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'viewerRefPreview';
+    wrap.className = 'viewer-ref-preview hidden';
+    wrap.innerHTML = `
+        <div class="viewer-ref-preview-backdrop" onclick="closeViewerRefPreview()"></div>
+        <div class="viewer-ref-preview-dialog" onclick="event.stopPropagation()">
+            <button type="button" class="viewer-ref-preview-close" onclick="closeViewerRefPreview()" aria-label="Close"><i data-lucide="x"></i></button>
+            <div id="viewerRefPreviewTitle" class="viewer-ref-preview-title"></div>
+            <div id="viewerRefPreviewBody" class="viewer-ref-preview-body"></div>
+        </div>
+    `;
+    document.getElementById('lightbox')?.appendChild(wrap);
+}
+function closeViewerRefPreview(){
+    const overlay = document.getElementById('viewerRefPreview');
+    if(!overlay) return;
+    overlay.classList.add('hidden');
+    const body = document.getElementById('viewerRefPreviewBody');
+    if(body){
+        body.querySelectorAll('video, audio').forEach(el => {
+            try { el.pause(); } catch(e){}
+            el.removeAttribute('src');
+            el.load?.();
+        });
+        body.innerHTML = '';
+    }
+    const title = document.getElementById('viewerRefPreviewTitle');
+    if(title) title.textContent = '';
+}
+function openViewerRefPreview(url, kind, name){
+    const rawUrl = String(url || '').trim();
+    if(!rawUrl) return;
+    ensureViewerRefPreview();
+    const overlay = document.getElementById('viewerRefPreview');
+    const body = document.getElementById('viewerRefPreviewBody');
+    const title = document.getElementById('viewerRefPreviewTitle');
+    if(!overlay || !body) return;
+    body.innerHTML = '';
+    const mediaKind = String(kind || 'image').toLowerCase();
+    if(mediaKind === 'video'){
+        body.innerHTML = `<video src="${escapeHtml(rawUrl)}" controls autoplay playsinline class="viewer-ref-preview-video"></video>`;
+    } else if(mediaKind === 'audio'){
+        body.innerHTML = `<audio src="${escapeHtml(rawUrl)}" controls autoplay class="viewer-ref-preview-audio"></audio>`;
+    } else {
+        body.innerHTML = `<img src="${escapeHtml(rawUrl)}" alt="" class="viewer-ref-preview-image">`;
+    }
+    if(title) title.textContent = name || fileNameFromUrl(rawUrl);
+    overlay.classList.remove('hidden');
+    if(global.lucide && typeof global.lucide.createIcons === 'function') global.lucide.createIcons();
+}
+function bindViewerRefThumbEvents(container){
+    if(!container || container.dataset.refBound) return;
+    container.dataset.refBound = '1';
+    container.addEventListener('click', e => {
+        const btn = e.target.closest('[data-ref-preview]');
+        if(!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openViewerRefPreview(btn.dataset.refPreview, btn.dataset.refKind, btn.title || '');
+    });
+}
+function renderViewerReferenceSections(data){
+    const container = document.getElementById('viewerRefSections');
+    if(!container) return;
+    const imageRefs = collectReferenceImages(data);
+    const videoRefs = collectReferenceVideos(data);
+    const audioRefs = collectReferenceAudios(data);
+    const blocks = [];
+    if(imageRefs.length){
+        blocks.push(`<div class="viewer-ref-section">
+            <div class="viewer-block-title"><span>${escapeHtml(tr('online.referenceImages') || 'Reference Images')}</span></div>
+            <div class="viewer-ref-thumbs">${renderRefImageThumbs(imageRefs)}</div>
+        </div>`);
+    }
+    if(videoRefs.length){
+        blocks.push(`<div class="viewer-ref-section">
+            <div class="viewer-block-title"><span>${escapeHtml(tr('online.referenceVideos') || tr('video.referenceVideos') || 'Reference Videos')}</span></div>
+            <div class="viewer-ref-thumbs">${renderRefVideoThumbs(videoRefs)}</div>
+        </div>`);
+    }
+    if(audioRefs.length){
+        blocks.push(`<div class="viewer-ref-section">
+            <div class="viewer-block-title"><span>${escapeHtml(tr('online.referenceAudio') || tr('video.referenceAudio') || 'Reference Audio')}</span></div>
+            <div class="viewer-ref-thumbs">${renderRefAudioThumbs(audioRefs)}</div>
+        </div>`);
+    }
+    container.innerHTML = blocks.join('');
+    container.classList.toggle('hidden', !blocks.length);
+    bindViewerRefThumbEvents(container);
+    if(global.lucide && typeof global.lucide.createIcons === 'function') global.lucide.createIcons();
+}
+function renderViewerExtraParams(data){
+    const el = document.getElementById('viewerExtraParams');
+    if(!el) return;
+    const rows = collectViewerParamRows(data);
+    if(!rows.length){
+        el.classList.add('hidden');
         el.innerHTML = '';
         return;
     }
-    wrap.classList.remove('hidden');
-    el.innerHTML = refs.map((ref, i) => `
-        <a href="${escapeHtml(ref.url)}" target="_blank" rel="noopener" class="viewer-ref-thumb" title="${escapeHtml(ref.name || ('Ref ' + (i + 1)))}">
-            <img src="${escapeHtml(ref.url)}" alt="">
-        </a>
-    `).join('');
+    el.classList.remove('hidden');
+    el.innerHTML = `
+        <div class="viewer-block-title"><span>${escapeHtml(tr('online.viewerParams') || 'Parameters')}</span></div>
+        <div class="viewer-param-list">
+            ${rows.map(row => `
+                <div class="viewer-param-row">
+                    <div class="viewer-param-label">${escapeHtml(row.label)}</div>
+                    <div class="viewer-param-value">${escapeHtml(row.value)}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+function renderViewerRefThumbs(data){
+    renderViewerReferenceSections(data);
+    renderViewerExtraParams(data);
 }
 function renderViewerMetaGrid(container, rows){
     container.innerHTML = rows.map(row => `
@@ -821,6 +1078,79 @@ async function importEditedViewerCanvas(canvas, editType){
     return items[0] || null;
 }
 
+async function importVideoFrameCanvas(canvas, source, captureTimeSec){
+    if(!canvas || !source) return null;
+    let blob;
+    try {
+        blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    } catch(e){
+        throw new Error('Capture failed');
+    }
+    if(!blob) throw new Error('Capture failed');
+    const file = new File([blob], `video_frame_${Date.now()}.png`, { type: 'image/png' });
+    const form = new FormData();
+    form.append('files', file);
+    const res = await fetch('/api/online-import', { method:'POST', body: form });
+    if(!res.ok) throw new Error('Import failed');
+    const data = await res.json();
+    const timeLabel = Number.isFinite(captureTimeSec) ? `${Math.max(0, captureTimeSec).toFixed(2)}s` : '';
+    const frameNote = tr('viewer.videoFrameAt') || 'Video frame';
+    const basePrompt = String(source.prompt || '').trim();
+    const items = (data.items || []).map(item => ({
+        ...item,
+        prompt: basePrompt
+            ? `${basePrompt} (${frameNote}${timeLabel ? ` ${timeLabel}` : ''})`
+            : `${frameNote}${timeLabel ? ` ${timeLabel}` : ''}`,
+        model: source.model || source.params?.model || item.model || '',
+        provider_id: source.provider_id || source.params?.provider_id || item.provider_id || '',
+        provider_name: source.provider_name || item.provider_name || '',
+        params: {
+            ...(source.params || {}),
+            imported: true,
+            video_frame_capture: true,
+            captured_from: historyKey(source),
+            capture_time_sec: captureTimeSec,
+            source_video_url: mediaUrl(source),
+            reference_images: source.params?.reference_images || []
+        }
+    }));
+    items.forEach(item => { if(opts.onUpsertItem) opts.onUpsertItem(item); });
+    if(opts.onRefresh) opts.onRefresh();
+    return items[0] || null;
+}
+
+async function captureViewerVideoFrame(ev){
+    ev?.stopPropagation();
+    const video = document.getElementById('viewerVideoEl');
+    const source = currentLightboxData;
+    const btn = document.getElementById('viewerCaptureFrameBtn');
+    if(!video || !source || getMediaKind(source) !== 'video') return;
+    if(video.readyState < 2){
+        alert(tr('viewer.captureFrameNotReady') || 'Video is not ready yet.');
+        return;
+    }
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if(!w || !h){
+        alert(tr('viewer.captureFrameNotReady') || 'Video is not ready yet.');
+        return;
+    }
+    if(btn) btn.disabled = true;
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        await importVideoFrameCanvas(canvas, source, video.currentTime);
+    } catch(err){
+        console.error(err);
+        alert(tr('viewer.captureFrameFailed') || 'Failed to capture video frame.');
+    } finally {
+        if(btn) btn.disabled = false;
+        if(global.lucide) lucide.createIcons();
+    }
+}
+
 async function getViewerGridSlicedCanvases(){
     const img = document.getElementById('lightboxImg');
     if(!img || !img.naturalWidth || !img.naturalHeight) return null;
@@ -1043,6 +1373,7 @@ function renderLightboxSidebar(data){
     const key = historyKey(data);
     document.getElementById('viewerFavBtn')?.classList.toggle('active', opts.isFavorite ? opts.isFavorite(data) : false);
     document.getElementById('viewerPinBtn')?.classList.toggle('pin-active', opts.isPinned ? opts.isPinned(data) : false);
+    if(global.lucide && typeof global.lucide.createIcons === 'function') global.lucide.createIcons();
 }
 function updateViewerNav(){
     const items = lightboxItems();
@@ -1109,6 +1440,7 @@ function openLightbox(data, options = {}){
             if(global.lucide) lucide.createIcons();
         }
 function closeLightbox(){
+    closeViewerRefPreview();
     document.getElementById('lightbox').classList.remove('open');
     document.body.style.overflow = '';
     lightboxIndex = -1;
@@ -1186,6 +1518,7 @@ function bindViewerGlobals(){
   global.copyLightboxPrompt = copyLightboxPrompt;
   global.copyLightboxImage = copyLightboxImage;
   global.downloadLightboxImage = downloadLightboxImage;
+  global.captureViewerVideoFrame = captureViewerVideoFrame;
   global.openLightboxFullscreen = openLightboxFullscreen;
   global.toggleViewerFavorite = toggleViewerFavorite;
   global.toggleViewerPin = toggleViewerPin;
@@ -1197,12 +1530,18 @@ function bindViewerGlobals(){
   global.applyViewerGridPreset = applyViewerGridPreset;
   global.refreshViewerGridSplitPreview = refreshViewerGridSplitPreview;
   global.syncViewerBrushSizeUI = syncViewerBrushSizeUI;
+  global.openViewerRefPreview = openViewerRefPreview;
+  global.closeViewerRefPreview = closeViewerRefPreview;
   if(!global._studioViewerKeyBound){
     global._studioViewerKeyBound = true;
     document.addEventListener('keydown', e => {
       const open = document.getElementById('lightbox')?.classList.contains('open');
       if(!open) return;
-      if(e.key === 'Escape') closeLightbox();
+      if(e.key === 'Escape'){
+        const refOpen = !document.getElementById('viewerRefPreview')?.classList.contains('hidden');
+        if(refOpen){ closeViewerRefPreview(); return; }
+        closeLightbox();
+      }
       if(e.key === 'ArrowLeft') viewerNav(-1);
       if(e.key === 'ArrowRight') viewerNav(1);
     });

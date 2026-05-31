@@ -242,6 +242,32 @@
         .output-grid-cell.drop-after::after { right:-7px; }
         .output-grid-cell .draggable-output { cursor:grab; user-select:none; -webkit-user-drag:element; }
         .output-grid-cell .draggable-output:active { cursor:grabbing; }
+        .audio-play-btn {
+            position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:36px; height:36px; border-radius:50%; z-index:4;
+            display:flex; align-items:center; justify-content:center;
+            background:rgba(22,22,22,.72); color:#f5f5f5;
+            border:1px solid rgba(255,255,255,.12);
+            cursor:pointer; padding:0;
+            opacity:0; pointer-events:none;
+            transition:opacity .18s var(--easing), background .18s var(--easing), border-color .18s var(--easing), transform .12s var(--easing);
+            backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+        }
+        .audio-play-btn svg { width:15px !important; height:15px !important; margin-left:1px; }
+        .audio-play-btn.is-playing svg { margin-left:0; }
+        .output-grid-cell.is-audio:hover .audio-play-btn,
+        .output-grid-cell.is-audio.is-audio-playing .audio-play-btn { opacity:1; pointer-events:auto; }
+        .audio-play-btn:hover { background:rgba(255,77,148,.88); border-color:rgba(255,77,148,.55); color:#fff; }
+        .audio-play-btn:active { transform:translate(-50%,-50%) scale(.94); }
+        .output-grid-cell.is-audio.is-audio-playing { border-color:rgba(255,77,148,.35); }
+        .output-grid-cell.drag-reject-bounce { animation:gallery-drag-reject .38s var(--easing); }
+        @keyframes gallery-drag-reject {
+            0%, 100% { transform:translateX(0); }
+            20% { transform:translateX(-7px); }
+            40% { transform:translateX(6px); }
+            60% { transform:translateX(-4px); }
+            80% { transform:translateX(3px); }
+        }
         .video-progress-bar {
             position: absolute;
             bottom: 0;
@@ -370,7 +396,7 @@
             return (list || []).map(item => `${historyKey(item)}:${mediaUrl(item)}:${item.type || ''}`).join('|');
         }
         function pendingFingerprint(jobs){
-            return (jobs || []).map(j => `${j.id}:${j.error || ''}:${j.mediaKind || 'image'}`).join('|');
+            return (jobs || []).map(j => `${j.id}:${j.error || ''}:${j.mediaKind || 'image'}:${j.task_id || ''}`).join('|');
         }
         function syncGalleryFingerprints(){
             lastHistoryFingerprint = historyDataFingerprint(allHistory);
@@ -413,6 +439,70 @@
             e.dataTransfer.setData('text/uri-list', normalized);
             e.dataTransfer.setData('text/plain', normalized);
         }
+        const GALLERY_VIDEO_MIME = 'application/x-studio-gallery-video';
+        const GALLERY_AUDIO_MIME = 'application/x-studio-gallery-audio';
+        function setGalleryMediaDragData(e, url, kind){
+            const normalized = normalizeImageUrl(url);
+            if(!normalized) return;
+            const mime = kind === 'audio' ? GALLERY_AUDIO_MIME : GALLERY_VIDEO_MIME;
+            e.dataTransfer.setData(mime, normalized);
+            e.dataTransfer.setData('text/uri-list', normalized);
+            e.dataTransfer.setData('text/plain', normalized);
+        }
+        const GalleryAudioPlayer = (function(){
+            let audioEl = null;
+            let playingKey = '';
+            function resetButtons(){
+                document.querySelectorAll('.audio-play-btn').forEach(btn => {
+                    btn.classList.remove('is-playing');
+                    btn.setAttribute('aria-pressed', 'false');
+                    const icon = btn.querySelector('[data-lucide]');
+                    if(icon) icon.setAttribute('data-lucide', 'play');
+                });
+                document.querySelectorAll('.output-grid-cell.is-audio-playing').forEach(cell => cell.classList.remove('is-audio-playing'));
+                if(window.lucide) lucide.createIcons();
+            }
+            function setPlayingState(btn, cell, playing){
+                resetButtons();
+                if(!playing) return;
+                playingKey = cell?.dataset?.ts || '';
+                btn.classList.add('is-playing');
+                btn.setAttribute('aria-pressed', 'true');
+                const icon = btn.querySelector('[data-lucide]');
+                if(icon) icon.setAttribute('data-lucide', 'pause');
+                cell?.classList.add('is-audio-playing');
+                if(window.lucide) lucide.createIcons();
+            }
+            return {
+                toggle(btn, cell, url){
+                    const key = cell?.dataset?.ts || '';
+                    if(playingKey === key && audioEl && !audioEl.paused){
+                        audioEl.pause();
+                        playingKey = '';
+                        resetButtons();
+                        return;
+                    }
+                    if(audioEl){
+                        audioEl.pause();
+                        audioEl = null;
+                    }
+                    audioEl = new Audio(url);
+                    playingKey = key;
+                    audioEl.onended = () => { audioEl = null; playingKey = ''; resetButtons(); };
+                    audioEl.onerror = () => { audioEl = null; playingKey = ''; resetButtons(); };
+                    audioEl.play().then(() => setPlayingState(btn, cell, true)).catch(() => {
+                        audioEl = null; playingKey = ''; resetButtons();
+                    });
+                },
+                stopAll(){
+                    if(audioEl) audioEl.pause();
+                    audioEl = null; playingKey = '';
+                    resetButtons();
+                }
+            };
+        })();
+        let activeGalleryDrag = null;
+        let galleryDragAccepted = false;
         const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
         function isAudioItem(item){
             if(item?.audios?.length) return true;
@@ -437,9 +527,8 @@
             return isImageItem(item);
         }
         function matchesPendingFilter(job){
-            if(mediaFilter === 'all') return true;
             if(mediaFilter === 'favorite') return false;
-            return pendingKind(job) === mediaFilter;
+            return true;
         }
 
         function setMediaFilter(next, btn){
@@ -602,7 +691,9 @@
                          <div class="video-progress-bar"><div class="video-progress-fill" id="progress-fill-${escapeHtml(key)}"></div></div>
                          <span class="video-badge"><i data-lucide="clapperboard" class="w-2.5 h-2.5"></i>VIDEO</span>`;
             } else if(audio){
-                media = `<div class="audio-cover draggable-output" draggable="true"><i data-lucide="music"></i></div><span class="audio-badge"><i data-lucide="music-2" class="w-3 h-3"></i>AUDIO</span>`;
+                media = `<div class="audio-cover draggable-output" draggable="true"><i data-lucide="music"></i></div>
+                         <button type="button" class="audio-play-btn" data-audio-play aria-label="Play" aria-pressed="false"><i data-lucide="play"></i></button>
+                         <span class="audio-badge"><i data-lucide="music-2" class="w-3 h-3"></i>AUDIO</span>`;
             } else {
                 media = `<img src="${escapeHtml(url)}" alt="" loading="lazy" class="draggable-output" draggable="true">`;
             }
@@ -623,6 +714,7 @@
         }
 
         function renderOutputGrid(){
+            GalleryAudioPlayer.stopAll();
             const grid = document.getElementById('outputGrid');
             const box = document.getElementById('resultBox');
             const placeholder = document.getElementById('placeholder');
@@ -658,6 +750,8 @@
                 if(!data) return;
                 const url = mediaUrl(data);
                 const pickable = isImageItem(data);
+                const videoItem = isVideoItem(data);
+                const audioItem = isAudioItem(data);
                 const key = historyKey(data);
                 const dragEl = cell.querySelector('.draggable-output');
 
@@ -669,15 +763,54 @@
                         reorderDragKey = key;
                         cell.classList.add('is-dragging');
                         e.dataTransfer.setData(REORDER_MIME, key);
-                        if(pickable) setImageDragData(e, url);
-                        e.dataTransfer.effectAllowed = pickable ? 'copyMove' : 'move';
+                        galleryDragAccepted = false;
+                        if(pickable){
+                            setImageDragData(e, url);
+                            e.dataTransfer.effectAllowed = 'copyMove';
+                        } else if(videoItem){
+                            setGalleryMediaDragData(e, url, 'video');
+                            e.dataTransfer.effectAllowed = 'copyMove';
+                            activeGalleryDrag = { key, mediaKind:'video', url: normalizeImageUrl(url) };
+                            window.parent.postMessage({ type:'studio-gallery-drag-start', mediaKind:'video', url: normalizeImageUrl(url), key }, '*');
+                        } else if(audioItem){
+                            setGalleryMediaDragData(e, url, 'audio');
+                            e.dataTransfer.effectAllowed = 'copyMove';
+                            activeGalleryDrag = { key, mediaKind:'audio', url: normalizeImageUrl(url) };
+                            window.parent.postMessage({ type:'studio-gallery-drag-start', mediaKind:'audio', url: normalizeImageUrl(url), key }, '*');
+                        } else {
+                            e.dataTransfer.effectAllowed = 'move';
+                        }
                     };
                     dragEl.ondragend = () => {
                         reorderDragKey = '';
                         cell.classList.remove('is-dragging');
                         clearReorderDropHints();
                         setTimeout(() => { delete dragEl.dataset.dragging; }, 0);
+                        if(activeGalleryDrag?.key === key){
+                            const rejectCell = cell;
+                            setTimeout(() => {
+                                if(!galleryDragAccepted){
+                                    rejectCell.classList.add('drag-reject-bounce');
+                                    setTimeout(() => rejectCell.classList.remove('drag-reject-bounce'), 420);
+                                }
+                                window.parent.postMessage({ type:'studio-gallery-drag-end', key, accepted: galleryDragAccepted }, '*');
+                                activeGalleryDrag = null;
+                                galleryDragAccepted = false;
+                            }, 40);
+                        } else {
+                            galleryDragAccepted = false;
+                        }
                     };
+                }
+
+                const playBtn = cell.querySelector('[data-audio-play]');
+                if(playBtn && audioItem){
+                    playBtn.addEventListener('click', e => {
+                        e.preventDefault(); e.stopPropagation();
+                        GalleryAudioPlayer.toggle(playBtn, cell, url);
+                    });
+                    playBtn.addEventListener('mousedown', e => e.stopPropagation());
+                    playBtn.addEventListener('dragstart', e => e.preventDefault());
                 }
 
                 cell.onclick = (e) => {
@@ -730,7 +863,7 @@
                         channel.postMessage({ type: 'gallery-apply-params', item: data });
                     }
                 });
-                cell.querySelector('[data-action="delete"]')?.addEventListener('click', e => { e.stopPropagation(); deleteHistoryItem(data.timestamp); });
+                cell.querySelector('[data-action="delete"]')?.addEventListener('click', e => { e.stopPropagation(); deleteHistoryItem(historyKey(data)); });
 
                 const videoEl = cell.querySelector('video');
                 if(videoEl){
@@ -869,7 +1002,8 @@
             const btn = document.getElementById('bulkDeleteBtn');
             if(btn) btn.disabled = true;
             try {
-                const timestamps = [...selectedKeys].map(Number).filter(t => !isNaN(t));
+                const keys = [...selectedKeys];
+                const timestamps = keys.map(k => findHistoryItemByKey(k)?.timestamp ?? k);
                 const res = await fetch('/api/history/delete-batch', {
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
@@ -878,12 +1012,7 @@
                 if(!res.ok){
                     throw new Error('Batch delete failed');
                 }
-                const keysToRemove = new Set([...selectedKeys]);
-                allHistory = allHistory.filter(h => !keysToRemove.has(historyKey(h)));
-                pinnedIds = pinnedIds.filter(id => !keysToRemove.has(id));
-                favoriteIds = favoriteIds.filter(id => !keysToRemove.has(id));
-                displayOrder = displayOrder.filter(id => !keysToRemove.has(id));
-                saveMeta();
+                removeHistoryFromLocal(keys);
                 setBulkSelectMode(false);
             } catch(err){
                 alert(err.message || '删除失败');
@@ -1013,6 +1142,26 @@
             } catch(e){ console.error(e); }
         }
 
+        function mergePanelPendingJobs(incoming, pageType){
+            const incomingList = incoming || [];
+            if(!incomingList.length) return;
+            const kindForPage = { online: 'image', video: 'video', local: 'local-comfy', runninghub: 'runninghub' };
+            const kind = kindForPage[pageType] || (incomingList[0] && incomingList[0].mediaKind) || '';
+            const incomingIds = new Set(incomingList.map(j => j.id));
+            if(kind){
+                pendingJobs = pendingJobs.filter(j => j.mediaKind !== kind && !incomingIds.has(j.id));
+            } else {
+                pendingJobs = pendingJobs.filter(j => !incomingIds.has(j.id));
+            }
+            pendingJobs = [...incomingList, ...pendingJobs];
+            const seen = new Set();
+            pendingJobs = pendingJobs.filter(j => {
+                if(!j?.id || seen.has(j.id)) return false;
+                seen.add(j.id);
+                return true;
+            });
+        }
+
         async function syncPendingJobs(){
             try {
                 const jobs = await fetch('/api/online-pending').then(r => r.json());
@@ -1021,29 +1170,13 @@
                     for(const job of jobs){
                         const isCompleted = allHistory.some(item => {
                             const params = item.params || {};
-                            if(params.job_id && params.job_id === job.id){
-                                return true;
-                            }
-                            const itemPrompt = (item.prompt || '').trim();
-                            const jobPrompt = (job.prompt || '').trim();
-                            const itemTimestamp = item.timestamp || 0;
-                            
-                            let matchesMedia = false;
-                            if(job.mediaKind === 'video' && item.videos && item.videos.length > 0){
-                                matchesMedia = true;
-                            } else if(job.mediaKind === 'audio' && item.audios && item.audios.length > 0){
-                                matchesMedia = true;
-                            } else if(job.mediaKind === 'image' && item.images && item.images.length > 0){
-                                matchesMedia = true;
-                            }
-                            
-                            const isPromptMatch = itemPrompt === jobPrompt || itemPrompt.includes(jobPrompt) || jobPrompt.includes(itemPrompt);
-                            const isNewer = itemTimestamp >= (job.timestamp - 15);
-                            
-                            return matchesMedia && isPromptMatch && isNewer;
+                            if(params.job_id && params.job_id === job.id) return true;
+                            return false;
                         });
                         
                         if(isCompleted){
+                            fetch('/api/online-pending/' + encodeURIComponent(job.id), { method:'DELETE' }).catch(()=>{});
+                        } else if(!job.task_id && job.timestamp && ((Date.now() / 1000) - job.timestamp > 120)){
                             fetch('/api/online-pending/' + encodeURIComponent(job.id), { method:'DELETE' }).catch(()=>{});
                         } else {
                             cleanedJobs.push(job);
@@ -1080,7 +1213,8 @@
                     });
 
                     const fp = pendingFingerprint(mergedJobs);
-                    if(fp === lastPendingFingerprint) return;
+                    const localFp = pendingFingerprint(pendingJobs);
+                    if(fp === lastPendingFingerprint && localFp === fp) return;
                     lastPendingFingerprint = fp;
                     pendingJobs = mergedJobs;
                     renderOutputGrid();
@@ -1094,6 +1228,7 @@
             if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
             if(!displayOrder.includes(key)) displayOrder.unshift(key);
             rebuildDisplayOrderFromPins();
+            syncGalleryFingerprints();
             saveMeta();
             renderOutputGrid();
         }
@@ -1114,15 +1249,46 @@
             else favoriteIds = [...favoriteIds.filter(id => !StudioHistoryMeta.keysEqual(id, key)), key];
             saveMeta(); renderOutputGrid();
         }
-        async function deleteHistoryItem(ts){
+        function findHistoryItemByKey(key){
+            if(key == null || key === '') return null;
+            return allHistory.find(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
+        }
+        function removeHistoryFromLocal(keys){
+            const matchers = (Array.isArray(keys) ? keys : [keys]).filter(k => k != null && k !== '');
+            if(!matchers.length) return;
+            const isRemovedKey = (id) => matchers.some(k => StudioHistoryMeta.keysEqual(id, k));
+            allHistory = allHistory.filter(h => !isRemovedKey(historyKey(h)));
+            pinnedIds = pinnedIds.filter(id => !isRemovedKey(id));
+            favoriteIds = favoriteIds.filter(id => !isRemovedKey(id));
+            displayOrder = displayOrder.filter(id => !isRemovedKey(id));
+            matchers.forEach(k => {
+                [...selectedKeys].forEach(sk => {
+                    if(StudioHistoryMeta.keysEqual(sk, k)) selectedKeys.delete(sk);
+                });
+            });
+            syncGalleryFingerprints();
+            saveMeta();
+            renderOutputGrid();
+        }
+
+        async function deleteHistoryItem(tsOrKey){
             if(!confirm(tr('online.deleteConfirm'))) return;
-            await fetch('/api/history/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ timestamp: ts }) });
-            const key = String(ts);
-            allHistory = allHistory.filter(h => historyKey(h) !== key);
-            pinnedIds = pinnedIds.filter(id => id !== key);
-            favoriteIds = favoriteIds.filter(id => id !== key);
-            displayOrder = displayOrder.filter(id => id !== key);
-            saveMeta(); renderOutputGrid();
+            const item = findHistoryItemByKey(tsOrKey);
+            const key = item ? historyKey(item) : historyKey({ timestamp: tsOrKey });
+            const apiTimestamp = item?.timestamp ?? tsOrKey;
+            if(!key) return;
+            try {
+                const res = await fetch('/api/history/delete', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ timestamp: apiTimestamp })
+                }).then(r => r.json());
+                if(!res?.success) return;
+            } catch(e){
+                console.error(e);
+                return;
+            }
+            removeHistoryFromLocal([key]);
         }
 
         async function importFiles(files){
@@ -1156,7 +1322,7 @@
             if(data.type === 'gallery-refresh') { loadAllHistory(); syncPendingJobs(); }
             if(data.type === 'gallery-add-item' && data.item) { upsertHistoryItem(data.item); syncPendingJobs(); }
             if(data.type === 'gallery-set-pending'){
-                pendingJobs = data.jobs || [];
+                mergePanelPendingJobs(data.jobs || [], data.pageType);
                 renderOutputGrid();
                 syncPendingJobs();
             }
@@ -1209,6 +1375,16 @@
             }
             if(data.type === 'studio-layout-resize'){
                 syncGalleryGridLayout();
+            }
+            if(data.type === 'studio-gallery-drag-accepted'){
+                galleryDragAccepted = true;
+            }
+            if(data.type === 'studio-gallery-drag-rejected' && data.key){
+                const rejectCell = document.querySelector(`.output-grid-cell[data-ts="${CSS.escape(data.key)}"]`);
+                if(rejectCell){
+                    rejectCell.classList.add('drag-reject-bounce');
+                    setTimeout(() => rejectCell.classList.remove('drag-reject-bounce'), 420);
+                }
             }
         });
         function hasImportFiles(dataTransfer){

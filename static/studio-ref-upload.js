@@ -149,7 +149,7 @@ async function handleImageUrl(url, slotId){
     if(!normalized) return;
     if(isFixedMode()){
         if(typeof opts.onUrlAssign === 'function'){
-            await opts.onUrlAssign(slotId, normalized);
+            await opts.onUrlAssign(normalized, slotId);
         }
         cancelBoardPick();
         return;
@@ -179,7 +179,7 @@ async function handleFile(file, slotId){
     if(!file) return;
     if(isFixedMode()){
         if(typeof opts.onFileUpload === 'function'){
-            await opts.onFileUpload(slotId, file);
+            await opts.onFileUpload(file, slotId);
         }
         return;
     }
@@ -297,13 +297,12 @@ function bindRefSlotEvents(cell, slot){
         handle.draggable = false;
     }
 }
-function renderSlotHtml(slot, idx){
+function renderSlotHtml(slot){
     const filled = !!slot.ref;
     const preview = filled ? slot.ref.url : '';
     return `<div class="upload-item group aspect-square rounded-md flex flex-col items-center justify-center cursor-pointer${filled ? ' has-image' : ''}${boardPickSlotId === slot.id ? ' is-board-target' : ''}" data-ref-id="${escapeHtml(slot.id)}">
         <input type="file" accept="image/*" class="hidden">
         ${filled ? '' : '<i data-lucide="plus" class="w-5 h-5 text-[#737373] group-hover:text-[#ff4d94]"></i>'}
-        <span class="ref-slot-label mt-2 uppercase">${String(idx + 1).padStart(2, '0')}</span>
         <img class="preview-img${filled ? '' : ' hidden'}" ${filled ? `src="${escapeHtml(preview)}"` : ''} draggable="false" alt="">
         <button type="button" data-ref-board class="cell-action-btn ref-slot-btn ref-board-btn" title="${escapeHtml(tr('online.boardPickTitle'))}">board</button>
         <button type="button" data-ref-reorder class="cell-action-btn ref-slot-btn ref-reorder-btn" title="${escapeHtml(tr('online.reorder') || 'Reorder')}"><i data-lucide="grip-vertical"></i></button>
@@ -314,7 +313,7 @@ function renderRefGrid(){
     const grid = gridEl();
     if(!grid) return;
     if(!isFixedMode()) ensureTrailingEmptySlot();
-    grid.innerHTML = refSlots.map((slot, idx) => renderSlotHtml(slot, idx)).join('');
+    grid.innerHTML = refSlots.map(slot => renderSlotHtml(slot)).join('');
     refSlots.forEach(slot => {
         const cell = grid.querySelector(`[data-ref-id="${slot.id}"]`);
         if(cell) bindRefSlotEvents(cell, slot);

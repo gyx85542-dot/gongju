@@ -19,7 +19,7 @@
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260530-rh-options"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
-    <link rel="stylesheet" href="/static/runninghub-settings.css?v=20260530-rh-options">
+    <link rel="stylesheet" href="/static/runninghub-settings.css?v=20260530-rh-toast">
     <link rel="stylesheet" href="/static/settings-magnific.css?v=20260530-field-schema">
     <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
     <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
@@ -69,6 +69,7 @@
     </style>
 </head>
 <body class="mg-studio theme-dark studio-theme-dark settings-page rh-settings">
+    <div id="rhToast" class="rh-toast" role="status" aria-live="polite" aria-atomic="true"></div>
     <div class="page">
         <div class="wrap">
             <header class="page-head">
@@ -235,10 +236,22 @@
         }
         function refreshIcons(){ if(window.lucide) lucide.createIcons(); }
         function setStatus(text){ statusEl.textContent = text || ''; }
+        let rhToastTimer = null;
+        function showToast(message, variant = 'success'){
+            const el = document.getElementById('rhToast');
+            if(!el || !message) return;
+            if(rhToastTimer) clearTimeout(rhToastTimer);
+            el.textContent = message;
+            el.className = `rh-toast rh-toast--${variant} is-visible`;
+            rhToastTimer = setTimeout(() => {
+                el.classList.remove('is-visible');
+            }, 2600);
+        }
         function escapeHtml(str){ return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
         function escapeAttr(str){ return escapeHtml(str).replace(/`/g, '&#96;'); }
         function uid(prefix='rh'){ return `${prefix}-${Math.random().toString(36).slice(2, 8)}`; }
-        const RH_DATA_TYPES = ['text', 'textarea', 'number', 'image'];
+        const RH_DATA_TYPES = ['text', 'textarea', 'number', 'image', 'video', 'audio'];
+        const RH_MEDIA_DATA_TYPES = ['image', 'video', 'audio'];
         function rhFieldIsDropdown(field){
             rhNormalizeFieldSchema(field);
             return String(field.inputMethod || '').toLowerCase() === 'dropdown';
@@ -426,13 +439,15 @@
                                     <option value="textarea" ${dataType === 'textarea' ? 'selected' : ''}>textarea</option>
                                     <option value="number" ${dataType === 'number' ? 'selected' : ''}>number</option>
                                     <option value="image" ${dataType === 'image' ? 'selected' : ''}>image</option>
+                                    <option value="video" ${dataType === 'video' ? 'selected' : ''}>video</option>
+                                    <option value="audio" ${dataType === 'audio' ? 'selected' : ''}>audio</option>
                                 </select>
                             </div>
                         </label>
                         <label class="rh-field">
                             <span class="rh-field-label">${tr('rh.inputMethod')}</span>
                             <div class="field-frame field-frame--select">
-                                <select class="size-select" onchange="updateParamInputMethod(${index}, this.value)">
+                                <select class="size-select" onchange="updateParamInputMethod(${index}, this.value)" ${RH_MEDIA_DATA_TYPES.includes(dataType) ? 'disabled' : ''}>
                                     <option value="manual" ${inputMethod === 'manual' ? 'selected' : ''}>${escapeHtml(tr('rh.inputManual'))}</option>
                                     <option value="dropdown" ${inputMethod === 'dropdown' ? 'selected' : ''}>${escapeHtml(tr('rh.inputDropdown'))}</option>
                                 </select>
@@ -787,6 +802,11 @@
             const field = wf?.fields?.[index];
             if(!field) return;
             field.dataType = RH_DATA_TYPES.includes(String(value || '').toLowerCase()) ? String(value).toLowerCase() : 'text';
+            if(RH_MEDIA_DATA_TYPES.includes(field.dataType)){
+                field.inputMethod = 'manual';
+                field.options = [];
+                delete field.apiValue;
+            }
             rhSyncLegacyType(field);
             renderParamList();
         };
@@ -794,6 +814,7 @@
             const wf = currentWorkflow();
             const field = wf?.fields?.[index];
             if(!field) return;
+            if(RH_MEDIA_DATA_TYPES.includes(String(field.dataType || '').toLowerCase())) return;
             field.inputMethod = String(value || '').toLowerCase() === 'dropdown' ? 'dropdown' : 'manual';
             if(field.inputMethod === 'dropdown'){
                 rhHydrateDropdownField(field, true);
@@ -867,6 +888,11 @@
             if(typeof d === 'string') return d;
             if(Array.isArray(d) && d.length) return d[0]?.msg || String(d[0]);
             return tr('rh.saveFailed');
+        }
+
+        function notifyRunningHubChanged(){
+            try { new BroadcastChannel('studio-api').postMessage({ type: 'runninghub-changed' }); } catch(e) {}
+            try { window.parent.postMessage({ type: 'runninghub-changed' }, '*'); } catch(e) {}
         }
 
         async function saveApiKey(){
@@ -950,9 +976,11 @@
                 renderWorkflowList();
                 renderEditor();
                 setStatus(tr('rh.saved'));
-                try { new BroadcastChannel('studio-api').postMessage({ type: 'runninghub-changed' }); } catch(e) {}
+                showToast(tr('rh.saved'));
+                notifyRunningHubChanged();
             } catch(err) {
                 setStatus('');
+                showToast(err.message || tr('rh.saveFailed'), 'error');
                 alert(err.message || '保存失败');
             }
         }

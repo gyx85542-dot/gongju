@@ -173,10 +173,7 @@
         .preview-title-row { display:flex; align-items:center; gap:8px; }
         .preview-title { font-size:13px; font-weight:850; color:var(--text); }
         .preview-pill { font-size:10px; font-weight:800; letter-spacing:.06em; padding:2px 8px; border-radius:6px; background:var(--soft); color:var(--muted); border:1px solid var(--line); }
-        .workspace-mode-tabs { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:220px; margin:10px auto 0; padding:4px; border:1px solid var(--line); border-radius:12px; background:var(--soft); }
-        .workspace-mode-tabs button { height:30px; min-width:88px; border-radius:8px; color:var(--muted); font-size:11px; font-weight:850; transition:background .15s ease, color .15s ease; }
-        .workspace-mode-tabs button:not(.active):hover { color:var(--text); }
-        .workspace-mode-tabs button.active { background:var(--panel); color:var(--text); box-shadow:none; }
+        .workflow-test-panel { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:12px; }
         .preview-desc { color:var(--muted); font-size:11.5px; font-weight:600; line-height:1.5; margin-bottom:4px; }
         #previewContent { display:flex; flex-direction:column; gap:12px; padding-top:6px; border-top:1px solid var(--line); }
         .preview-empty { padding:32px 16px; text-align:center; color:var(--faint); font-size:12px; font-weight:700; line-height:1.6; border:1px dashed var(--line); border-radius:12px; transition:border-color .15s ease, color .15s ease; }
@@ -217,35 +214,9 @@
         .workflow-title-input { width:min(420px, 100%); height:30px; border:0; border-bottom:1px dashed var(--line-strong); border-radius:0; background:transparent; color:var(--text); outline:none; padding:0 2px 2px; font-size:20px; line-height:1.1; font-weight:900; letter-spacing:-.01em; }
         .workflow-title-input:hover { border-bottom-color:var(--muted); }
         .workflow-title-input:focus { border-bottom-color:var(--text); background:transparent; }
-        .mini-canvas { height:420px; border:1px solid var(--line); border-radius:8px; background-color:#141414; background-image:radial-gradient(var(--line-strong) 1px, transparent 1px); background-size:22px 22px; overflow:hidden; position:relative; cursor:grab; }
-        .mini-canvas.large { height:760px; }
-        .mini-canvas.is-panning { cursor:grabbing; }
-        .mini-world { position:absolute; left:0; top:0; transform-origin:0 0; width:900px; height:620px; }
-        .mini-toolbar { position:absolute; top:12px; left:12px; display:flex; gap:8px; z-index:4; }
-        .mini-tool { height:32px; padding:0 10px; border-radius:8px; background:var(--soft); border:1px solid var(--line); color:var(--muted); display:flex; align-items:center; gap:6px; font-size:11px; font-weight:850; box-shadow:none; transition:background .15s ease, color .15s ease, border-color .15s ease; }
-        .mini-tool:hover { color:var(--text); border-color:rgba(255,255,255,.12); background:#3a3a3a; }
-        .mini-card { position:absolute; width:230px; border:1px solid var(--line); border-radius:12px; background:var(--panel); box-shadow:0 12px 30px rgba(0,0,0,.24); overflow:hidden; user-select:none; }
-        .mini-card.comfy-card { width:270px; }
-        .mini-card-head { height:34px; display:flex; align-items:center; gap:8px; padding:0 10px; border-bottom:1px solid var(--line); color:var(--text); font-size:11px; font-weight:900; cursor:grab; }
-        .mini-card-body { padding:10px; display:flex; flex-direction:column; gap:8px; }
-        .mini-node-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .mini-delete { width:22px; height:22px; border-radius:8px; color:var(--faint); display:flex; align-items:center; justify-content:center; transition:background .15s ease, color .15s ease; }
-        .mini-delete:hover { background:rgba(255,77,148,.12); color:var(--accent); }
-        .mini-textarea { width:100%; min-height:92px; resize:vertical; border:none; border-radius:12px; background:#262626; color:var(--text); outline:none; padding:8px; font-size:12px; font-weight:650; line-height:1.45; user-select:text; }
-        .mini-input { width:100%; height:32px; border:none; border-radius:12px; background:#262626; color:var(--text); outline:none; padding:0 9px; font-size:12px; font-weight:650; user-select:text; }
-        .mini-image-drop { min-height:120px; border:1px dashed var(--line-strong); border-radius:12px; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--muted); background:var(--soft); font-size:11px; font-weight:800; cursor:pointer; transition:background .15s ease, color .15s ease, border-color .15s ease; }
-        .mini-image-drop:hover { border-color:rgba(255,77,148,.4); color:var(--accent); }
-        .mini-image-drop img { width:100%; max-height:170px; object-fit:contain; border-radius:8px; display:block; }
-        .mini-settings-list { display:flex; flex-direction:column; gap:8px; max-height:230px; overflow:auto; }
-        .mini-result img { width:100%; border-radius:8px; display:block; cursor:zoom-in; }
         .image-lightbox { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; padding:36px; background:rgba(16,16,16,.96); backdrop-filter:blur(16px); }
         .image-lightbox.open { display:flex; }
         .image-lightbox img { display:block; max-width:min(1120px, 92vw); max-height:86vh; object-fit:contain; border-radius:12px; background:var(--panel); box-shadow:0 30px 90px rgba(0,0,0,.28); border:1px solid var(--line); }
-        .mini-line { position:absolute; height:2px; background:var(--line-strong); transform-origin:0 50%; pointer-events:none; opacity:.85; }
-        .mini-port { position:absolute; top:50%; width:10px; height:10px; border-radius:8px; background:var(--text); box-shadow:0 0 0 3px var(--panel), 0 0 0 4px var(--line-strong); transform:translateY(-50%); }
-        .mini-port.in { left:-5px; }
-        .mini-port.out { right:-5px; }
-        .mini-run { margin-top:10px; }
         @media (max-width:1100px) { .layout { grid-template-columns:1fr; } .sidebar, .preview { position:static; } }
     </style>
 </head>
@@ -255,7 +226,7 @@
             <header class="page-head">
                 <div>
                     <div class="title" data-i18n="comfy.title">ComfyUI 设置</div>
-                    <div class="sub" data-i18n="comfy.subtitle">上传 API 格式的工作流，选择想暴露给画布的节点参数并自定义名称、控件类型，右侧实时预览并支持运行测试。</div>
+                    <div class="sub" data-i18n="comfy.subtitle">上传 API 格式的工作流，选择要暴露的节点参数并自定义名称、控件类型，支持运行测试。</div>
                 </div>
                 <div id="status" class="status"></div>
             </header>
@@ -282,18 +253,6 @@
                         </button>
                         <input id="uploadInput" type="file" accept="application/json" style="display:none" onchange="onUpload(event)">
                     </div>
-
-                    <div class="side-card" id="previewCard">
-                        <div class="preview-title-row">
-                            <i data-lucide="eye" class="w-4 h-4" style="color:var(--muted)"></i>
-                            <div class="preview-title" data-i18n="comfy.nodePreview">画布节点预览</div>
-                            <div class="preview-pill" data-i18n="comfy.live">实时</div>
-                        </div>
-                        <div class="preview-desc" data-i18n="comfy.previewDesc">这个工作流在画布 Comfy 节点上将显示出的控件，可直接填写并点击「运行测试」。</div>
-                        <div id="previewContent">
-                            <div class="preview-empty" data-i18n="comfy.previewEmpty">勾选节点输入字段后<br>预览将出现在这里</div>
-                        </div>
-                    </div>
                 </aside>
 
                 <main class="content">
@@ -315,10 +274,6 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="workspace-mode-tabs">
-                                <button id="workspaceGraphTab" type="button" class="active" onclick="setWorkspaceMode('graph')" data-i18n="comfy.workflow">工作流</button>
-                                <button id="workspaceCanvasTab" type="button" onclick="setWorkspaceMode('canvas')" data-i18n="comfy.testCanvas">测试画布</button>
-                            </div>
                         </div>
                         <div class="graph-svg-wrap" style="position:relative">
                             <svg id="graphSvg" class="graph-svg"></svg>
@@ -331,7 +286,14 @@
                             <div id="popupBackdrop" class="popup-backdrop" style="display:none" onclick="closeNodePopup()"></div>
                             <div id="nodePopup" class="popup-panel" style="display:none"></div>
                         </div>
-                        <div id="miniCanvasHost" style="display:none"></div>
+                        <div id="workflowTestPanel" class="workflow-test-panel" style="display:none">
+                            <div class="preview-title-row">
+                                <i data-lucide="flask-conical" class="w-4 h-4" style="color:var(--muted)"></i>
+                                <div class="preview-title" data-i18n="comfy.runTestPanel">运行测试</div>
+                            </div>
+                            <div class="preview-desc" data-i18n="comfy.runTestDesc">填写下方参数并运行，验证工作流配置是否正确。</div>
+                            <div id="previewContent"></div>
+                        </div>
                     </div>
                     <div id="nodesToggle" class="nodes-toggle" style="display:none" onclick="toggleNodeList()">
                         <i data-lucide="list" class="w-3.5 h-3.5"></i>
@@ -357,7 +319,6 @@
             renderList();
             renderEditor();
             renderPreview();
-            renderWorkspaceView();
             refreshIcons();
         }
         function applyLanguage(){
@@ -477,11 +438,6 @@
         let previewRandomActive = {};   // field_id -> 筛子运行时是否激活；未设置时默认激活
         let previewImageUrls = {};      // field_id -> 浏览器可显示的本地 URL（仅图片字段）
         let runResult = null;           // url 或 null
-        let workspaceMode = 'graph';
-        let miniView = { k: 1, x: 0, y: 0 };
-        let miniCards = {};
-        let miniTestNodes = [];
-        let miniDrag = null;
 
         const statusEl = document.getElementById('status');
         const listEl = document.getElementById('workflowList');
@@ -491,33 +447,11 @@
         const saveBtn = document.getElementById('saveBtn');
         const nodeListEl = document.getElementById('nodeList');
         const previewCard = document.getElementById('previewContent');
-        const miniCanvasHost = document.getElementById('miniCanvasHost');
+        const workflowTestPanel = document.getElementById('workflowTestPanel');
 
         function setStatus(text){ statusEl.textContent = text || ''; }
         function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
         function escapeAttr(s){ return escapeHtml(s); }
-        function fieldKind(f){
-            if(f.type === 'image') return 'image';
-            const key = `${f.input || ''} ${f.name || ''}`.toLowerCase();
-            if(f.type === 'textarea' || /prompt|text|提示词|正向|负向/.test(key)) return 'prompt';
-            return 'setting';
-        }
-        function defaultMiniCards(){
-            return {
-                prompt:{ x:24, y:30 },
-                image:{ x:24, y:210 },
-                custom:{ x:280, y:78 },
-                output:{ x:540, y:120 }
-            };
-        }
-        function defaultMiniTestNodes(){
-            return [
-                { id:'prompt_1', type:'prompt', x:36, y:96, text:'' },
-                { id:'image_1', type:'image', x:36, y:286, url:'', value:'' },
-                { id:'comfy_1', type:'comfy', x:330, y:150 },
-                { id:'output_1', type:'output', x:670, y:190 }
-            ];
-        }
 
         // —— ComfyUI 后端地址管理 ——
         let comfyInstances = [];
@@ -613,10 +547,7 @@
                 currentWorkflow = data.workflow;
                 currentConfig = data.config || { title:name.replace('.json',''), fields:[] };
                 if(!currentConfig.fields) currentConfig.fields = [];
-                if(!currentConfig.mini_cards) currentConfig.mini_cards = {};
                 isBuiltin = !!data.builtin;
-                miniCards = {...defaultMiniCards(), ...currentConfig.mini_cards};
-                currentConfig.mini_cards = miniCards;
                 // 释放上一次的图片 blob URL
                 Object.values(previewImageUrls).forEach(u => { try { URL.revokeObjectURL(u); } catch(e){} });
                 previewImageUrls = {};
@@ -627,8 +558,6 @@
                 previewRandomActive = {};
                 runResult = null;
                 graphView = { k: 1, x: 0, y: 0 };
-                miniView = { k: 1, x: 0, y: 0 };
-                miniTestNodes = defaultMiniTestNodes();
                 renderEditor();
                 renderPreview();
                 // 新工作流加载后自动适配窗口
@@ -723,7 +652,6 @@
             // 改名字 / 类型时不需要整页重渲染，浮窗自身刷新即可
             if(key === 'name' || key === 'min' || key === 'max' || key === 'step' || key === 'default' || key === 'options' || key === 'random_enabled'){
                 renderPreview();
-                if(workspaceMode === 'canvas') renderMiniCanvasPreview(miniCanvasHost, true);
                 if(popupNodeId === f.node) refreshPopupBody();
                 return;
             }
@@ -740,13 +668,6 @@
             renderList();
         }
 
-        function setWorkspaceMode(mode){
-            workspaceMode = mode === 'canvas' ? 'canvas' : 'graph';
-            document.getElementById('workspaceGraphTab')?.classList.toggle('active', workspaceMode === 'graph');
-            document.getElementById('workspaceCanvasTab')?.classList.toggle('active', workspaceMode === 'canvas');
-            renderWorkspaceView();
-        }
-
         function renderEditor(){
             if(!currentWorkflow){
                 deleteBtn.style.display = 'none';
@@ -754,17 +675,17 @@
                 nodeListEl.innerHTML = '';
                 document.getElementById('graphCard').style.display = 'none';
                 document.getElementById('nodesToggle').style.display = 'none';
-                if(miniCanvasHost) miniCanvasHost.style.display = 'none';
+                if(workflowTestPanel) workflowTestPanel.style.display = 'none';
                 return;
             }
-            document.getElementById('nodesToggle').style.display = workspaceMode === 'graph' ? 'flex' : 'none';
+            document.getElementById('graphCard').style.display = 'block';
+            document.getElementById('nodesToggle').style.display = 'flex';
             workflowTitleInput.value = currentConfig.title || selectedName.replace('.json','');
             subEl.textContent = tf('comfy.nodeStats', {nodes:Object.keys(currentWorkflow).length, fields:currentConfig.fields.length}) + (isBuiltin ? ` · ${tr('comfy.builtin')}` : '');
             deleteBtn.style.display = isBuiltin ? 'none' : 'inline-flex';
             saveBtn.style.display = 'inline-flex';
 
             renderGraph();
-            renderWorkspaceView();
 
             const nodes = Object.entries(currentWorkflow).sort((a,b)=>{
                 const aNum = parseInt(a[0],10), bNum = parseInt(b[0],10);
@@ -1218,7 +1139,6 @@
             if(!fieldSupportsRandom(f)) return;
             previewRandomActive[fieldId] = !isPreviewRandomActive(fieldId);
             renderPreview();
-            if(workspaceMode === 'canvas') renderMiniCanvasPreview(miniCanvasHost, true);
         }
 
         function applyActiveRandomValues(fields){
@@ -1250,9 +1170,11 @@
 
         function renderPreview(){
             if(!currentConfig || !currentConfig.fields.length){
-                previewCard.innerHTML = `<div class="preview-empty">${tr('comfy.previewEmpty')}</div>`;
+                if(workflowTestPanel) workflowTestPanel.style.display = 'none';
+                if(previewCard) previewCard.innerHTML = `<div class="preview-empty">${tr('comfy.previewEmpty')}</div>`;
                 return;
             }
+            if(workflowTestPanel) workflowTestPanel.style.display = 'block';
             const fieldsHtml = currentConfig.fields.map(f => renderPreviewField(f)).join('');
             const resultHtml = runResult
                 ? `<div class="run-result"><img src="${escapeAttr(runResult)}" onclick="openImagePreview('${escapeAttr(runResult)}')"><div class="run-status">${tr('comfy.runSuccess')}</div></div>`
@@ -1305,256 +1227,6 @@
             return `<div class="pfield">${label}<input class="pfield-input" type="text" value="${escapeAttr(v)}" oninput="setPreviewValue('${f.id}',this.value)"></div>`;
         }
 
-        function miniCardStyle(key){
-            const p = miniCards[key] || defaultMiniCards()[key] || {x:0,y:0};
-            return `left:${p.x}px;top:${p.y}px`;
-        }
-
-        function miniLine(aKey, bKey){
-            const a = miniCards[aKey] || defaultMiniCards()[aKey];
-            const b = miniCards[bKey] || defaultMiniCards()[bKey];
-            const x1 = a.x + 210, y1 = a.y + 70, x2 = b.x, y2 = b.y + 70;
-            const dx = x2 - x1, dy = y2 - y1;
-            const len = Math.sqrt(dx*dx + dy*dy);
-            const deg = Math.atan2(dy, dx) * 180 / Math.PI;
-            return `<div class="mini-line" style="left:${x1}px;top:${y1}px;width:${len}px;transform:rotate(${deg}deg)"></div>`;
-        }
-
-        function renderWorkspaceView(){
-            const graphWrap = document.querySelector('.graph-svg-wrap');
-            const nodesToggle = document.getElementById('nodesToggle');
-            document.getElementById('workspaceGraphTab')?.classList.toggle('active', workspaceMode === 'graph');
-            document.getElementById('workspaceCanvasTab')?.classList.toggle('active', workspaceMode === 'canvas');
-            if(!currentWorkflow){
-                if(graphWrap) graphWrap.style.display = 'none';
-                if(miniCanvasHost) miniCanvasHost.style.display = 'none';
-                return;
-            }
-            if(workspaceMode === 'canvas'){
-                if(graphWrap) graphWrap.style.display = 'none';
-                if(nodesToggle) nodesToggle.style.display = 'none';
-                renderMiniCanvasPreview(miniCanvasHost, true);
-            } else {
-                if(graphWrap) graphWrap.style.display = 'block';
-                if(miniCanvasHost) miniCanvasHost.style.display = 'none';
-                if(nodesToggle) nodesToggle.style.display = 'flex';
-            }
-        }
-
-        function renderMiniCanvasPreview(target = previewCard, large = false){
-            if(!target) return;
-            const promptFields = currentConfig.fields.filter(f => fieldKind(f) === 'prompt');
-            const imageFields = currentConfig.fields.filter(f => fieldKind(f) === 'image');
-            const settingFields = currentConfig.fields.filter(f => fieldKind(f) === 'setting');
-            const prompts = miniTestNodes.filter(n => n.type === 'prompt');
-            const images = miniTestNodes.filter(n => n.type === 'image');
-            const comfy = miniTestNodes.find(n => n.type === 'comfy') || defaultMiniTestNodes().find(n => n.type === 'comfy');
-            const output = miniTestNodes.find(n => n.type === 'output') || defaultMiniTestNodes().find(n => n.type === 'output');
-            const resultHtml = runResult
-                ? `<div class="mini-result"><img src="${escapeAttr(runResult)}" onclick="openImagePreview('${escapeAttr(runResult)}')"><div class="run-status">${tr('comfy.runSuccess')}</div></div>`
-                : `<div class="preview-empty" style="padding:18px 10px">${tr('comfy.resultHere')}</div>`;
-            target.style.display = 'block';
-            target.innerHTML = `
-                <div id="miniCanvas" class="mini-canvas ${large ? 'large' : ''}">
-                    <div class="mini-toolbar">
-                        <button class="mini-tool" type="button" onclick="addMiniNode('prompt')"><i data-lucide="text-cursor-input" class="w-3.5 h-3.5"></i>${tr('comfy.addPrompt')}</button>
-                        <button class="mini-tool" type="button" onclick="addMiniNode('image')"><i data-lucide="image-plus" class="w-3.5 h-3.5"></i>${tr('comfy.addImage')}</button>
-                    </div>
-                    <div id="miniWorld" class="mini-world" style="transform:translate(${miniView.x}px,${miniView.y}px) scale(${miniView.k})">
-                        ${[...prompts, ...images].map(n => miniLineBetween(n, comfy)).join('')}
-                        ${miniLineBetween(comfy, output)}
-                        ${prompts.map((n,i) => `
-                            <div class="mini-card" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px">
-                                <span class="mini-port out"></span>
-                                <div class="mini-card-head"><i data-lucide="text-cursor-input" class="w-3.5 h-3.5"></i><span class="mini-node-title">${tr('comfy.promptNode')} ${i+1}</span>${miniDeleteButton(n)}</div>
-                                <div class="mini-card-body"><textarea class="mini-textarea" oninput="updateMiniNode('${n.id}','text',this.value)" placeholder="${escapeAttr(tr('comfy.promptPlaceholder'))}">${escapeHtml(n.text || '')}</textarea></div>
-                            </div>`).join('')}
-                        ${images.map((n,i) => `
-                            <div class="mini-card" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px">
-                                <span class="mini-port out"></span>
-                                <div class="mini-card-head"><i data-lucide="image" class="w-3.5 h-3.5"></i><span class="mini-node-title">${tr('comfy.imageNode')} ${i+1}</span>${miniDeleteButton(n)}</div>
-                                <div class="mini-card-body"><div class="mini-image-drop" onclick="pickMiniImage('${n.id}')">${n.url ? `<img src="${escapeAttr(n.url)}">` : tr('comfy.clickUploadImage')}</div></div>
-                            </div>`).join('')}
-                        <div class="mini-card comfy-card" data-node="${comfy.id}" style="left:${comfy.x}px;top:${comfy.y}px">
-                            <span class="mini-port in"></span><span class="mini-port out"></span>
-                            <div class="mini-card-head"><i data-lucide="workflow" class="w-3.5 h-3.5"></i><span class="mini-node-title">${escapeHtml(currentConfig.title || selectedName.replace('.json',''))} · ${tr('canvas.comfyCustom')}</span></div>
-                            <div class="mini-card-body">
-                                <div class="text-[10px] font-black uppercase" style="color:var(--faint)">${tr('comfy.inputs')}</div>
-                                <div class="preview-empty" style="padding:10px;font-size:11px;text-align:left">
-                                    ${tf('comfy.needsImages', {count:imageFields.length})} · ${promptFields.length ? tr('comfy.acceptsPrompt') : tr('comfy.noPromptField')}
-                                </div>
-                                <div class="mini-settings-list">
-                                    ${settingFields.length ? settingFields.map(f => renderMiniField(f)).join('') : `<div class="preview-empty" style="padding:16px 10px">${tr('comfy.otherParamsHere')}</div>`}
-                                </div>
-                                <button id="runBtn" class="run-btn mini-run" type="button" onclick="onRun()">
-                                    <i data-lucide="play" class="w-4 h-4"></i><span>${tr('comfy.runTest')}</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="mini-card" data-node="${output.id}" style="left:${output.x}px;top:${output.y}px">
-                            <span class="mini-port in"></span>
-                            <div class="mini-card-head"><i data-lucide="circle-dot" class="w-3.5 h-3.5"></i><span>${tr('comfy.output')}</span></div>
-                            <div class="mini-card-body">${resultHtml}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            bindMiniCanvas();
-            refreshIcons();
-        }
-
-        function renderMiniField(f){
-            const label = `<div class="pfield-label">${escapeHtml(f.name || f.input)}</div>`;
-            const v = previewValues[f.id] ?? f.default ?? (f.type==='boolean'?false:(f.type==='number'||f.type==='slider'?0:''));
-            if(f.type === 'image'){
-                const displayUrl = previewImageUrls[f.id] || (typeof v === 'string' && /^(\/|https?:|blob:|data:)/.test(v) ? v : '');
-                return `<div class="pfield">${label}<div class="mini-image-drop" onclick="pickImage('${f.id}')">${displayUrl ? `<img src="${escapeAttr(displayUrl)}">` : tr('comfy.clickUploadImage')}</div></div>`;
-            }
-            if(f.type === 'textarea'){
-                return `<div class="pfield">${label}<textarea class="mini-textarea" oninput="setPreviewValue('${f.id}',this.value)">${escapeHtml(v)}</textarea></div>`;
-            }
-            if(f.type === 'number'){
-                const randomBtn = randomButtonHtml(f);
-                return `<div class="pfield">${label}<div class="pfield-random-row" style="${randomBtn ? '' : 'grid-template-columns:1fr'}"><input class="mini-input" type="number" value="${escapeAttr(v)}" oninput="setPreviewValue('${f.id}',parseFloat(this.value)||0)">${randomBtn}</div></div>`;
-            }
-            if(f.type === 'slider'){
-                const min = f.min ?? 0, max = f.max ?? 10, step = f.step ?? 1;
-                return `<div class="pfield">${label}<div class="pfield-random-row" style="grid-template-columns:1fr"><div class="pfield-slider">
-                    <input type="range" min="${min}" max="${max}" step="${step}" value="${escapeAttr(v)}" oninput="setPreviewValue('${f.id}',parseFloat(this.value))">
-                    <span class="pfield-slider-val" data-slider-val="${f.id}">${v}</span>
-                </div></div></div>`;
-            }
-            if(f.type === 'dropdown'){
-                const opts = (f.options || []).map(o => `<option value="${escapeAttr(o)}" ${String(v)===String(o)?'selected':''}>${escapeHtml(o)}</option>`).join('');
-                return `<div class="pfield">${label}<select class="pfield-select" onchange="setPreviewValue('${f.id}',this.value)">${opts || `<option value="">${tr('comfy.noOptions')}</option>`}</select></div>`;
-            }
-            if(f.type === 'boolean'){
-                return `<div class="pfield">${label}<div class="pfield-bool"><div class="pfield-bool-track ${v?'on':''}" onclick="setPreviewValue('${f.id}',!${!!v});this.classList.toggle('on')"><div class="pfield-bool-thumb"></div></div></div></div>`;
-            }
-            return `<div class="pfield">${label}<input class="mini-input" type="text" value="${escapeAttr(v)}" oninput="setPreviewValue('${f.id}',this.value)"></div>`;
-        }
-
-        function miniDeleteButton(node){
-            return ['prompt','image'].includes(node.type) ? `<button class="mini-delete" type="button" onclick="removeMiniNode('${node.id}')" title="${escapeAttr(tr('common.delete'))}"><i data-lucide="x" class="w-3 h-3"></i></button>` : '';
-        }
-
-        function miniLineBetween(a, b){
-            if(!a || !b) return '';
-            const x1 = a.x + 230, y1 = a.y + 72, x2 = b.x, y2 = b.y + 72;
-            const dx = x2 - x1, dy = y2 - y1;
-            const len = Math.sqrt(dx*dx + dy*dy);
-            const deg = Math.atan2(dy, dx) * 180 / Math.PI;
-            return `<div class="mini-line" style="left:${x1}px;top:${y1}px;width:${len}px;transform:rotate(${deg}deg)"></div>`;
-        }
-
-        function addMiniNode(type){
-            const count = miniTestNodes.filter(n => n.type === type).length;
-            miniTestNodes.push({
-                id:`${type}_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
-                type,
-                x:42 + count * 26,
-                y:type === 'prompt' ? 86 + count * 170 : 286 + count * 170,
-                text:'',
-                url:'',
-                value:''
-            });
-            renderWorkspaceView();
-        }
-
-        function removeMiniNode(id){
-            miniTestNodes = miniTestNodes.filter(n => n.id !== id);
-            renderWorkspaceView();
-        }
-
-        function updateMiniNode(id, key, value){
-            const node = miniTestNodes.find(n => n.id === id);
-            if(node) node[key] = value;
-        }
-
-        async function pickMiniImage(nodeId){
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = async () => {
-                const file = input.files[0];
-                if(!file) return;
-                const node = miniTestNodes.find(n => n.id === nodeId);
-                if(!node) return;
-                if(node.url && node.url.startsWith('blob:')) URL.revokeObjectURL(node.url);
-                node.url = URL.createObjectURL(file);
-                renderWorkspaceView();
-                const form = new FormData();
-                form.append('files', file);
-                try {
-                    const data = await fetch('/api/upload', { method:'POST', body:form }).then(r=>r.json());
-                    node.value = data.files?.[0]?.comfy_name || data.files?.[0]?.filename || file.name;
-                } catch(e){ alert(tr('comfy.imageUploadFailed')); }
-            };
-            input.click();
-        }
-
-        function bindMiniCanvas(){
-            const canvas = document.getElementById('miniCanvas');
-            const world = document.getElementById('miniWorld');
-            if(!canvas || !world) return;
-            const sync = () => { world.style.transform = `translate(${miniView.x}px,${miniView.y}px) scale(${miniView.k})`; };
-            canvas.onwheel = e => {
-                e.preventDefault();
-                const old = miniView.k;
-                const next = Math.max(0.45, Math.min(1.8, old * (e.deltaY > 0 ? 0.9 : 1.1)));
-                const rect = canvas.getBoundingClientRect();
-                const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-                miniView.x = mx - (mx - miniView.x) * (next / old);
-                miniView.y = my - (my - miniView.y) * (next / old);
-                miniView.k = next;
-                sync();
-            };
-            canvas.onmousedown = e => {
-                if(e.target.closest('textarea,input,select,button,.mini-image-drop')) return;
-                const card = e.target.closest('.mini-card');
-                if(card && e.target.closest('.mini-card-head')){
-                    const id = card.dataset.node || card.dataset.card;
-                    const node = miniTestNodes.find(n => n.id === id);
-                    const pos = node || miniCards[id] || defaultMiniCards()[id];
-                    miniDrag = { type:'card', id, sx:e.clientX, sy:e.clientY, ox:pos.x, oy:pos.y };
-                } else {
-                    miniDrag = { type:'pan', sx:e.clientX, sy:e.clientY, ox:miniView.x, oy:miniView.y };
-                    canvas.classList.add('is-panning');
-                }
-            };
-            window.onmousemove = e => {
-                if(!miniDrag) return;
-                if(miniDrag.type === 'pan'){
-                    miniView.x = miniDrag.ox + e.clientX - miniDrag.sx;
-                    miniView.y = miniDrag.oy + e.clientY - miniDrag.sy;
-                    sync();
-                } else {
-                    const dx = (e.clientX - miniDrag.sx) / miniView.k;
-                    const dy = (e.clientY - miniDrag.sy) / miniView.k;
-                    const node = miniTestNodes.find(n => n.id === miniDrag.id);
-                    if(node){
-                        node.x = miniDrag.ox + dx;
-                        node.y = miniDrag.oy + dy;
-                    } else {
-                        miniCards[miniDrag.id] = { x: miniDrag.ox + dx, y: miniDrag.oy + dy };
-                        currentConfig.mini_cards = miniCards;
-                    }
-                    const card = world.querySelector(`[data-node="${miniDrag.id}"],[data-card="${miniDrag.id}"]`);
-                    if(card){
-                        const p = node || miniCards[miniDrag.id];
-                        card.style.left = `${p.x}px`;
-                        card.style.top = `${p.y}px`;
-                    }
-                }
-            };
-            window.onmouseup = () => {
-                if(miniDrag?.type === 'pan') canvas.classList.remove('is-panning');
-                const shouldRefresh = miniDrag?.type === 'card';
-                miniDrag = null;
-                if(shouldRefresh) renderWorkspaceView();
-            };
-        }
-
         async function pickImage(fieldId){
             const input = document.createElement('input');
             input.type = 'file';
@@ -1584,8 +1256,7 @@
             if(btn){ btn.disabled = true; btn.querySelector('span').textContent = tr('comfy.runningTest'); }
             setStatus(tr('comfy.runningTest'));
             try {
-                const baseFields = workspaceMode === 'canvas' ? fieldsFromMiniCanvas() : {...previewValues};
-                const runFields = applyActiveRandomValues(baseFields);
+                const runFields = applyActiveRandomValues({...previewValues});
                 const res = await fetch(`/api/workflows/${encodeURIComponent(selectedName)}/run`, {
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
@@ -1595,7 +1266,6 @@
                 const data = await res.json();
                 runResult = data.images?.[0] || null;
                 renderPreview();
-                renderWorkspaceView();
                 setStatus(tr('comfy.runSuccess'));
             } catch(e){
                 alert(e.message || tr('comfy.runFailed'));
@@ -1603,21 +1273,6 @@
             } finally {
                 if(btn){ btn.disabled = false; btn.querySelector('span').textContent = tr('comfy.runTest'); }
             }
-        }
-
-        function fieldsFromMiniCanvas(){
-            const fields = {...previewValues};
-            const imageFields = currentConfig.fields.filter(f => fieldKind(f) === 'image');
-            const promptFields = currentConfig.fields.filter(f => fieldKind(f) === 'prompt');
-            const images = miniTestNodes.filter(n => n.type === 'image' && n.value);
-            const prompt = miniTestNodes.filter(n => n.type === 'prompt').map(n => n.text || '').filter(Boolean).join('\n\n');
-            imageFields.forEach((f, i) => {
-                fields[f.id] = images[i]?.value || fields[f.id] || '';
-            });
-            promptFields.forEach(f => {
-                fields[f.id] = prompt || fields[f.id] || '';
-            });
-            return fields;
         }
 
         async function onUpload(event){
@@ -1679,7 +1334,6 @@
                 currentConfig = null;
                 renderEditor();
                 renderPreview();
-                renderWorkspaceView();
                 await loadList();
                 new BroadcastChannel('studio-api').postMessage({ type: 'workflows-changed' });
             } catch(e){ alert(e.message || tr('comfy.deleteFailed')); }

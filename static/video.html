@@ -9,9 +9,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
-    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
+    <script src="/static/studio-panel-bridge.js?v=20260530-pending-fix"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
+    <script src="/static/studio-media-ref-upload.js?v=20260530-global"></script>
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-media-ref">
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
     <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
@@ -41,7 +42,7 @@
                 </label>
                 <label class="block">
                     <div class="control-label mb-1"><span data-i18n="video.model">模型</span></div>
-                    <select id="modelSelect" class="size-select" onchange="selectedModel=this.value;syncVideoParams()"></select>
+                    <select id="modelSelect" class="size-select" onchange="onModelChange(this.value)"></select>
                 </label>
             </section>
             <section class="tool-panel">
@@ -52,6 +53,20 @@
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.referenceImages">参考图</span></div>
                     <div id="refGrid" class="ref-grid"></div>
+                </div>
+                <div id="seedanceRefWrap" class="seedance-ref-wrap" aria-hidden="true">
+                    <div class="seedance-ref-block">
+                        <div class="control-label mb-1"><span data-i18n="video.referenceVideos">参考视频</span></div>
+                        <div id="refVideoDropZone" class="media-ref-drop-zone" data-accept="video">
+                            <div id="refVideoGrid" class="ref-grid"></div>
+                        </div>
+                    </div>
+                    <div class="seedance-ref-block">
+                        <div class="control-label mb-1"><span data-i18n="video.referenceAudio">参考音频</span></div>
+                        <div id="refAudioDropZone" class="media-ref-drop-zone" data-accept="audio">
+                            <div id="refAudioGrid" class="ref-grid"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
             <section class="tool-panel panel-field-stack">
@@ -71,6 +86,12 @@
                         <option value="1080p">1080p</option>
                     </select>
                 </label>
+                <label id="generateAudioWrap" class="block hidden">
+                    <div class="flex items-center gap-2 mt-1">
+                        <input id="generateAudioInput" type="checkbox" class="accent-[#ff4d94]" checked>
+                        <span class="control-label" data-i18n="video.generateAudio">生成配套音频</span>
+                    </div>
+                </label>
             </section>
             <span id="genBtnWrap" class="generate-btn-wrap">
                 <button id="genBtn" onclick="submitVideo()" class="glass-btn generate-btn" type="button" disabled>
@@ -87,6 +108,75 @@
 
         let provider = 'comfly', selectedModel = 'veo3-fast', apiProviders = [];
         let pendingJobs = [];
+        let mediaRelay = null;
+        let videoRefGrid = null;
+        let audioRefGrid = null;
+
+        function onModelChange(model){
+            selectedModel = model;
+            syncVideoParams();
+            syncSeedanceRefSections();
+            syncSeedanceExtraOptions();
+            syncSeedanceExtraOptions();
+        }
+        function syncSeedanceExtraOptions(){
+            const wrap = document.getElementById('generateAudioWrap');
+            const show = isDoubaoSeedance20Model(selectedModel);
+            if(wrap) wrap.classList.toggle('hidden', !show);
+        }
+        function syncSeedanceRefSections(){
+            StudioMediaRefUpload.setCollapsible('seedanceRefWrap', isDoubaoSeedance20Model(selectedModel), mediaRelay);
+        }
+        function notifyGalleryDragResult(accepted){
+            try {
+                window.parent.postMessage({ type:'studio-gallery-drag-result', accepted }, '*');
+            } catch(e){}
+        }
+        function initMediaRefUploads(){
+            mediaRelay = StudioMediaRefUpload.createGalleryRelay({
+                isEnabled: () => isDoubaoSeedance20Model(selectedModel),
+                onDropAccepted: () => notifyGalleryDragResult(true),
+                onDropRejected: () => notifyGalleryDragResult(false),
+            });
+            mediaRelay.bind();
+            videoRefGrid = StudioMediaRefUpload.mount({
+                gridId: 'refVideoGrid',
+                dropZoneId: 'refVideoDropZone',
+                kind: 'video',
+                maxSlots: 3,
+                tr,
+                galleryRelay: mediaRelay,
+            });
+            audioRefGrid = StudioMediaRefUpload.mount({
+                gridId: 'refAudioGrid',
+                dropZoneId: 'refAudioDropZone',
+                kind: 'audio',
+                maxSlots: 3,
+                tr,
+                galleryRelay: mediaRelay,
+            });
+        }
+        function buildVideoPayload(){
+            const payload = {
+                prompt: document.getElementById('promptInput').value.trim(),
+                provider_id: provider,
+                model: selectedModel,
+                duration: Number(document.getElementById('durationSelect').value || 5),
+                aspect_ratio: document.getElementById('aspectSelect').value,
+                resolution: document.getElementById('resolutionSelect').value,
+                reference_images: getReferenceList(),
+                enhance_prompt: false,
+                enable_upsample: false,
+                generate_audio: !!document.getElementById('generateAudioInput')?.checked,
+            };
+            if(isDoubaoSeedance20Model(selectedModel)){
+                const videos = videoRefGrid?.getUrls() || [];
+                const audios = audioRefGrid?.getUrls() || [];
+                if(videos.length) payload.reference_videos = videos;
+                if(audios.length) payload.reference_audios = audios;
+            }
+            return payload;
+        }
 
         function syncGenBtnTip(showTip){
             const wrap = document.getElementById('genBtnWrap');
@@ -123,7 +213,19 @@
             const id = String(model || '').toLowerCase();
             return /kling[-_]?v?2[-_.]?6|keling2\.6/.test(id);
         }
-        const DOUBAO_SEEDANCE_20_ASPECTS = ['9:16', '3:4', '1:1', '4:3', '16:9', '21:9'];
+        const APIMART_VIDEO_MODEL_ALIASES = {
+            'doubao-seedance-2-0-260128': 'doubao-seedance-2.0',
+            'doubao-seedance-2-0-fast-260128': 'doubao-seedance-2.0-fast',
+        };
+        function apimartVideoModel(model){
+            const id = String(model || '').toLowerCase();
+            return APIMART_VIDEO_MODEL_ALIASES[id] || id;
+        }
+        function seedance20Supports1080p(model){
+            const normalized = apimartVideoModel(model);
+            return normalized === 'doubao-seedance-2.0' || normalized === 'doubao-seedance-2.0-face';
+        }
+        const DOUBAO_SEEDANCE_20_ASPECTS = ['9:16', '3:4', '1:1', '4:3', '16:9', '21:9', 'adaptive'];
         const DEFAULT_VIDEO_DURATIONS = [5, 8, 10];
         const DEFAULT_VIDEO_ASPECTS = ['16:9', '9:16', '1:1', '4:3', '3:4'];
         function kling26AspectOptions(){
@@ -173,7 +275,9 @@
                 aspectSelect.innerHTML = aspects.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
             }
             if(resolutionSelect){
-                const resolutions = isDoubaoSeedance20Model(selectedModel) ? ['480p', '720p'] : ['480p', '720p', '1080p'];
+                const resolutions = isDoubaoSeedance20Model(selectedModel)
+                    ? (seedance20Supports1080p(selectedModel) ? ['480p', '720p', '1080p'] : ['480p', '720p'])
+                    : ['480p', '720p', '1080p'];
                 resolutionSelect.innerHTML = resolutions.map(v => `<option value="${v}">${v}</option>`).join('');
                 resolutionSelect.value = resolutions.includes(prevResolution) ? prevResolution : (profile?.defaultResolution || '720p');
             }
@@ -194,6 +298,8 @@
             document.getElementById('providerSelect').innerHTML = StudioApiProviders.buildProviderOptionsHtml(providers, provider, escapeHtml);
             document.getElementById('modelSelect').innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m===selectedModel?'selected':''}>${escapeHtml(m)}</option>`).join('');
             syncVideoParams();
+            syncSeedanceRefSections();
+            syncSeedanceExtraOptions();
         }
         function setProvider(v){
             const item = panelProviders().find(p => p.id === v);
@@ -226,24 +332,91 @@
             }
         }
 
+        async function clearPendingJob(jobId){
+            pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+            if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+            notifyGallery();
+        }
+
+        function failPendingJob(jobId, message, delay = 2800){
+            const job = pendingJobs.find(j => j.id === jobId);
+            if(job) job.error = message || tr('video.failed');
+            notifyGallery();
+            if(delay > 0){
+                setTimeout(() => { clearPendingJob(jobId); }, delay);
+            } else {
+                clearPendingJob(jobId);
+            }
+        }
+
+        const resumingJobIds = new Set();
+
+        async function resumePendingJobPoll(job){
+            if(!job?.id || !job.task_id || resumingJobIds.has(job.id)) return;
+            resumingJobIds.add(job.id);
+            try {
+                const result = await pollCanvasVideoTask(job.task_id);
+                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
+                resumingJobIds.delete(job.id);
+                await clearPendingJob(job.id);
+            } catch(err){
+                resumingJobIds.delete(job.id);
+                failPendingJob(job.id, err.message || tr('video.failed'));
+            }
+        }
+
+        async function resumePendingJobs(){
+            try {
+                const jobs = await fetch('/api/online-pending').then(r => r.json());
+                if(!Array.isArray(jobs) || !jobs.length) return;
+                const now = Date.now() / 1000;
+                let changed = false;
+                for(const serverJob of jobs){
+                    if(serverJob.error) continue;
+                    if(serverJob.mediaKind && serverJob.mediaKind !== 'video') continue;
+                    if(!serverJob.task_id){
+                        if(serverJob.timestamp && now - serverJob.timestamp > 120){
+                            fetch('/api/online-pending/' + encodeURIComponent(serverJob.id), { method:'DELETE' }).catch(()=>{});
+                        }
+                        continue;
+                    }
+                    let local = pendingJobs.find(j => j.id === serverJob.id);
+                    if(!local){
+                        local = { ...serverJob };
+                        pendingJobs.unshift(local);
+                        changed = true;
+                    } else {
+                        Object.assign(local, serverJob);
+                    }
+                    resumePendingJobPoll(local);
+                }
+                if(changed) notifyGallery();
+            } catch(e){
+                console.error('Resume pending jobs failed:', e);
+            }
+        }
+
         async function runJob(jobId, payload){
             try {
-                const result = await fetch('/api/online-video', {
-                    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-                }).then(async r => { if(!r.ok) throw new Error((await r.json()).detail || tr('video.failed')); return r.json(); });
-                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
-                notifyGallery();
-            } catch(err){
+                const createRes = await fetch('/api/canvas-video-tasks', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({ ...payload, job_id: jobId })
+                }).then(async r => {
+                    if(!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || tr('video.failed'));
+                    return r.json();
+                });
+                const taskId = createRes.task_id;
                 const job = pendingJobs.find(j => j.id === jobId);
-                if(job) job.error = err.message || tr('video.failed');
+                if(job) job.task_id = taskId;
+                if(window.updatePendingJobOnServer) updatePendingJobOnServer(jobId, { task_id: taskId });
                 notifyGallery();
-                setTimeout(() => {
-                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                    notifyGallery();
-                }, 2800);
+
+                const result = await pollCanvasVideoTask(taskId);
+                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
+                await clearPendingJob(jobId);
+            } catch(err){
+                failPendingJob(jobId, err.message || tr('video.failed'));
             }
         }
 
@@ -251,26 +424,13 @@
             const prompt = document.getElementById('promptInput').value.trim();
             if(!prompt){ alert(tr('video.promptRequired')); return; }
             if(!StudioApiProviders.guardProviderKey(provider, panelProviders())) return;
-            const payload = {
-                prompt,
-                provider_id: provider,
-                model: selectedModel,
-                duration: Number(document.getElementById('durationSelect').value || 5),
-                aspect_ratio: document.getElementById('aspectSelect').value,
-                resolution: document.getElementById('resolutionSelect').value,
-                reference_images: getReferenceList(),
-                enhance_prompt: false,
-                enable_upsample: false,
-                generate_audio: false,
-            };
-            const jobId = 'pending_'+Date.now();
-            const jobObj = { id: jobId, prompt, mediaKind: 'video' };
+            const payload = buildVideoPayload();
+            const jobId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const jobObj = { id: jobId, prompt, mediaKind: 'video', timestamp: Date.now() / 1000 };
             pendingJobs.unshift(jobObj);
             if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
             notifyGallery();
-            document.getElementById('genBtn').disabled = true;
-            await runJob(jobId, { ...payload, job_id: jobId });
-            syncGenBtnState();
+            void runJob(jobId, { ...payload, job_id: jobId });
         }
 
         window.applyRecordParams = function(data){
@@ -281,22 +441,34 @@
             if(p.provider_id) setProvider(p.provider_id);
             if(p.model){ selectedModel = p.model; renderProviderControls(); }
             else syncVideoParams();
+            syncSeedanceRefSections();
             if(p.duration) document.getElementById('durationSelect').value = String(p.duration);
             if(p.aspect_ratio) document.getElementById('aspectSelect').value = p.aspect_ratio;
             if(p.resolution) document.getElementById('resolutionSelect').value = p.resolution;
+            if(typeof p.generate_audio === 'boolean'){
+                const audioInput = document.getElementById('generateAudioInput');
+                if(audioInput) audioInput.checked = p.generate_audio;
+            }
             if(Array.isArray(p.reference_images)) StudioRefUpload.setReferenceImages(p.reference_images);
+            if(Array.isArray(p.reference_videos)) videoRefGrid?.setUrls(p.reference_videos);
+            if(Array.isArray(p.reference_audios)) audioRefGrid?.setUrls(p.reference_audios);
         };
 
         window.addEventListener('message', e => {
             if(e.data?.type === 'studio-lang' && window.StudioI18n){
                 StudioI18n.set(e.data.lang);
                 syncGenBtnState();
+                syncSeedanceRefSections();
             }
         });
         if(window.StudioI18n) document.title = tr('video.title');
         StudioRefUpload.init({ tr, escapeHtml, referenceFormat: 'video' });
+        initMediaRefUploads();
+        syncSeedanceRefSections();
+        syncSeedanceExtraOptions();
         syncGenBtnState();
         loadConfig();
+        resumePendingJobs();
         StudioApiProviders.onProvidersChanged(refreshApiProviders);
     </script>
 </body>

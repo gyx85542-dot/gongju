@@ -30,7 +30,7 @@
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-cell-hover">
     <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
-    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260530-viewer-ui">
+    <link rel="stylesheet" href="/static/studio-media-viewer.css?v=20260530-ref-thumb">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
@@ -812,21 +812,21 @@
         <main class="stage">
             <div id="studio-shell" class="studio-shell active">
                     <div class="studio-panels studio-module">
-                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260530-provider-sync" class="active" scrolling="no"></iframe>
-                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260530-range-white" scrolling="no"></iframe>
-                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260530-provider-sync" scrolling="no"></iframe>
-                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-rh-options" scrolling="no"></iframe>
+                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260530-pending-fix" class="active" scrolling="no"></iframe>
+                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260530-pending-fix" scrolling="no"></iframe>
+                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260530-gen-audio" scrolling="no"></iframe>
+                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-rh-media" scrolling="no"></iframe>
                         <div id="studioPanelResizeHandle" class="studio-panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize parameter panel" title="拖拽调整参数面板宽度"></div>
                     </div>
                     <div class="studio-gallery-wrap studio-module">
-                        <iframe id="frame-gallery" data-src="/static/gallery.html?embed=1&v=20260530-cell-hover" class="active" scrolling="no"></iframe>
+                        <iframe id="frame-gallery" data-src="/static/gallery.html?embed=1&v=20260530-pending-fix" class="active" scrolling="no"></iframe>
                     </div>
             </div>
             <div id="full-stage" class="full-stage">
                 <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260530-provider-sync" scrolling="yes"></iframe>
                 <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260530-provider-sync" scrolling="yes"></iframe>
-                <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260530-pullup-select" scrolling="yes"></iframe>
-                <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260530-rh-options" scrolling="yes"></iframe>
+                <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260530-no-canvas" scrolling="yes"></iframe>
+                <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260530-rh-toast" scrolling="yes"></iframe>
             </div>
 
             <div class="nano-monitor is-hidden" id="nano-monitor">
@@ -850,6 +850,9 @@
                         <div id="lightboxFrame" class="viewer-canvas">
                             <div id="viewerStage" class="viewer-stage">
                                 <img id="lightboxImg" alt="preview">
+                                <button type="button" id="viewerCaptureFrameBtn" class="viewer-capture-frame-btn" onclick="captureViewerVideoFrame(event)" data-i18n-tip="viewer.captureFrameTip" title="截取当前视频帧" aria-label="截取当前视频帧">
+                                    <i data-lucide="camera"></i>
+                                </button>
                                 <canvas id="viewerDrawCanvas" class="viewer-draw-canvas"></canvas>
                                 <div id="viewerBrushCursor" class="viewer-brush-cursor"></div>
                                 <div id="viewerCropLayer" class="viewer-crop-layer hidden">
@@ -878,10 +881,8 @@
                         <div class="viewer-tabs"><span class="viewer-tab"><i data-lucide="info" class="w-3.5 h-3.5"></i><span data-i18n="online.viewerInfo">Info</span></span></div>
                         <div class="viewer-sidebar-scroll">
                             <section>
-                                <div id="lightboxRefsWrap" class="viewer-ref-section hidden">
-                                    <div class="viewer-block-title"><span data-i18n="online.referenceImages">Reference Images</span></div>
-                                    <div id="lightboxRefs" class="viewer-ref-thumbs"></div>
-                                </div>
+                                <div id="viewerRefSections" class="viewer-ref-sections"></div>
+                                <div id="viewerExtraParams" class="viewer-extra-params hidden"></div>
                                 <div id="lightboxInfo" class="viewer-info-grid"></div>
                             </section>
                             <section id="lightboxPromptSection">
@@ -971,7 +972,7 @@
     </div>
 
     <script src="/static/studio-history-meta.js?v=20260530-apply-route"></script>
-    <script src="/static/studio-media-viewer.js?v=20260530-grid-clear"></script>
+    <script src="/static/studio-media-viewer.js?v=20260530-ref-thumb"></script>
     <script>
         function generateUUID() {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -1084,7 +1085,7 @@
             }
         });
 
-        const STUDIO_BUILD = '20260526-brush-fix2';
+        const STUDIO_BUILD = '20260530-pending-fix';
         const STUDIO_BUILD_KEY = 'studio_shell_build';
 
         function frameTargetHref(frame){
@@ -1093,12 +1094,42 @@
             catch(e) { return ''; }
         }
 
+        function frameLooksBlank(frame){
+            try {
+                const doc = frame?.contentDocument;
+                if(!doc?.body) return !frame?.src;
+                return doc.body.childElementCount === 0;
+            } catch(e){
+                return false;
+            }
+        }
+
         function ensureFrameLoaded(frame){
             if(!frame?.dataset?.src) return;
             const target = frameTargetHref(frame);
             if(!target) return;
+            const normalizedTarget = target.replace(/#.*$/, '');
             const current = frame.src ? frame.src.replace(/#.*$/, '') : '';
-            if(current !== target.replace(/#.*$/, '')) frame.src = frame.dataset.src;
+            if(!current || current !== normalizedTarget || frameLooksBlank(frame)){
+                frame.src = frame.dataset.src;
+            }
+        }
+
+        function preloadStudioPanelFrames(){
+            STUDIO_PAGE_IDS.forEach((id, index) => {
+                setTimeout(() => {
+                    ensureFrameLoaded(document.getElementById('frame-' + id));
+                }, index * 250);
+            });
+            ensureFrameLoaded(document.getElementById('frame-gallery'));
+        }
+
+        function preloadFullStageFrames(){
+            ['gpt-chat', 'api-settings', 'comfyui-settings', 'runninghub-settings'].forEach((id, index) => {
+                setTimeout(() => {
+                    ensureFrameLoaded(document.getElementById('frame-' + id));
+                }, index * 300);
+            });
         }
 
         function resetStudioFramesIfBuildChanged(){
@@ -1165,6 +1196,7 @@
                 syncThemeToFrame(gallery);
                 syncLanguageToFrame(gallery);
                 notifyGalleryRefresh();
+                if(id === 'runninghub') refreshRunningHubPanel();
             } else {
                 const target = document.getElementById('frame-' + id);
                 if(target) target.classList.add('active');
@@ -1178,14 +1210,23 @@
         }
 
         function restoreActivePage() {
-            const id = PAGE_IDS.includes(localStorage.getItem(ACTIVE_PAGE_KEY)) ? localStorage.getItem(ACTIVE_PAGE_KEY) : DEFAULT_PAGE_ID;
-            switchUI(navTriggerForPage(id), id, { skipRemember:true });
-            document.documentElement.classList.remove('studio-route-booting');
+            try {
+                const id = PAGE_IDS.includes(localStorage.getItem(ACTIVE_PAGE_KEY)) ? localStorage.getItem(ACTIVE_PAGE_KEY) : DEFAULT_PAGE_ID;
+                switchUI(navTriggerForPage(id), id, { skipRemember:true });
+            } finally {
+                document.documentElement.classList.remove('studio-route-booting');
+            }
         }
         document.addEventListener('DOMContentLoaded', () => {
             resetStudioFramesIfBuildChanged();
             initStudioPanelResize();
             restoreActivePage();
+            preloadStudioPanelFrames();
+            if(typeof requestIdleCallback === 'function'){
+                requestIdleCallback(() => preloadFullStageFrames(), { timeout: 2500 });
+            } else {
+                setTimeout(preloadFullStageFrames, 1500);
+            }
         }, { once:true });
 
         const STUDIO_PANEL_WIDTH_KEY = 'studio_panel_width';
@@ -1361,10 +1402,24 @@
             });
         }
 
+        function refreshRunningHubPanel(){
+            const frame = document.getElementById('frame-runninghub');
+            if(!frame) return;
+            const send = () => {
+                try { frame.contentWindow?.postMessage({ type: 'runninghub-changed' }, '*'); } catch(e) {}
+            };
+            ensureFrameLoaded(frame);
+            send();
+            frame.addEventListener('load', send, { once: true });
+        }
+
         try {
             new BroadcastChannel('studio-api').onmessage = (e) => {
                 if (e.data?.type === 'providers-changed') {
                     broadcastProvidersChanged(e.data);
+                }
+                if (e.data?.type === 'runninghub-changed') {
+                    refreshRunningHubPanel();
                 }
             };
         } catch(e) {}
@@ -1372,6 +1427,9 @@
         window.addEventListener('message', (e) => {
             if (e.data?.type === 'providers-changed' && e.source !== window) {
                 broadcastProvidersChanged(e.data);
+            }
+            if (e.data?.type === 'runninghub-changed' && e.source !== window) {
+                refreshRunningHubPanel();
             }
         });
 
@@ -1383,6 +1441,63 @@
             const page = e.data?.type === 'studio-navigate' ? e.data.page : '';
             if(!page || !PAGE_IDS.includes(page)) return;
             switchUI(navTriggerForPage(page), page);
+        });
+
+        let galleryCrossDrag = null;
+        let galleryDropHandled = false;
+        function getActiveStudioPanelFrame(){
+            return document.querySelector('#studio-shell .studio-panels iframe.active');
+        }
+        function postGalleryDragMessage(payload){
+            const gallery = document.getElementById('frame-gallery');
+            try { gallery?.contentWindow?.postMessage(payload, '*'); } catch(e) {}
+        }
+        function forwardGalleryDragToPanel(type, e, extra = {}){
+            const frame = getActiveStudioPanelFrame();
+            if(!frame?.contentWindow || !galleryCrossDrag) return;
+            const rect = frame.getBoundingClientRect();
+            frame.contentWindow.postMessage({
+                type,
+                mediaKind: galleryCrossDrag.mediaKind,
+                url: galleryCrossDrag.url,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                inPanel: e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom,
+                ...extra
+            }, '*');
+        }
+        window.addEventListener('message', (e) => {
+            if(e.data?.type === 'studio-gallery-drag-start'){
+                galleryDropHandled = false;
+                galleryCrossDrag = {
+                    mediaKind: e.data.mediaKind,
+                    url: e.data.url,
+                    key: e.data.key || ''
+                };
+            }
+            if(e.data?.type === 'studio-gallery-drag-end'){
+                galleryCrossDrag = null;
+                galleryDropHandled = false;
+                const frame = getActiveStudioPanelFrame();
+                try { frame?.contentWindow?.postMessage({ type:'studio-gallery-drag-end' }, '*'); } catch(err) {}
+            }
+            if(e.data?.type === 'studio-gallery-drag-result'){
+                postGalleryDragMessage({
+                    type: e.data.accepted ? 'studio-gallery-drag-accepted' : 'studio-gallery-drag-rejected',
+                    key: galleryCrossDrag?.key || ''
+                });
+            }
+        });
+        document.addEventListener('dragover', (e) => {
+            if(!galleryCrossDrag) return;
+            e.preventDefault();
+            forwardGalleryDragToPanel('studio-gallery-drag-over', e);
+        });
+        document.addEventListener('drop', (e) => {
+            if(!galleryCrossDrag || galleryDropHandled) return;
+            e.preventDefault();
+            galleryDropHandled = true;
+            forwardGalleryDragToPanel('studio-gallery-drag-drop', e);
         });
 
         window.addEventListener('DOMContentLoaded', () => {

@@ -20,8 +20,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260525-comfyui"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260523-board-ref"></script>
-    <script src="/static/studio-ref-upload.js?v=20260530-ref-unify"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-comfy-resume"></script>
+    <script src="/static/studio-ref-upload.js?v=20260530-ref-upload-fix"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
     <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
@@ -320,6 +320,15 @@
                 onBoardPickUI: syncOutputDragState
             });
         }
+        function refreshRefGrid(){
+            const images = effectiveFields().filter(f => fieldKind(f) === 'image');
+            if(!images.length) return;
+            mountWorkflowRefGrid(images);
+        }
+        function isServerAssetUrl(url){
+            const n = StudioRefUpload.normalizeImageUrl(url);
+            return n.startsWith('/assets/') || n.startsWith('/output/');
+        }
         function syncOutputDragState(){
             const pickId = StudioRefUpload.getBoardPickSlotId();
             document.querySelectorAll('#outputGrid .output-grid-cell img.draggable-output').forEach(img => {
@@ -377,6 +386,7 @@
             const preview = URL.createObjectURL(file);
             if(fieldImageUrls[fieldId]) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
             fieldImageUrls[fieldId] = preview;
+            refreshRefGrid();
             const form = new FormData();
             form.append('files', file);
             try {
@@ -387,32 +397,49 @@
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     fieldImageUrls[fieldId] = savedUrl;
                 }
-                renderDynamicPanel();
+                refreshRefGrid();
+                syncGenBtnState();
             } catch(e){
                 alert(tr('comfy.imageUploadFailed'));
                 delete fieldValues[fieldId];
                 delete fieldImageUrls[fieldId];
-                renderDynamicPanel();
+                refreshRefGrid();
+                syncGenBtnState();
             }
         }
         async function assignWorkflowImageFromUrl(url, fieldId){
             const normalized = StudioRefUpload.normalizeImageUrl(url);
             if(!normalized || !fieldId) return;
             fieldImageUrls[fieldId] = normalized;
+            refreshRefGrid();
             try {
-                const resp = await fetch(normalized);
-                if(!resp.ok) throw new Error('fetch failed');
-                const blob = await resp.blob();
-                const name = normalized.split('/').pop() || 'image.png';
-                const file = new File([blob], name, { type: blob.type || 'image/png' });
-                await uploadWorkflowFile(file, fieldId);
+                if(isServerAssetUrl(normalized)){
+                    const data = await fetch('/api/upload/reuse', {
+                        method:'POST',
+                        headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ url: normalized })
+                    }).then(r=>r.json());
+                    fieldValues[fieldId] = data.files?.[0]?.comfy_name || '';
+                    const savedUrl = StudioRefUpload.normalizeImageUrl(data.files?.[0]?.url || normalized);
+                    if(savedUrl) fieldImageUrls[fieldId] = savedUrl;
+                } else {
+                    const resp = await fetch(normalized);
+                    if(!resp.ok) throw new Error('fetch failed');
+                    const blob = await resp.blob();
+                    const name = normalized.split('/').pop() || 'image.png';
+                    await uploadWorkflowFile(new File([blob], name, { type: blob.type || 'image/png' }), fieldId);
+                }
+                refreshRefGrid();
+                syncGenBtnState();
             } catch(e){
                 alert(tr('comfy.imageUploadFailed'));
                 delete fieldValues[fieldId];
                 delete fieldImageUrls[fieldId];
-                renderDynamicPanel();
+                refreshRefGrid();
+                syncGenBtnState();
+            } finally {
+                cancelBoardPick();
             }
-            cancelBoardPick();
         }
 
         function collectRunFields(){
@@ -474,34 +501,105 @@
             return true;
         }
 
+        async function clearPendingJob(jobId){
+            pendingJobs = pendingJobs.filter(j => j.id !== jobId);
+            if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
+            renderOutputGrid();
+        }
+
+        function failPendingJob(jobId, message, delay = 2800){
+            const job = pendingJobs.find(j => j.id === jobId);
+            if(job) job.error = message || tr('local.generateFailed');
+            renderOutputGrid();
+            if(delay > 0){
+                setTimeout(() => { clearPendingJob(jobId); }, delay);
+            } else {
+                clearPendingJob(jobId);
+            }
+        }
+
+        const resumingJobIds = new Set();
+
+        function buildRunPayload(){
+            return {
+                fields: collectRunFields(),
+                config: { ...currentConfig, fields: effectiveFields() },
+                client_id: CLIENT_ID,
+                history_type: HISTORY_TYPE,
+                reference_images: collectReferenceImages(),
+                prompt: collectPrimaryPrompt(),
+            };
+        }
+
+        async function resumePendingJobPoll(job){
+            if(!job?.id || !job.task_id || resumingJobIds.has(job.id)) return;
+            resumingJobIds.add(job.id);
+            try {
+                const data = await pollCanvasComfyTask(job.task_id);
+                if(data.error) throw new Error(data.error);
+                if(data.images?.length) upsertHistoryItem(data);
+                else throw new Error(tr('local.generateFailed'));
+                resumingJobIds.delete(job.id);
+                await clearPendingJob(job.id);
+            } catch(err){
+                resumingJobIds.delete(job.id);
+                failPendingJob(job.id, err.message || tr('local.generateFailed'));
+            }
+        }
+
+        async function resumePendingJobs(){
+            try {
+                const jobs = await fetch('/api/online-pending').then(r => r.json());
+                if(!Array.isArray(jobs) || !jobs.length) return;
+                const now = Date.now() / 1000;
+                let changed = false;
+                for(const serverJob of jobs){
+                    if(serverJob.error) continue;
+                    if(serverJob.mediaKind && serverJob.mediaKind !== 'local-comfy') continue;
+                    if(!serverJob.task_id){
+                        if(serverJob.timestamp && now - serverJob.timestamp > 120){
+                            fetch('/api/online-pending/' + encodeURIComponent(serverJob.id), { method:'DELETE' }).catch(()=>{});
+                        }
+                        continue;
+                    }
+                    let local = pendingJobs.find(j => j.id === serverJob.id);
+                    if(!local){
+                        local = { ...serverJob };
+                        pendingJobs.unshift(local);
+                        changed = true;
+                    } else {
+                        Object.assign(local, serverJob);
+                    }
+                    resumePendingJobPoll(local);
+                }
+                if(changed) renderOutputGrid();
+            } catch(e){
+                console.error('Resume pending jobs failed:', e);
+            }
+        }
+
         async function runGenerateJob(jobId){
             try {
-                const res = await fetch(`/api/workflows/${encodeURIComponent(selectedWorkflow)}/run`, {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                        fields: collectRunFields(),
-                        config: { ...currentConfig, fields: effectiveFields() },
-                        client_id: CLIENT_ID,
-                        history_type: HISTORY_TYPE,
-                        reference_images: collectReferenceImages(),
-                        prompt: collectPrimaryPrompt(),
-                    })
+                const createRes = await fetch(`/api/canvas-comfy-tasks/${encodeURIComponent(selectedWorkflow)}`, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify(buildRunPayload())
+                }).then(async r => {
+                    if(!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || tr('local.generateFailed'));
+                    return r.json();
                 });
-                const data = await res.json();
-                if(!res.ok || data.error) throw new Error(data.error || data.detail || tr('local.generateFailed'));
-                if(data.images?.length) upsertHistoryItem(data);
-                pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                renderOutputGrid();
-            } catch(err){
+                const taskId = createRes.task_id;
                 const job = pendingJobs.find(j => j.id === jobId);
-                if(job) job.error = err.message || 'Failed';
+                if(job) job.task_id = taskId;
+                if(window.updatePendingJobOnServer) updatePendingJobOnServer(jobId, { task_id: taskId });
                 renderOutputGrid();
-                setTimeout(() => {
-                    pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-                    if(window.deletePendingJobOnServer) deletePendingJobOnServer(jobId);
-                    renderOutputGrid();
-                }, 2800);
+
+                const data = await pollCanvasComfyTask(taskId);
+                if(data.error) throw new Error(data.error);
+                if(data.images?.length) upsertHistoryItem(data);
+                await clearPendingJob(jobId);
+            } catch(err){
+                failPendingJob(jobId, err.message || tr('local.generateFailed'));
             }
         }
         async function submitGenerate(){
@@ -512,7 +610,7 @@
             const jobs = [];
             for(let i=0; i<batchCount; i++){
                 const jobId = `pending_${Date.now()}_${i}`;
-                const jobObj = { id: jobId, prompt: promptText, mediaKind: 'image', batchIndex: batchCount>1?i+1:0, batchTotal: batchCount };
+                const jobObj = { id: jobId, prompt: promptText, mediaKind: 'local-comfy', batchIndex: batchCount>1?i+1:0, batchTotal: batchCount };
                 pendingJobs.unshift(jobObj);
                 if(window.registerPendingJobOnServer) registerPendingJobOnServer(jobObj);
                 jobs.push(runGenerateJob(jobId));
@@ -678,21 +776,44 @@
             const wf = data.workflow_json || data.params?.workflow;
             if(wf && workflows.some(w => w.name === wf)) await selectWorkflow(wf);
             const saved = data.params || {};
-            Object.entries(saved).forEach(([nodeId, inputs]) => {
-                if(typeof inputs !== 'object' || Array.isArray(inputs)) return;
-                Object.entries(inputs).forEach(([input, val]) => {
-                    const f = effectiveFields().find(x => x.node === nodeId && x.input === input);
-                    if(f) fieldValues[f.id] = val;
+            if(saved.fields && typeof saved.fields === 'object' && !Array.isArray(saved.fields)){
+                Object.entries(saved.fields).forEach(([fid, val]) => { fieldValues[fid] = val; });
+            } else {
+                Object.entries(saved).forEach(([nodeId, inputs]) => {
+                    if(nodeId === 'reference_images' || nodeId === 'fields' || nodeId === 'workflow') return;
+                    if(typeof inputs !== 'object' || Array.isArray(inputs)) return;
+                    Object.entries(inputs).forEach(([input, val]) => {
+                        const f = effectiveFields().find(x => x.node === nodeId && x.input === input);
+                        if(f) fieldValues[f.id] = val;
+                    });
                 });
-            });
+            }
+            const promptText = String(data.prompt || '').trim();
+            if(promptText){
+                const prompts = effectiveFields().filter(f => fieldKind(f) === 'prompt');
+                if(prompts.length){
+                    prompts.forEach((f, i) => {
+                        if(i === 0 || !String(fieldValues[f.id] ?? '').trim()) fieldValues[f.id] = promptText;
+                    });
+                }
+            }
             const imageFields = effectiveFields().filter(f => fieldKind(f) === 'image');
             const refs = Array.isArray(saved.reference_images) ? saved.reference_images : [];
             imageFields.forEach((f, i) => {
                 const ref = refs[i];
-                if(ref?.url) fieldImageUrls[f.id] = StudioRefUpload.normalizeImageUrl(ref.url);
+                if(ref?.url){
+                    const url = StudioRefUpload.normalizeImageUrl(ref.url);
+                    fieldImageUrls[f.id] = url;
+                    if(!fieldValues[f.id]) fieldValues[f.id] = ref.name || url.split('/').pop() || '';
+                } else if(fieldValues[f.id] && !fieldImageUrls[f.id]){
+                    const val = String(fieldValues[f.id] || '');
+                    if(val.startsWith('/assets/') || val.startsWith('/output/')) fieldImageUrls[f.id] = val;
+                }
             });
             renderDynamicPanel();
+            syncGenBtnState();
         }
+        window.applyRecordParams = applyRecordParams;
         async function loadAllHistory(){
             if(historyLoading) return; historyLoading = true;
             try {
@@ -748,6 +869,7 @@
             document.getElementById('outputColsSlider').oninput = e => setOutputCols(e.target.value);
             await loadWorkflowList();
             await loadAllHistory();
+            await resumePendingJobs();
             if(window.StudioPanelBridge){
                 const bridge = StudioPanelBridge;
                 renderOutputGrid = function(){
