@@ -1224,9 +1224,15 @@
 
         function upsertHistoryItem(item){
             const key = historyKey(item);
-            const idx = allHistory.findIndex(h => historyKey(h) === key);
+            if(!key) return;
+            const idx = allHistory.findIndex(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
             if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
-            if(!displayOrder.includes(key)) displayOrder.unshift(key);
+            displayOrder = displayOrder.filter(id => !StudioHistoryMeta.keysEqual(id, key));
+            if(StudioHistoryMeta.includesKey(pinnedIds, key)){
+                pinnedIds = [key, ...pinnedIds.filter(id => !StudioHistoryMeta.keysEqual(id, key))];
+            } else {
+                displayOrder.unshift(key);
+            }
             rebuildDisplayOrderFromPins();
             syncGalleryFingerprints();
             saveMeta();
@@ -1320,7 +1326,11 @@
         channel.onmessage = (event) => {
             const data = event.data || {};
             if(data.type === 'gallery-refresh') { loadAllHistory(); syncPendingJobs(); }
-            if(data.type === 'gallery-add-item' && data.item) { upsertHistoryItem(data.item); syncPendingJobs(); }
+            if(data.type === 'gallery-add-item' && data.item) {
+                upsertHistoryItem(data.item);
+                loadAllHistory();
+                syncPendingJobs();
+            }
             if(data.type === 'gallery-set-pending'){
                 mergePanelPendingJobs(data.jobs || [], data.pageType);
                 renderOutputGrid();

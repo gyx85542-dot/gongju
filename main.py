@@ -857,6 +857,7 @@ class OnlineImageRequest(BaseModel):
     provider_id: str = "comfly"
     model: str = ""
     size: str = "1024x1024"
+    resolution: Optional[str] = None
     quality: str = "auto"
     reference_images: List[AIReference] = []
     job_id: Optional[str] = None
@@ -887,6 +888,53 @@ def history_has_media(item):
 
 CANVAS_TASKS: Dict[str, Dict[str, Any]] = {}
 CANVAS_TASK_LOCK = Lock()
+CANVAS_TASK_LOG_FILE = os.path.join(DATA_DIR, "canvas_tasks.log")
+
+def log_canvas_task_event(event: Dict[str, Any]) -> None:
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        payload = {"ts": time.time(), **event}
+        with open(CANVAS_TASK_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        status = payload.get("status") or ""
+        task_id = payload.get("task_id") or ""
+        task_type = payload.get("task_type") or ""
+        err = str(payload.get("error") or "")[:240]
+        print(f"[canvas-task] {status} {task_type} {task_id} {err}")
+    except Exception as exc:
+        print(f"log_canvas_task_event failed: {exc}")
+
+def canvas_task_context_from_payload(payload: Any) -> Dict[str, Any]:
+    ctx: Dict[str, Any] = {}
+    if payload is None:
+        return ctx
+    for key in ("job_id", "model", "provider_id", "workflow_id"):
+        val = getattr(payload, key, None)
+        if val:
+            ctx[key] = val
+    prompt = getattr(payload, "prompt", None)
+    if prompt:
+        ctx["prompt"] = str(prompt)[:200]
+    return ctx
+
+def mark_canvas_task_failed(task_id: str, error: str, status_code: int = 500, **context: Any) -> None:
+    with CANVAS_TASK_LOCK:
+        task_type = (CANVAS_TASKS.get(task_id) or {}).get("type") or context.get("task_type") or ""
+        if task_id in CANVAS_TASKS:
+            CANVAS_TASKS[task_id].update({
+                "status": "failed",
+                "error": str(error),
+                "status_code": status_code,
+                "updated_at": time.time(),
+            })
+    log_canvas_task_event({
+        "task_id": task_id,
+        "task_type": task_type,
+        "status": "failed",
+        "status_code": status_code,
+        "error": str(error),
+        **{k: v for k, v in context.items() if k != "task_type"},
+    })
 
 class CanvasVideoRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=VIDEO_PROMPT_MAX_LENGTH)
@@ -1827,7 +1875,34 @@ def apimart_size_resolution(size):
     best = min(common, key=lambda item: abs(ratio - item[0] / item[1]))
     return best[2], resolution
 
-async def generate_ai_image(prompt, size, quality, model, reference_images=None, provider_id="comfly"):
+def normalize_apimart_resolution(value):
+    raw = str(value or "").strip().lower()
+    return raw if raw in {"1k", "2k", "4k"} else ""
+
+def apimart_image_size_resolution(size, resolution_hint=None):
+    """Map client size + resolution to APIMart GPT-Image-2 fields (ratio/pixels + 1k/2k/4k)."""
+    hint = normalize_apimart_resolution(resolution_hint)
+    width, height = parse_size_pair(size)
+    if width and height:
+        pixel_size = f"{width}x{height}"
+        if hint:
+            return pixel_size, hint
+        if resolution_hint is not None:
+            return pixel_size, ""
+        return apimart_size_resolution(size)
+    raw = str(size or "").strip().lower().replace(" ", "")
+    auto_match = re.fullmatch(r"auto:(1k|2k|4k)", raw)
+    if auto_match:
+        return "auto", auto_match.group(1)
+    if raw == "auto":
+        return "auto", hint or "1k"
+    if re.fullmatch(r"\d+:\d+", raw):
+        return raw, hint or "1k"
+    if raw in {"1k", "2k", "4k"}:
+        return "1:1", raw
+    return apimart_size_resolution(size)
+
+async def generate_ai_image(prompt, size, quality, model, reference_images=None, provider_id="comfly", resolution_hint=None):
     provider = get_api_provider(provider_id)
     is_gpt2 = is_gpt_image_2_model(model)
     is_apimart = is_apimart_provider(provider)
@@ -1859,7 +1934,7 @@ async def generate_ai_image(prompt, size, quality, model, reference_images=None,
             )
 
         if is_apimart:
-            apimart_size, resolution = apimart_size_resolution(size)
+            apimart_size, apimart_resolution = apimart_image_size_resolution(size, resolution_hint)
             # APIMart 的 GPT-Image-2 图生图仍走 /images/generations，
             # 通过 image_urls 传参考图，不使用 OpenAI multipart /images/edits。
             body = {
@@ -1867,9 +1942,10 @@ async def generate_ai_image(prompt, size, quality, model, reference_images=None,
                 "prompt": prompt,
                 "n": 1,
                 "size": apimart_size,
-                "resolution": resolution,
                 "official_fallback": False,
             }
+            if apimart_resolution:
+                body["resolution"] = apimart_resolution
             if image_refs:
                 body["image_urls"] = [reference_to_data_url(ref, max_size=1536) for ref in image_refs[:16]]
             response = await client.post(gen_url, headers=api_headers(provider=provider), json=body)
@@ -2368,7 +2444,9 @@ async def build_online_image_result(payload: OnlineImageRequest):
     model = selected_model(payload.model, default_model)
     refs = [ref.dict() for ref in payload.reference_images if ref.url]
     try:
-        image_data, raw = await generate_ai_image(payload.prompt, payload.size, payload.quality, model, refs, provider["id"])
+        image_data, raw = await generate_ai_image(
+            payload.prompt, payload.size, payload.quality, model, refs, provider["id"], payload.resolution
+        )
         local_url = await save_ai_image_to_output(image_data, prefix="online_")
     except httpx.HTTPStatusError as exc:
         text = exc.response.text or ''
@@ -2401,7 +2479,11 @@ async def build_online_image_result(payload: OnlineImageRequest):
         "provider_name": provider.get("name") or provider["id"],
         "task_id": extract_task_id(raw) if isinstance(raw, dict) else None,
         "request_id": raw.get("id") if isinstance(raw, dict) else None,
-        "params": {"provider_id": provider["id"], "model": model, "size": payload.size, "quality": payload.quality, "reference_images": refs, "job_id": payload.job_id},
+        "params": {
+            "provider_id": provider["id"], "model": model, "size": payload.size,
+            "resolution": payload.resolution or "",
+            "quality": payload.quality, "reference_images": refs, "job_id": payload.job_id,
+        },
         "raw_usage": raw.get("usage") if isinstance(raw, dict) else None,
     }
     save_to_history(result)
@@ -2473,6 +2555,7 @@ async def online_import(files: List[UploadFile] = File(...)):
     return {"items": items}
 
 async def run_canvas_image_task(task_id: str, payload: OnlineImageRequest):
+    ctx = canvas_task_context_from_payload(payload)
     with CANVAS_TASK_LOCK:
         if task_id in CANVAS_TASKS:
             CANVAS_TASKS[task_id]["status"] = "running"
@@ -2486,16 +2569,10 @@ async def run_canvas_image_task(task_id: str, payload: OnlineImageRequest):
                 "error": "",
                 "updated_at": time.time(),
             })
+    except HTTPException as exc:
+        mark_canvas_task_failed(task_id, str(exc.detail), exc.status_code, **ctx)
     except Exception as exc:
-        detail = getattr(exc, "detail", None) or str(exc)
-        status_code = getattr(exc, "status_code", 500)
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(detail),
-                "status_code": status_code,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc), 500, **ctx)
 @app.post("/api/canvas-image-tasks")
 async def create_canvas_image_task(payload: OnlineImageRequest):
     task_id = f"canvas_img_{uuid.uuid4().hex}"
@@ -2888,6 +2965,7 @@ async def build_online_video_result(payload: OnlineVideoRequest):
     return record
 
 async def run_canvas_video_task(task_id: str, payload: OnlineVideoRequest):
+    ctx = canvas_task_context_from_payload(payload)
     with CANVAS_TASK_LOCK:
         if task_id in CANVAS_TASKS:
             CANVAS_TASKS[task_id]["status"] = "running"
@@ -2902,21 +2980,9 @@ async def run_canvas_video_task(task_id: str, payload: OnlineVideoRequest):
                 "updated_at": time.time(),
             })
     except HTTPException as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc.detail),
-                "status_code": exc.status_code,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc.detail), exc.status_code, **ctx)
     except Exception as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc),
-                "status_code": 500,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc), 500, **ctx)
 
 @app.post("/api/canvas-video-tasks")
 async def create_canvas_video_task(payload: OnlineVideoRequest):
@@ -3794,6 +3860,7 @@ def run_workflow_generate(name: str, payload: WorkflowRunRequest):
     return generate(prepare_workflow_generate_request(name, payload))
 
 async def run_canvas_comfy_task(task_id: str, name: str, payload: WorkflowRunRequest):
+    ctx = {**canvas_task_context_from_payload(payload), "workflow": name}
     with CANVAS_TASK_LOCK:
         if task_id in CANVAS_TASKS:
             CANVAS_TASKS[task_id]["status"] = "running"
@@ -3801,13 +3868,12 @@ async def run_canvas_comfy_task(task_id: str, name: str, payload: WorkflowRunReq
     try:
         result = await asyncio.to_thread(run_workflow_generate, name, payload)
         if result.get("error"):
-            with CANVAS_TASK_LOCK:
-                CANVAS_TASKS[task_id].update({
-                    "status": "failed",
-                    "error": str(result.get("error") or "Generation failed"),
-                    "status_code": 400,
-                    "updated_at": time.time(),
-                })
+            mark_canvas_task_failed(
+                task_id,
+                str(result.get("error") or "Generation failed"),
+                400,
+                **ctx,
+            )
         else:
             with CANVAS_TASK_LOCK:
                 CANVAS_TASKS[task_id].update({
@@ -3817,21 +3883,9 @@ async def run_canvas_comfy_task(task_id: str, name: str, payload: WorkflowRunReq
                     "updated_at": time.time(),
                 })
     except HTTPException as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc.detail),
-                "status_code": exc.status_code,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc.detail), exc.status_code, **ctx)
     except Exception as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc),
-                "status_code": 500,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc), 500, **ctx)
 
 @app.post("/api/canvas-comfy-tasks/{name:path}")
 async def create_canvas_comfy_task(name: str, payload: WorkflowRunRequest):
@@ -4955,6 +5009,7 @@ def build_runninghub_result(payload: RunningHubRunRequest):
     }
 
 async def run_canvas_runninghub_task(task_id: str, payload: RunningHubRunRequest):
+    ctx = canvas_task_context_from_payload(payload)
     with CANVAS_TASK_LOCK:
         if task_id in CANVAS_TASKS:
             CANVAS_TASKS[task_id]["status"] = "running"
@@ -4969,21 +5024,9 @@ async def run_canvas_runninghub_task(task_id: str, payload: RunningHubRunRequest
                 "updated_at": time.time(),
             })
     except HTTPException as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc.detail),
-                "status_code": exc.status_code,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc.detail), exc.status_code, **ctx)
     except Exception as exc:
-        with CANVAS_TASK_LOCK:
-            CANVAS_TASKS[task_id].update({
-                "status": "failed",
-                "error": str(exc),
-                "status_code": 500,
-                "updated_at": time.time(),
-            })
+        mark_canvas_task_failed(task_id, str(exc), 500, **ctx)
 
 @app.post("/api/canvas-runninghub-tasks")
 async def create_canvas_runninghub_task(payload: RunningHubRunRequest):

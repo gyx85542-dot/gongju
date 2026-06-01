@@ -627,13 +627,13 @@
             keyInput.readOnly = false;
             keyInput.placeholder = item.has_key ? `${tr('api.keepCurrentKey')} ${item.key_preview || ''}` : tr('api.enterKey');
             keyHint.textContent = item.has_key ? `${tr('api.keySaved')}${item.key_env || 'API/.env'}` : tr('api.noKey');
-            const deleteBtn = document.getElementById('deleteBtn');
+                                                const deleteBtn = document.getElementById('deleteBtn');
             if(deleteBtn) deleteBtn.style.display = locked ? 'none' : 'inline-flex';
             setBuiltinFieldsLocked(locked);
             renderModels('image');
             renderModels('chat');
             renderModels('video');
-            renderProviderList();
+                        renderProviderList();
         }
         function showVerifyResult(html){ const el = document.getElementById('verifyResult'); if(el){ el.style.display = 'block'; el.innerHTML = html; } }
         function clearVerifyResult(){ const el = document.getElementById('verifyResult'); if(el){ el.style.display = 'none'; el.innerHTML = ''; } }
@@ -1026,7 +1026,7 @@
                         deletedId: pendingDeletedProviderId || undefined,
                     });
                 } else {
-                    try { new BroadcastChannel('studio-api').postMessage({ type:'providers-changed' }); } catch(e) {}
+                try { new BroadcastChannel('studio-api').postMessage({ type:'providers-changed' }); } catch(e) {}
                 }
                 pendingDeletedProviderId = '';
                 return true;

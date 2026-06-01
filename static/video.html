@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260530-pending-fix"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-task-fix"></script>
     <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
     <script src="/static/studio-media-ref-upload.js?v=20260530-global"></script>
     <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-media-ref">
@@ -338,14 +338,23 @@
             notifyGallery();
         }
 
-        function failPendingJob(jobId, message, delay = 2800){
+        function failPendingJob(jobId, message, delay = 8000){
             const job = pendingJobs.find(j => j.id === jobId);
             if(job) job.error = message || tr('video.failed');
+            console.error('[video] generation failed:', jobId, message);
             notifyGallery();
             if(delay > 0){
                 setTimeout(() => { clearPendingJob(jobId); }, delay);
             } else {
                 clearPendingJob(jobId);
+            }
+        }
+
+        function deliverResultToGallery(result){
+            if(!result?.videos?.length && !result?.images?.length) return;
+            if(window.StudioPanelBridge){
+                StudioPanelBridge.notifyAddItem(result);
+                StudioPanelBridge.notifyRefresh();
             }
         }
 
@@ -356,7 +365,7 @@
             resumingJobIds.add(job.id);
             try {
                 const result = await pollCanvasVideoTask(job.task_id);
-                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
+                deliverResultToGallery(result);
                 resumingJobIds.delete(job.id);
                 await clearPendingJob(job.id);
             } catch(err){
@@ -413,7 +422,7 @@
                 notifyGallery();
 
                 const result = await pollCanvasVideoTask(taskId);
-                if(window.StudioPanelBridge) StudioPanelBridge.notifyAddItem(result);
+                deliverResultToGallery(result);
                 await clearPendingJob(jobId);
             } catch(err){
                 failPendingJob(jobId, err.message || tr('video.failed'));

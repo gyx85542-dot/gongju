@@ -182,6 +182,8 @@
 
         });
 
+        const missingNew = [];
+
         allHistory.forEach((item) => {
 
             const k = historyKey(item);
@@ -190,9 +192,13 @@
 
             restSeen.add(k);
 
-            restList.push(k);
+            missingNew.push(k);
 
         });
+
+        // historyList 通常按时间降序；缺失项应出现在列表前部而非末尾
+
+        restList = [...missingNew, ...restList];
 
         displayOrder = [...pinnedList, ...restList];
 

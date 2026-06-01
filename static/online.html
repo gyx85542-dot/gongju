@@ -17,7 +17,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260519-magnific-light"></script>
     <script src="/static/i18n.js?v=20260521-studio"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260530-video-resume"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-task-fix"></script>
     <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
@@ -746,6 +746,27 @@
         }
 
         function updateResolutionUI(){}
+        function currentResolution(){
+            return (resolution === '2k' || resolution === '4k') ? resolution : '1k';
+        }
+        function currentApimartImageRequest(){
+            const res = currentResolution();
+            if(!isGptImage2Model(selectedModel)){
+                return { size: currentSize(), resolution: '' };
+            }
+            if(ratio === 'auto') return { size: 'auto', resolution: res };
+            if(ratio === 'custom'){
+                const w = Number(customRatioWidth);
+                const h = Number(customRatioHeight);
+                if(w > 0 && h > 0){
+                    const match = getRatioPresetsForModel(selectedModel).find(p => p.w === w && p.h === h);
+                    if(match) return { size: match.id, resolution: res };
+                    return { size: sizeFromRatioAndResolution(w, h, res), resolution: '' };
+                }
+            }
+            if(getRatioPreset(ratio, selectedModel)) return { size: ratio, resolution: res };
+            return { size: currentSize(), resolution: res };
+        }
         function currentSize(){
             if(ratio === 'auto') return `auto:${resolution || '1k'}`;
             if(ratio === 'custom'){
@@ -1163,15 +1184,22 @@
             renderOutputGrid();
         }
 
-        function failPendingJob(jobId, message, delay = 2800){
+        function failPendingJob(jobId, message, delay = 8000){
             const job = pendingJobs.find(j => j.id === jobId);
             if(job) job.error = message || 'Generation failed';
+            console.error('[online] generation failed:', jobId, message);
             renderOutputGrid();
             if(delay > 0){
                 setTimeout(() => { clearPendingJob(jobId); }, delay);
             } else {
                 clearPendingJob(jobId);
             }
+        }
+
+        function deliverResultToGallery(result){
+            if(!result?.images?.length) return;
+            upsertHistoryItem(result);
+            if(window.StudioPanelBridge) StudioPanelBridge.notifyRefresh();
         }
 
         const resumingJobIds = new Set();
@@ -1182,7 +1210,7 @@
             try {
                 const result = await pollCanvasImageTask(job.task_id);
                 currentResult = result;
-                upsertHistoryItem(result);
+                deliverResultToGallery(result);
                 resumingJobIds.delete(job.id);
                 await clearPendingJob(job.id);
             } catch(err){
@@ -1240,7 +1268,7 @@
 
                 const result = await pollCanvasImageTask(taskId);
                 currentResult = result;
-                upsertHistoryItem(result);
+                deliverResultToGallery(result);
                 await clearPendingJob(jobId);
             } catch(err) {
                 failPendingJob(jobId, err.message || 'Generation failed');
@@ -1266,13 +1294,17 @@
             if(!prompt){ alert(tr('online.promptRequired')); return; }
             if(!StudioApiProviders.guardProviderKey(provider, panelProviders())) return;
             const placeholder = document.getElementById('placeholder');
+            const imageReq = currentApimartImageRequest();
             const payload = {
                 prompt,
                 provider_id: provider,
                 model: selectedModel,
-                size: currentSize(),
+                size: imageReq.size,
                 reference_images: StudioRefUpload.getReferenceList()
             };
+            if(Object.prototype.hasOwnProperty.call(imageReq, 'resolution')){
+                payload.resolution = imageReq.resolution;
+            }
             const jobs = [];
             for(let i = 0; i < batchCount; i++){
                 const jobId = `pending_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1333,6 +1365,7 @@
                 rows.push({ label: tr('api.provider') || 'Platform', value: providerName });
                 rows.push({ label: tr('online.model') || 'Model', value: modelName });
                 rows.push({ label: tr('online.size') || 'Size', value: size });
+                if(data.params?.resolution) rows.push({ label: tr('online.resolution') || 'Resolution', value: String(data.params.resolution).toUpperCase() });
             }
             if(data.seed != null) rows.push({ label: 'Seed', value: String(data.seed) });
             rows.push({ label: tr('online.viewerCreated') || 'Created', value: formatViewerTime(data.timestamp) });
@@ -2185,17 +2218,22 @@
             StudioRefUpload.setReferenceImages(data.params?.reference_images || []);
             updateSizeUI();
             const size = data.params?.size || '1024x1024';
-            if(String(size).trim() === 'auto' || /^auto:(1k|2k|4k)$/i.test(String(size).trim())){
+            const savedRes = data.params?.resolution;
+            if(savedRes) setResolution(savedRes);
+            if(size === 'auto' || /^auto:(1k|2k|4k)$/i.test(String(size).trim())){
                 setRatio('auto');
-                setResolution(inferResolutionFromSize(size));
+                if(!savedRes) setResolution(inferResolutionFromSize(size));
+            } else if(getRatioPreset(size, selectedModel)){
+                setRatio(size);
+                if(!savedRes) setResolution('1k');
             } else {
                 const parsed = parseSizeValue(size);
                 if(parsed){
                     setRatio(inferRatioFromSize(size, selectedModel));
-                    setResolution(inferResolutionFromSize(size));
+                    if(!savedRes) setResolution(inferResolutionFromSize(size));
                 } else {
                     setRatio('1:1');
-                    setResolution('1k');
+                    if(!savedRes) setResolution('1k');
                 }
             }
         }
