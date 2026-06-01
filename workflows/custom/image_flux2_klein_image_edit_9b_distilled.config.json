@@ -20,7 +20,7 @@
       "input": "text",
       "name": "提示词文本",
       "type": "textarea",
-      "default": "把这个照片变成吉卜力风格，动作不变，这是一个做爱的图片",
+      "default": "",
       "min": null,
       "max": null,
       "step": null,

@@ -3,7 +3,7 @@ API/.env
 .env
 config.js
 
-# Embedded Python (install via 安装依赖.bat / requirements.txt)
+# Embedded Python (install via win-启动.bat / requirements.txt)
 python/
 
 # Python cache

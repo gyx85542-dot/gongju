@@ -1,7 +1,7 @@
 1. API网站注册：
 https://apimart.ai/register?aff=1uyAbb
 
-2.运行安装依赖.bat
+2.双击 win-启动.bat（Windows）或 mac-启动.command（macOS）
 
 3. 如果电脑没有安装过python，运行就会打不开程序，梯子好的可以安装codex，国内网可以安装trae，可以自己搜索软件也可以用网盘的安装包
 
@@ -17,4 +17,4 @@ https://apimart.ai/register?aff=1uyAbb
 
 
 ---mac运行---
-新增了3个mac的使用说明/修复全选/启动服务，如果运行仍然失败，建议安装www.trae.cn，选中这个项目文件夹，让他运行程序
+双击 mac-启动.command 即可。若仍失败，建议安装 www.trae.cn，选中项目文件夹后让它帮你排查环境。
