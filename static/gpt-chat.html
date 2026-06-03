@@ -121,7 +121,7 @@
 
         <div class="composer-wrap">
             <div id="composerBody" class="composer-body">
-                <textarea id="messageInput" rows="3" class="nano-input chat-prompt-input w-full outline-none resize-none" placeholder="输入消息，Enter 发送..." data-i18n-placeholder="chat.inputPlaceholder" oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+                <textarea id="messageInput" rows="3" data-prompt-enhance-skip class="nano-input chat-prompt-input w-full outline-none resize-none" placeholder="输入消息，Enter 发送..." data-i18n-placeholder="chat.inputPlaceholder" oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
                 <div id="refStrip" class="ref-strip"></div>
                 <div class="composer-inside-foot">
                     <div class="left-tools">
@@ -427,6 +427,23 @@
 
         function hasImageFiles(items){ return [...(items || [])].some(item => item.kind === 'file' && item.type.startsWith('image/')); }
         function autoGrow(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 168) + 'px'; }
+
+        function restoreChatComposer(){
+            const input = document.getElementById('messageInput');
+            if(!input) return;
+            const wrap = input.closest('.prompt-enhance-wrap');
+            if(wrap && wrap.parentElement){
+                wrap.parentElement.insertBefore(input, wrap);
+                wrap.remove();
+            }
+            input.removeAttribute('data-prompt-enhance-wrapped');
+            input.removeAttribute('data-prompt-enhance-height-done');
+            input.style.minHeight = '';
+            const rows = parseInt(input.getAttribute('rows'), 10);
+            if(rows > 3) input.setAttribute('rows', '3');
+            autoGrow(input);
+        }
+        restoreChatComposer();
         function handleKey(e){ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } }
 
         async function sendMessage(){

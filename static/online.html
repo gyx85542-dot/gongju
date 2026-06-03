@@ -172,6 +172,8 @@
     <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260603-panorama-vision">
+    <script src="/static/studio-prompt-enhance.js?v=20260603-panorama-vision"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -749,9 +751,27 @@
         function currentResolution(){
             return (resolution === '2k' || resolution === '4k') ? resolution : '1k';
         }
+        function usesApimartRatioSize(model){
+            return isGptImage2Model(model) || isGeminiImageModel(model);
+        }
+        function nearestRatioPresetId(w, h, model){
+            const presets = getRatioPresetsForModel(model).filter(p => p.w > 0 && p.h > 0);
+            if(!presets.length || !(w > 0) || !(h > 0)) return '';
+            const target = w / h;
+            let best = presets[0];
+            let bestDelta = Math.abs(target - best.w / best.h);
+            presets.forEach(p => {
+                const delta = Math.abs(target - p.w / p.h);
+                if(delta < bestDelta){
+                    best = p;
+                    bestDelta = delta;
+                }
+            });
+            return best.id;
+        }
         function currentApimartImageRequest(){
             const res = currentResolution();
-            if(!isGptImage2Model(selectedModel)){
+            if(!usesApimartRatioSize(selectedModel)){
                 return { size: currentSize(), resolution: '' };
             }
             if(ratio === 'auto') return { size: 'auto', resolution: res };
@@ -761,7 +781,11 @@
                 if(w > 0 && h > 0){
                     const match = getRatioPresetsForModel(selectedModel).find(p => p.w === w && p.h === h);
                     if(match) return { size: match.id, resolution: res };
-                    return { size: sizeFromRatioAndResolution(w, h, res), resolution: '' };
+                    if(isGeminiImageModel(selectedModel)){
+                        const nearest = nearestRatioPresetId(w, h, selectedModel);
+                        if(nearest) return { size: nearest, resolution: res };
+                    }
+                    return { size: sizeFromRatioAndResolution(w, h, res), resolution: isGptImage2Model(selectedModel) ? '' : res };
                 }
             }
             if(getRatioPreset(ratio, selectedModel)) return { size: ratio, resolution: res };
@@ -1184,10 +1208,12 @@
             renderOutputGrid();
         }
 
-        function failPendingJob(jobId, message, delay = 8000){
+        function failPendingJob(jobId, message, delay = 20000){
+            const errMsg = String(message || '').trim() || '生图失败，请稍后重试';
             const job = pendingJobs.find(j => j.id === jobId);
-            if(job) job.error = message || 'Generation failed';
-            console.error('[online] generation failed:', jobId, message);
+            if(job) job.error = errMsg;
+            if(window.updatePendingJobOnServer) updatePendingJobOnServer(jobId, { error: errMsg });
+            console.error('[online] generation failed:', jobId, errMsg);
             renderOutputGrid();
             if(delay > 0){
                 setTimeout(() => { clearPendingJob(jobId); }, delay);

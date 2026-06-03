@@ -25,6 +25,7 @@ import httpx
 from PIL import Image
 from io import BytesIO
 import database as db
+import prompt_enhance as pe
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Header, Request, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
@@ -981,6 +982,12 @@ class ChatRequest(BaseModel):
     reference_images: List[AIReference] = []
     provider: str = "comfly"
 
+class PromptEnhanceRequest(BaseModel):
+    prompt: str = Field(default="", max_length=LLM_MESSAGE_MAX_LENGTH)
+    mode: str = Field(min_length=1, max_length=64)
+    provider: str = ""
+    reference_images: List[AIReference] = Field(default_factory=list)
+
 class ConversationCreateRequest(BaseModel):
     title: str = "新对话"
 
@@ -1282,6 +1289,17 @@ def provider_protocol(provider):
 def is_apimart_provider(provider):
     base_url = str((provider or {}).get("base_url") or "").lower()
     return provider_protocol(provider) == "apimart" or "apimart.ai" in base_url
+
+def format_httpx_error(exc, prefix="请求失败"):
+    msg = str(exc).strip()
+    if not msg:
+        name = type(exc).__name__
+        req = getattr(exc, "request", None)
+        if req is not None:
+            msg = f"{name}（{getattr(req, 'method', 'GET')} {getattr(req, 'url', '')}）"
+        else:
+            msg = name or "网络连接异常"
+    return f"{prefix}：{msg}"
 
 async def wait_for_image_task(client, task_id, provider=None):
     base_url = (provider.get("base_url") if provider else AI_BASE_URL).rstrip("/")
@@ -1819,6 +1837,24 @@ GPT_IMAGE2_MIN_PIXELS = 655_360
 def is_gpt_image_2_model(model):
     return str(model or "").strip().lower() == "gpt-image-2"
 
+def is_gemini_image_model(model):
+    name = str(model or "").strip().lower()
+    return name in {"gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview"}
+
+def apimart_gemini_resolution_value(resolution_hint):
+    """APIMart Gemini 生图要求 resolution 为 0.5K / 1K / 2K / 4K。"""
+    raw = str(resolution_hint or "1k").strip().lower()
+    return {"0.5k": "0.5K", "1k": "1K", "2k": "2K", "4k": "4K"}.get(raw, "1K")
+
+def apimart_gemini_image_fields(size, resolution_hint=None):
+    """Gemini 生图必须用比例字符串 + resolution，不能传 1536x864 这类像素尺寸。"""
+    raw = str(size or "").strip().replace(" ", "")
+    hint = normalize_apimart_resolution(resolution_hint) or "1k"
+    if re.fullmatch(r"\d+:\d+", raw):
+        return raw, apimart_gemini_resolution_value(hint)
+    ratio, inferred = apimart_size_resolution(size)
+    return ratio, apimart_gemini_resolution_value(hint or inferred or "1k")
+
 def normalize_gpt_image_2_size(size):
     width, height = parse_size_pair(size)
     if not width or not height:
@@ -1934,7 +1970,10 @@ async def generate_ai_image(prompt, size, quality, model, reference_images=None,
             )
 
         if is_apimart:
-            apimart_size, apimart_resolution = apimart_image_size_resolution(size, resolution_hint)
+            if is_gemini_image_model(model):
+                apimart_size, apimart_resolution = apimart_gemini_image_fields(size, resolution_hint)
+            else:
+                apimart_size, apimart_resolution = apimart_image_size_resolution(size, resolution_hint)
             # APIMart 的 GPT-Image-2 图生图仍走 /images/generations，
             # 通过 image_urls 传参考图，不使用 OpenAI multipart /images/edits。
             body = {
@@ -2047,6 +2086,23 @@ def upstream_message_from_record(item):
                 content.append({"type": "image_url", "image_url": {"url": url}})
         return {"role": role, "content": content}
     return {"role": role, "content": item.get("content", "")}
+
+def build_enhance_user_message(text: str, refs: list, *, max_images: int = 4, empty_text: str = ""):
+    """构建 Enhance 用户消息；有参考图时使用 OpenAI 多模态 content 数组。"""
+    image_refs = [
+        ref for ref in (refs or [])
+        if ref.get("url") and str(ref.get("role") or "").strip().lower() != "mask"
+    ]
+    prompt_text = (text or "").strip()
+    if not image_refs:
+        return prompt_text
+    content = []
+    content.append({"type": "text", "text": prompt_text or empty_text})
+    for ref in image_refs[:max_images]:
+        url = reference_to_data_url(ref, max_size=1536)
+        if url:
+            content.append({"type": "image_url", "image_url": {"url": url}})
+    return content
 
 # --- 路由接口 ---
 
@@ -2467,7 +2523,7 @@ async def build_online_image_result(payload: OnlineImageRequest):
         detail = friendly or f"上游生图接口错误：{text[:300]}"
         raise HTTPException(status_code=exc.response.status_code, detail=detail) from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"请求上游生图接口失败：{exc}") from exc
+        raise HTTPException(status_code=502, detail=format_httpx_error(exc, "请求上游生图接口失败")) from exc
 
     result = {
         "prompt": payload.prompt,
@@ -3239,6 +3295,93 @@ async def chat_stream(payload: ChatRequest, request: Request, x_user_id: str = H
         yield sse_event({"type": "done", "conversation": conversation, "message": assistant_message})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+@app.post("/api/prompt/enhance")
+async def api_prompt_enhance(payload: PromptEnhanceRequest):
+    mode = (payload.mode or "").strip()
+    if mode not in pe.ENHANCE_MODES:
+        raise HTTPException(status_code=400, detail=f"未知的优化模式：{mode}")
+
+    user_text = (payload.prompt or "").strip()
+    if mode == "character_turnaround":
+        return {
+            "prompt": pe.build_character_turnaround(user_text),
+            "mode": mode,
+            "model": "",
+            "provider": "",
+        }
+    if mode == "image_upscale":
+        return {
+            "prompt": pe.build_image_upscale(user_text),
+            "mode": mode,
+            "model": "",
+            "provider": "",
+        }
+
+    refs = [ref.dict() for ref in payload.reference_images if ref.url]
+    if mode == "panorama":
+        if not user_text and not refs:
+            raise HTTPException(status_code=400, detail="请先输入提示词或上传参考图片")
+    elif not user_text:
+        raise HTTPException(status_code=400, detail="请先输入提示词")
+
+    system = pe.get_enhance_system_prompt(mode)
+    if not system:
+        raise HTTPException(status_code=400, detail="该模式不支持远程优化")
+
+    provider_id = pe.resolve_enhance_provider_id(
+        load_api_providers,
+        get_primary_provider_id,
+        get_api_provider,
+        BUILTIN_APIMART_ID,
+        payload.provider or "",
+    )
+    api_provider = get_api_provider(provider_id)
+    chat_base, chat_hdrs, model = resolve_chat_provider(provider_id, pe.ENHANCE_CHAT_MODEL)
+    user_content = user_text
+    if mode == "panorama" and refs:
+        user_content = build_enhance_user_message(
+            user_text,
+            refs,
+            empty_text="请根据上传的场景参考图，反推并生成360度全景空间描述。",
+        )
+    req_body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+    }
+    if is_apimart_provider(api_provider):
+        req_body["stream"] = False
+
+    try:
+        async with httpx.AsyncClient(timeout=AI_REQUEST_TIMEOUT) as client:
+            response = await client.post(
+                f"{chat_base}/chat/completions",
+                headers=chat_hdrs,
+                json=req_body,
+            )
+            response.raise_for_status()
+            raw = response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code,
+            detail=f"上游接口错误：{exc.response.text}",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"请求上游接口失败：{exc}") from exc
+
+    result = text_from_chat_response(raw).strip()
+    if not result:
+        raise HTTPException(status_code=502, detail="模型返回了空内容")
+
+    return {
+        "prompt": result,
+        "mode": mode,
+        "model": model,
+        "provider": provider_id,
+    }
 
 # --- 历史记录 ---
 

@@ -1211,6 +1211,10 @@
                         const tsB = (typeof b.id === 'string' && b.id.startsWith('pending_')) ? parseInt(b.id.split('_')[1], 10) : 0;
                         return (tsB || 0) - (tsA || 0);
                     });
+                    for(const job of mergedJobs){
+                        const local = pendingJobs.find(j => j.id === job.id);
+                        if(local?.error && !job.error) job.error = local.error;
+                    }
 
                     const fp = pendingFingerprint(mergedJobs);
                     const localFp = pendingFingerprint(pendingJobs);

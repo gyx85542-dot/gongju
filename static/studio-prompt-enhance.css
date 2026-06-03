@@ -1,0 +1,173 @@
+/* 提示词区：文本框独立；Enhance 在文本框外下方右对齐 */
+.prompt-enhance-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.prompt-enhance-wrap > textarea,
+.prompt-enhance-wrap > textarea.nano-input,
+.prompt-enhance-wrap > textarea.wf-textarea,
+.prompt-enhance-wrap > textarea.chat-prompt-input {
+    display: block;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.prompt-enhance-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+}
+
+/* 覆盖 pullup-select-wrap 默认 width:100%，否则按钮会贴在左侧 */
+.prompt-enhance-actions .prompt-enhance-select-wrap,
+.prompt-enhance-actions .pullup-select-wrap {
+    position: relative;
+    width: auto !important;
+    max-width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+/* Enhance 按钮 — 与分辨率上拉同款，略短 */
+.prompt-enhance-select-wrap {
+    position: relative;
+    width: auto !important;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.prompt-enhance-select-wrap .pullup-select-trigger {
+    width: auto;
+    min-width: 0;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 6px 0 8px;
+    gap: 4px;
+    border-radius: 12px;
+}
+
+.prompt-enhance-select-wrap .pullup-select-current {
+    flex: 0 1 auto;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.prompt-enhance-select-wrap .pullup-select-chevron svg {
+    width: 12px !important;
+    height: 12px !important;
+    stroke-width: 2.25;
+}
+
+.prompt-enhance-select-wrap:has(.pullup-select-menu:not(.hidden)) .pullup-select-chevron {
+    transform: rotate(180deg);
+}
+
+.prompt-enhance-select-wrap > .pullup-select-menu.pullup-open-up {
+    left: auto;
+    right: 0;
+    width: auto;
+    min-width: 148px;
+    bottom: calc(100% + 4px);
+    top: auto;
+}
+
+.prompt-enhance-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    animation: promptEnhancePop 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.prompt-enhance-menu-title {
+    padding: 4px 8px 2px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #737373;
+    user-select: none;
+}
+
+.prompt-enhance-option {
+    width: 100%;
+    min-height: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #a3a3a3;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: left;
+    padding: 0 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.prompt-enhance-option:hover {
+    background: #333333;
+    color: #f5f5f5;
+}
+
+.prompt-enhance-option.active {
+    background: #3a3a3a;
+    color: #f5f5f5;
+}
+
+.prompt-enhance-menu-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 4px 4px 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 2px;
+}
+
+.prompt-enhance-confirm {
+    height: 28px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 8px;
+    background: #ff4d94;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.18s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.prompt-enhance-confirm:hover:not(:disabled) {
+    background: #e8437f;
+}
+
+.prompt-enhance-confirm:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+@keyframes promptEnhancePop {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
