@@ -1494,6 +1494,10 @@ async function downloadLightboxImage(e){
     if(kind !== 'image'){
         const url = mediaUrl(data);
         if(!url) return;
+        if(global.downloadStudioAsset){
+            await global.downloadStudioAsset(url, url.split('/').pop() || 'media');
+            return;
+        }
         const link = document.createElement('a');
         link.href = url;
         link.download = url.split('/').pop() || 'media';
@@ -1503,13 +1507,21 @@ async function downloadLightboxImage(e){
         return;
     }
     const merged = await getViewerMergedCanvas();
-    if(!merged) return;
-    const link = document.createElement('a');
-    link.href = merged.toDataURL('image/png');
-    link.download = `studio-image-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    if(merged){
+        try {
+            const link = document.createElement('a');
+            link.href = merged.toDataURL('image/png');
+            link.download = `studio-image-${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return;
+        } catch (_) {}
+    }
+    const url = data?.images?.[0];
+    if(url && global.downloadStudioAsset){
+        await global.downloadStudioAsset(url, `studio-image-${Date.now()}.png`);
+    }
 }
 function bindViewerGlobals(){
   global.viewerNav = viewerNav;

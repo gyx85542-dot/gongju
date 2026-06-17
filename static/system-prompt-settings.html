@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Prompt</title>
+    <script>
+        (function(){
+            try {
+                localStorage.setItem('studio_theme', 'light');
+                localStorage.setItem('canvas_theme', 'light');
+                document.documentElement.classList.add('studio-theme-dark');
+                document.documentElement.classList.add('theme-dark');
+            } catch(e) {}
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/theme.js?v=20260520-magnific-light"></script>
+    <script src="/static/i18n.js?v=20260530-sp-unified"></script>
+    <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
+    <link rel="stylesheet" href="/static/runninghub-settings.css?v=20260530-rh-toast">
+    <link rel="stylesheet" href="/static/settings-magnific.css?v=20260530-field-schema">
+    <link rel="stylesheet" href="/static/theme.css?v=20260520-panel-26">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; }
+        button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+        .page { min-height: 100vh; padding: 40px 32px 80px; }
+        .wrap { max-width: 1100px; margin: 0 auto; }
+        .page-head { padding: 0 4px 28px; display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+        .page-head .title { font-size: 26px; line-height: 1.05; font-weight: 900; letter-spacing: -0.015em; }
+        .page-head .sub { margin-top: 8px; font-size: 12.5px; line-height: 1.55; font-weight: 600; max-width: 640px; }
+        .page-head .status { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; min-height: 16px; }
+        .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; align-items: start; }
+        .prompt-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 4px; max-height: calc(100vh - 260px); overflow-y: auto; }
+        .prompt-card { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 8px 10px; display: flex; align-items: center; gap: 10px; min-height: 48px; border-radius: 10px; }
+        .prompt-card.active { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); }
+        .prompt-mark { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .prompt-name { min-width: 0; font-size: 12.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .prompt-meta { margin-top: 1px; font-size: 10px; font-weight: 700; opacity: .65; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .field-frame input, .field-frame textarea { width: 100%; border: 0; background: transparent; outline: none; }
+        .field-frame input { height: 30px; padding: 0 10px; font-size: 12px; font-weight: 650; }
+        .field-frame textarea { min-height: 320px; padding: 10px; resize: vertical; font-size: 12px; font-weight: 650; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .sp-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .sp-hint { margin-top: 8px; font-size: 11px; line-height: 1.55; font-weight: 600; opacity: .7; }
+        .empty-editor { padding: 48px 24px; text-align: center; font-size: 12px; font-weight: 650; opacity: .55; }
+        @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body class="mg-studio theme-dark studio-theme-dark settings-page rh-settings">
+    <div id="spToast" class="rh-toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="page">
+        <div class="wrap">
+            <header class="page-head">
+                <div>
+                    <div class="title" data-i18n="sp.title">System Prompt</div>
+                    <div class="sub" data-i18n="sp.subtitle">管理 Enhance 使用的全部系统提示词（含内置模式）。Enhance 会默认发送提示词框文字与所有已上传的图像、视频、音频。</div>
+                </div>
+                <div id="status" class="status"></div>
+            </header>
+            <div class="layout">
+                <aside class="sidebar">
+                    <div class="side-section-title" data-i18n="sp.listTitle">提示词列表</div>
+                    <div id="promptList" class="prompt-list"></div>
+                    <button class="add-btn" type="button" onclick="addPrompt()" data-i18n-title="sp.add"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </aside>
+                <main class="content rh-settings-main">
+                    <div id="emptyEditor" class="empty-editor" data-i18n="sp.emptyHint">选择左侧提示词，或点击 + 新建</div>
+                    <section class="rh-card" id="editorCard" hidden>
+                        <h3 class="rh-card-title" data-i18n="sp.editorTitle">编辑系统提示词</h3>
+                        <div class="rh-form-stack">
+                            <label class="rh-field">
+                                <span class="rh-field-label" data-i18n="sp.name">名称</span>
+                                <div class="field-frame"><input id="nameInput" type="text" placeholder="视频反推"></div>
+                            </label>
+                            <label class="rh-field full">
+                                <span class="rh-field-label" data-i18n="sp.systemPrompt">系统提示词</span>
+                                <div class="field-frame"><textarea id="systemInput" placeholder="你是…"></textarea></div>
+                            </label>
+                            <p id="kindHint" class="sp-hint"></p>
+                        </div>
+                        <div class="sp-actions">
+                            <button class="action-btn save-btn settings-btn" type="button" onclick="savePrompts()"><i data-lucide="save"></i><span data-i18n="sp.save">保存</span></button>
+                            <button id="deleteBtn" class="action-btn ghost-btn settings-btn" type="button" onclick="deleteSelected()"><i data-lucide="trash-2"></i><span data-i18n="sp.delete">删除</span></button>
+                            <button id="resetBtn" class="action-btn ghost-btn settings-btn" type="button" onclick="resetSelected()" hidden><i data-lucide="rotate-ccw"></i><span data-i18n="sp.reset">恢复默认</span></button>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+    </div>
+    <script>
+        lucide.createIcons();
+        function tr(k){ return window.StudioI18n ? StudioI18n.t(k) : k; }
+        function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        let prompts = [];
+        let selectedId = '';
+        let toastTimer = null;
+
+        function showToast(msg, ok){
+            const el = document.getElementById('spToast');
+            if(!el) return;
+            el.textContent = msg;
+            el.classList.toggle('ok', !!ok);
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+        }
+
+        function notifyEnhancePromptsChanged(){
+            try { new BroadcastChannel('studio-api').postMessage({ type: 'enhance-prompts-changed' }); } catch(e) {}
+            try { window.parent.postMessage({ type: 'enhance-prompts-changed' }, '*'); } catch(e) {}
+        }
+
+        function newPrompt(){
+            return {
+                id: 'sp_' + (crypto.randomUUID?.() || String(Date.now())).replace(/-/g, '').slice(0, 12),
+                name: tr('sp.newName'),
+                system_prompt: '',
+                kind: 'llm',
+                builtin: false,
+            };
+        }
+
+        function kindLabel(item){
+            if(!item) return '';
+            if(item.kind === 'local') return tr('sp.tagLocal');
+            return item.builtin ? tr('sp.tagBuiltin') : tr('sp.tagCustom');
+        }
+
+        function renderList(){
+            const list = document.getElementById('promptList');
+            if(!prompts.length){
+                list.innerHTML = `<div class="empty-editor" style="padding:16px 8px">${escapeHtml(tr('sp.noItems'))}</div>`;
+                return;
+            }
+            list.innerHTML = prompts.map(p => `
+                <button type="button" class="prompt-card ${p.id === selectedId ? 'active' : ''}" onclick="selectPrompt('${escapeAttr(p.id)}')">
+                    <span class="prompt-mark"><i data-lucide="scroll-text" class="w-4 h-4"></i></span>
+                    <span style="min-width:0">
+                        <div class="prompt-name">${escapeHtml(p.name || tr('sp.untitled'))}</div>
+                        <div class="prompt-meta">${escapeHtml(kindLabel(p))}</div>
+                    </span>
+                </button>
+            `).join('');
+            lucide.createIcons({ nodes: list.querySelectorAll('[data-lucide]') });
+        }
+
+        function escapeAttr(s){ return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+        function syncEditor(){
+            const item = prompts.find(p => p.id === selectedId);
+            const empty = document.getElementById('emptyEditor');
+            const card = document.getElementById('editorCard');
+            const deleteBtn = document.getElementById('deleteBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const kindHint = document.getElementById('kindHint');
+            if(!item){
+                empty.hidden = false;
+                card.hidden = true;
+                return;
+            }
+            empty.hidden = true;
+            card.hidden = false;
+            document.getElementById('nameInput').value = item.name || '';
+            document.getElementById('systemInput').value = item.system_prompt || '';
+            if(kindHint){
+                kindHint.textContent = item.kind === 'local' ? tr('sp.localHint') : tr('sp.llmHint');
+            }
+            if(deleteBtn) deleteBtn.hidden = !!item.builtin;
+            if(resetBtn) resetBtn.hidden = !item.builtin;
+        }
+
+        function readEditorIntoSelected(){
+            const item = prompts.find(p => p.id === selectedId);
+            if(!item) return null;
+            item.name = document.getElementById('nameInput').value.trim();
+            item.system_prompt = document.getElementById('systemInput').value.trim();
+            return item;
+        }
+
+        function selectPrompt(id){
+            readEditorIntoSelected();
+            selectedId = id;
+            renderList();
+            syncEditor();
+        }
+
+        function addPrompt(){
+            readEditorIntoSelected();
+            const item = newPrompt();
+            prompts.push(item);
+            selectedId = item.id;
+            renderList();
+            syncEditor();
+        }
+
+        async function loadPrompts(){
+            try {
+                const data = await fetch('/api/enhance-system-prompts').then(r => r.json());
+                prompts = Array.isArray(data.prompts) ? data.prompts : [];
+                if(!selectedId || !prompts.some(p => p.id === selectedId)){
+                    selectedId = prompts[0]?.id || '';
+                }
+                renderList();
+                syncEditor();
+            } catch(e){
+                showToast(tr('sp.loadFailed'), false);
+            }
+        }
+
+        async function savePrompts(){
+            readEditorIntoSelected();
+            const valid = prompts.filter(p => String(p.name || '').trim() && String(p.system_prompt || '').trim());
+            if(selectedId && !valid.some(p => p.id === selectedId)){
+                showToast(tr('sp.invalid'), false);
+                return;
+            }
+            try {
+                const res = await fetch('/api/enhance-system-prompts', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompts: valid }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(data.detail || tr('sp.saveFailed'));
+                prompts = data.prompts || valid;
+                if(selectedId && !prompts.some(p => p.id === selectedId)){
+                    selectedId = prompts[0]?.id || '';
+                }
+                renderList();
+                syncEditor();
+                showToast(tr('sp.saved'), true);
+                notifyEnhancePromptsChanged();
+            } catch(e){
+                showToast(e.message || tr('sp.saveFailed'), false);
+            }
+        }
+
+        async function deleteSelected(){
+            if(!selectedId) return;
+            const item = prompts.find(p => p.id === selectedId);
+            if(item?.builtin){
+                showToast(tr('sp.cannotDeleteBuiltin'), false);
+                return;
+            }
+            if(!confirm(tr('sp.deleteConfirm'))) return;
+            prompts = prompts.filter(p => p.id !== selectedId);
+            selectedId = prompts[0]?.id || '';
+            await savePrompts();
+        }
+
+        async function resetSelected(){
+            const item = prompts.find(p => p.id === selectedId);
+            if(!item?.builtin) return;
+            if(!confirm(tr('sp.resetConfirm'))) return;
+            try {
+                const res = await fetch('/api/enhance-system-prompts/' + encodeURIComponent(selectedId) + '/reset', { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if(!res.ok) throw new Error(data.detail || tr('sp.saveFailed'));
+                prompts = data.prompts || [];
+                renderList();
+                syncEditor();
+                showToast(tr('sp.resetDone'), true);
+                notifyEnhancePromptsChanged();
+            } catch(e){
+                showToast(e.message || tr('sp.saveFailed'), false);
+            }
+        }
+
+        ['nameInput', 'systemInput'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => {
+                readEditorIntoSelected();
+                renderList();
+            });
+        });
+
+        loadPrompts();
+    </script>
+</body>
+</html>

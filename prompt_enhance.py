@@ -26,40 +26,17 @@ CHARACTER_TURNAROUND_PREFIX = (
 
 CHARACTER_TURNAROUND_SUFFIX = '"'
 
-SYSTEM_STORYBOARD_GRID = """任务描述
-角色设定：你是一位世界顶级的电影分镜导演与视觉概念艺术家，擅长将零散的文字或图像素材转化为具有高度叙事感和电影质感的连续分镜图。
-核心任务：根据用户提供的图片内容、文字描述或两者结合，将其重构并转化为一个多宫格（4宫格/9宫格/25宫格）的电影分镜图生成提示词。默认是9宫格，如果用户有特殊要求，比如4宫格或者25宫格，怎按照用户要求输出。
-任务依据：你将参考各大著名电影大师的摄影美学，确保每一个分镜不仅是独立的艺术品，更是逻辑连贯、视觉统一的故事片段。
-分析和判断
-故事结构拆解：
-首先分析用户输入的情感走向（如：孤独、紧张、浪漫、史诗感）。
-根据用户要求的格数（4/9/25），从故事中筛选出最具戏剧张力的核心时刻。
-确保分镜之间具有明显的视觉节奏变化（远景、中景、特写、过肩镜头的交替）。
-视觉风格统一性判断：
-色彩方案：根据情感基调设定统一的调色盘（例如：赛博朋克的青橙色调，或王家卫式的怀旧绿与暗红）。
-连贯性校验：判断角色特征、服装细节、场景道具在不同分镜中是否保持逻辑一致。如果用户输入了图片，在描述到特定角色时，必须在其前面加上对应的图片序号（如：图1，图2...）。
-构图与灯光审美：
-每个分镜必须符合专业构图原则（三分法、引导线、前景构图等）。
-灯光需具备层次感，明确主光、辅光与轮廓光的运用。
-输出要求
-【禁止项】
-严禁使用诸如 "masterpiece", "8k", "hyper-detailed", "--ar 16:9", "v 6.0" 等Stable Diffusion或Midjourney的特定标签或后缀。
-严禁输出生硬的关键词堆砌，必须使用流畅、细腻的自然语言叙述。
-严禁出现塑料感的皮肤纹理、畸形的人体结构或逻辑混乱的画面。
-严禁在宫格图上面出现除了序号之外的文字内容
-【必须项】
-空间布局：必须描述为一张包含[X]个分镜的完整长图，按[X]x[X]网格排列，并明确提及使用简洁的白色细边框和左上角的编号。
-角色标注：如果用户输入了图片，在描述中凡涉及到图片中的角色时，必须在其名称前冠以图片序号（如：图1中的男人、图2的角色）。
-比例控制：每个子分镜的内部描述必须强调为16:9的宽屏比例。
-叙事顺序：描述必须体现时间上的先后顺序和动作的连续性。
-镜头美学：必须包含对焦距（广角/长焦）、镜头运动暗示（推拉摇移）以及灯光质感的细腻自然语言描述。
-最终输出格式
-你的输出应直接为一段可供AI绘图工具使用的、高度详细的自然语言指令，格式如下：
-制作一张由[数字]个连续分镜组成的[网格形式，如3x3]分镜图。这张图展现了[故事简述]。所有分镜严格按照网格排列，分镜之间由纤细的白色边框分隔，每个画面的左上角都有一个小巧的数字编号。严禁在宫格图上面出现除了序号之外的文字内容
-[分镜1描述]：描述画面的内容、构图、景别、光影情感。
-[分镜2描述]：描述画面的内容、构图、景别、动作延续感。
-……（以此类推）
-视觉质量规范：整体画面呈现出[某种特定电影风格]的质感。色彩上[描述色调细节]。灯光运用了[描述光影布局]。所有画面中的角色与场景保持高度一致，展现出极致的细节，如皮肤的真实纹理、衣物的纤维感以及环境中的空气感，避免任何视觉瑕疵，整体呈现出一种专业电影长片的视觉冲击力。"""
+STORYBOARD_GRID_PLACEHOLDER = "[这里替换用户的输入]"
+
+STORYBOARD_GRID_TEMPLATE = (
+    "制作一张由9个连续分镜组成的3x3分镜图。这张图展现了"
+    + STORYBOARD_GRID_PLACEHOLDER
+    + "。所有分镜严格按照网格排列，分镜之间由纤细的白色边框分隔，每个画面的左上角都有一个小巧的数字编号。严禁在宫格图上面出现除了序号与底部标注文字之外的无关文字内容。\n"
+    "视觉风格：高精度3D动画电影渲染，CG渲染风格，次表面散射皮肤质感，浓郁的史诗感色彩调和，强光影对比\n"
+    "底部标注条：每个分镜的底部必须包含一个横跨全宽的、高度约占画面八分之一的黑色半透明矩形条。\n"
+    "标注内容：在半透明矩形条上，需用简洁的白色字体书写该分镜的标注，格式为：[景别 | 运镜 | 画面简述]。\n"
+    '要求：描述必须简明扼要，不得啰嗦。例如："特写 | 推镜头 | 主角惊恐的眼神" 或 "全景 | 横移 | 荒野上的孤独背影"。'
+)
 
 SYSTEM_VIDEO_GEN = """# 系统提示词：超颗粒度视频分析
 
@@ -173,13 +150,13 @@ SYSTEM_VIDEO_GEN = """# 系统提示词：超颗粒度视频分析
 
 将视频按照时间顺序拆分为多个段落。
 
-每个段落使用加粗时间戳标题，并配上一个主题性阶段标题。
+每个段落配上一个主题性阶段标题。
 
-每个时间段下方使用项目符号归类描述。
-
+# 禁止项：
+禁止出现时间戳
 ## 输出格式
 
-**[时间戳] - [时间戳]：[阶段标题]**
+**[阶段标题]**
 
 - **视觉构图：**  
   描述镜头类型、光线、视觉风格、画面比例、拍摄格式和画面质感。  
@@ -200,7 +177,7 @@ SYSTEM_VIDEO_GEN = """# 系统提示词：超颗粒度视频分析
 
 ---
 
-请根据用户输入的内容，按上述格式输出完整的视频分镜/动作拆解描述。只输出最终结果，不要解释你的工作步骤。"""
+请根据上传的参考图或视频画面，按上述格式输出完整的视频分镜/动作拆解描述。只输出最终结果，不要解释你的工作步骤。"""
 
 SYSTEM_PANORAMA = """任务描述
 你是一位专业的空间视觉描述专家，任务是接收用户提供的场景图片或文字描述，并将其转化为一个无死角、细节丰富且完全客观的360度空间场景描述。你的扩充需要为全景图生成提供空间结构、材质、光影和物体分布的逻辑依据。
@@ -265,26 +242,147 @@ SYSTEM_GENERAL = """# 任务描述
 （此处填入你撰写的自然语言提示词，建议长度在150-300字之间，以确保细节充盈。）"""
 
 SYSTEM_BY_MODE = {
-    "storyboard_grid": SYSTEM_STORYBOARD_GRID,
     "video_gen": SYSTEM_VIDEO_GEN,
     "panorama": SYSTEM_PANORAMA,
     "general": SYSTEM_GENERAL,
 }
 
 
-def get_enhance_system_prompt(mode: str) -> str | None:
-    if mode in {"character_turnaround", "image_upscale"}:
+LOCAL_INPUT_PLACEHOLDER = "{input}"
+
+
+def default_enhance_prompts() -> list:
+    return [
+        {
+            "id": "storyboard_grid",
+            "name": "九宫格分镜",
+            "kind": "local",
+            "builtin": True,
+            "system_prompt": STORYBOARD_GRID_TEMPLATE,
+        },
+        {
+            "id": "video_gen",
+            "name": "视频生成",
+            "kind": "llm",
+            "builtin": True,
+            "system_prompt": SYSTEM_VIDEO_GEN,
+        },
+        {
+            "id": "character_turnaround",
+            "name": "人物三视图",
+            "kind": "local",
+            "builtin": True,
+            "system_prompt": CHARACTER_TURNAROUND_PREFIX + LOCAL_INPUT_PLACEHOLDER + CHARACTER_TURNAROUND_SUFFIX,
+        },
+        {
+            "id": "image_upscale",
+            "name": "图片高清放大",
+            "kind": "local",
+            "builtin": True,
+            "system_prompt": IMAGE_UPSCALE_PROMPT,
+        },
+        {
+            "id": "panorama",
+            "name": "全景图",
+            "kind": "llm",
+            "builtin": True,
+            "system_prompt": SYSTEM_PANORAMA,
+        },
+        {
+            "id": "general",
+            "name": "常规优化",
+            "kind": "llm",
+            "builtin": True,
+            "system_prompt": SYSTEM_GENERAL,
+        },
+    ]
+
+
+def merge_enhance_prompts(saved: list | None) -> list:
+    defaults = {item["id"]: item for item in default_enhance_prompts()}
+    saved_map = {}
+    for raw in saved or []:
+        if not isinstance(raw, dict):
+            continue
+        pid = str(raw.get("id") or "").strip()
+        if pid:
+            saved_map[pid] = raw
+    merged = []
+    for default in default_enhance_prompts():
+        pid = default["id"]
+        hit = saved_map.get(pid) or {}
+        merged.append({
+            "id": pid,
+            "name": str(hit.get("name") or default["name"]).strip() or default["name"],
+            "system_prompt": str(hit.get("system_prompt") or default["system_prompt"]).strip() or default["system_prompt"],
+            "kind": default["kind"],
+            "builtin": True,
+        })
+    for pid, hit in saved_map.items():
+        if pid in defaults:
+            continue
+        name = str(hit.get("name") or "").strip()
+        system_prompt = str(hit.get("system_prompt") or "").strip()
+        if not name or not system_prompt:
+            continue
+        merged.append({
+            "id": pid,
+            "name": name,
+            "system_prompt": system_prompt,
+            "kind": "llm",
+            "builtin": False,
+        })
+    return merged
+
+
+def find_enhance_prompt(mode_id: str, prompts: list | None = None):
+    pid = str(mode_id or "").strip()
+    if not pid:
         return None
-    return SYSTEM_BY_MODE.get(mode)
+    for item in prompts or merge_enhance_prompts([]):
+        if item.get("id") == pid:
+            return item
+    return None
 
 
-def build_character_turnaround(user_input: str) -> str:
+def get_enhance_system_prompt(mode: str) -> str | None:
+    item = find_enhance_prompt(mode)
+    if not item or item.get("kind") != "llm":
+        return None
+    return item.get("system_prompt")
+
+
+def build_storyboard_grid(user_input: str, template: str = "") -> str:
     text = (user_input or "").strip()
+    tpl = template or STORYBOARD_GRID_TEMPLATE
+    if STORYBOARD_GRID_PLACEHOLDER in tpl:
+        return tpl.replace(STORYBOARD_GRID_PLACEHOLDER, text)
+    return f"{tpl}{text}"
+
+
+def build_character_turnaround(user_input: str, template: str = "") -> str:
+    text = (user_input or "").strip()
+    tpl = template or (CHARACTER_TURNAROUND_PREFIX + LOCAL_INPUT_PLACEHOLDER + CHARACTER_TURNAROUND_SUFFIX)
+    if LOCAL_INPUT_PLACEHOLDER in tpl:
+        return tpl.replace(LOCAL_INPUT_PLACEHOLDER, text)
     return f"{CHARACTER_TURNAROUND_PREFIX}{text}{CHARACTER_TURNAROUND_SUFFIX}"
 
 
-def build_image_upscale(_user_input: str = "") -> str:
-    return IMAGE_UPSCALE_PROMPT
+def build_image_upscale(_user_input: str = "", template: str = "") -> str:
+    text = (template or IMAGE_UPSCALE_PROMPT or "").strip()
+    return text or IMAGE_UPSCALE_PROMPT
+
+
+def run_local_enhance(item: dict, user_text: str) -> str:
+    mode = str(item.get("id") or "").strip()
+    template = str(item.get("system_prompt") or "")
+    if mode == "storyboard_grid":
+        return build_storyboard_grid(user_text, template)
+    if mode == "character_turnaround":
+        return build_character_turnaround(user_text, template)
+    if mode == "image_upscale":
+        return build_image_upscale(user_text, template)
+    raise ValueError(f"Unknown local enhance mode: {mode}")
 
 
 def resolve_enhance_provider_id(

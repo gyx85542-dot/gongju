@@ -984,9 +984,85 @@ class ChatRequest(BaseModel):
 
 class PromptEnhanceRequest(BaseModel):
     prompt: str = Field(default="", max_length=LLM_MESSAGE_MAX_LENGTH)
-    mode: str = Field(min_length=1, max_length=64)
+    mode: str = Field(min_length=1, max_length=128)
     provider: str = ""
     reference_images: List[AIReference] = Field(default_factory=list)
+    reference_videos: List[str] = Field(default_factory=list)
+    reference_audios: List[str] = Field(default_factory=list)
+
+class EnhanceSystemPromptItem(BaseModel):
+    id: str = ""
+    name: str = Field(min_length=1, max_length=120)
+    system_prompt: str = Field(min_length=1, max_length=50000)
+    kind: str = "llm"
+    builtin: bool = False
+
+class EnhanceSystemPromptsPayload(BaseModel):
+    prompts: List[EnhanceSystemPromptItem] = Field(default_factory=list)
+
+ENHANCE_SYSTEM_PROMPTS_FILE = os.path.join(DATA_DIR, "enhance_system_prompts.json")
+ENHANCE_SYSTEM_PROMPTS_LOCK = Lock()
+
+def _load_saved_enhance_prompts_raw() -> list:
+    with ENHANCE_SYSTEM_PROMPTS_LOCK:
+        if not os.path.exists(ENHANCE_SYSTEM_PROMPTS_FILE):
+            return []
+        try:
+            with open(ENHANCE_SYSTEM_PROMPTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return []
+    return data if isinstance(data, list) else []
+
+def load_enhance_system_prompts() -> list:
+    return pe.merge_enhance_prompts(_load_saved_enhance_prompts_raw())
+
+def save_enhance_system_prompts(prompts: list) -> list:
+    defaults = {item["id"] for item in pe.default_enhance_prompts()}
+    normalized = []
+    seen = set()
+    incoming = {str((raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else raw).get("id") or "").strip(): raw for raw in (prompts or []) if isinstance(raw, (dict, EnhanceSystemPromptItem))}
+    for default in pe.default_enhance_prompts():
+        pid = default["id"]
+        raw = incoming.get(pid)
+        item = raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else dict(raw or default)
+        name = str(item.get("name") or default["name"]).strip()
+        system_prompt = str(item.get("system_prompt") or default["system_prompt"]).strip()
+        normalized.append({
+            "id": pid,
+            "name": name or default["name"],
+            "system_prompt": system_prompt or default["system_prompt"],
+            "kind": default["kind"],
+            "builtin": True,
+        })
+        seen.add(pid)
+    for raw in prompts or []:
+        item = raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else dict(raw)
+        pid = str(item.get("id") or "").strip() or uuid.uuid4().hex
+        if pid in defaults or pid in seen:
+            continue
+        name = str(item.get("name") or "").strip()
+        system_prompt = str(item.get("system_prompt") or "").strip()
+        if not name or not system_prompt:
+            continue
+        if pid in seen:
+            pid = uuid.uuid4().hex
+        seen.add(pid)
+        normalized.append({
+            "id": pid,
+            "name": name,
+            "system_prompt": system_prompt,
+            "kind": "llm",
+            "builtin": False,
+        })
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with ENHANCE_SYSTEM_PROMPTS_LOCK:
+        with open(ENHANCE_SYSTEM_PROMPTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(normalized, f, ensure_ascii=False, indent=2)
+    return load_enhance_system_prompts()
+
+def find_enhance_system_prompt(prompt_id: str):
+    return pe.find_enhance_prompt(prompt_id, load_enhance_system_prompts())
 
 class ConversationCreateRequest(BaseModel):
     title: str = "新对话"
@@ -1241,28 +1317,67 @@ def text_delta_from_chat_chunk(data):
 def sse_event(data):
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
+def normalize_image_url_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith(("http://", "https://", "data:")):
+            return text
+        return ""
+    if isinstance(value, list):
+        for item in value:
+            found = normalize_image_url_value(item)
+            if found:
+                return found
+        return ""
+    if isinstance(value, dict):
+        for key in ("url", "image_url", "imageUrl", "href", "src", "uri"):
+            found = normalize_image_url_value(value.get(key))
+            if found:
+                return found
+    return ""
+
+
+def extract_image_payload_from_item(item):
+    if not isinstance(item, dict):
+        return None
+    url = normalize_image_url_value(item.get("url"))
+    if url:
+        if url.startswith("data:") and ";base64," in url:
+            return {"type": "b64", "value": url.split(";base64,", 1)[1]}
+        return {"type": "url", "value": url}
+    for key in ("b64_json", "base64", "image"):
+        raw = item.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return {"type": "b64", "value": raw.strip()}
+    found = extract_apimart_asset_url(item)
+    if found and found.startswith(("http://", "https://", "data:")):
+        if found.startswith("data:") and ";base64," in found:
+            return {"type": "b64", "value": found.split(";base64,", 1)[1]}
+        return {"type": "url", "value": found}
+    return None
+
+
 def extract_image(data):
-    if isinstance(data.get("data"), dict) and isinstance(data["data"].get("result"), dict):
+    if isinstance(data, dict):
+        data = unwrap_apimart_response(data)
+    if isinstance(data, dict) and isinstance(data.get("data"), dict) and isinstance(data["data"].get("result"), dict):
         data = data["data"]
-    if isinstance(data.get("result"), dict):
+    if isinstance(data, dict) and isinstance(data.get("result"), dict):
         result_images = data["result"].get("images") or []
         if result_images:
-            first = result_images[0]
-            url = first.get("url")
-            if isinstance(url, list) and url:
-                return {"type": "url", "value": url[0]}
-            if isinstance(url, str) and url:
-                return {"type": "url", "value": url}
-    if isinstance(data.get("data"), dict) and isinstance(data["data"].get("data"), dict):
+            payload = extract_image_payload_from_item(result_images[0])
+            if payload:
+                return payload
+    if isinstance(data, dict) and isinstance(data.get("data"), dict) and isinstance(data["data"].get("data"), dict):
         data = data["data"]["data"]
-    images = data.get("data") or []
+    images = (data or {}).get("data") if isinstance(data, dict) else data
     if not isinstance(images, list) or not images:
         raise HTTPException(status_code=502, detail="生图接口没有返回图片数据")
-    first = images[0]
-    if first.get("url"):
-        return {"type": "url", "value": first["url"]}
-    if first.get("b64_json"):
-        return {"type": "b64", "value": first["b64_json"]}
+    payload = extract_image_payload_from_item(images[0])
+    if payload:
+        return payload
     raise HTTPException(status_code=502, detail="无法识别生图接口返回格式")
 
 def extract_task_id(data):
@@ -1765,34 +1880,86 @@ async def upload_media_for_apimart(client, provider, ref_url: str, media_kind: s
             return f"ERR:上传异常 {e}"
     return "ERR:不支持的媒体来源（仅支持 http/https/asset 或本地 /output/ /assets/ 路径）"
 
-async def save_ai_image_to_output(image_data, prefix="online_", category="output"):
+REMOTE_ASSET_FETCH_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+}
+
+
+def _write_image_bytes_to_output(content: bytes, content_type: str, prefix: str, category: str) -> str:
     filename = f"{prefix}{uuid.uuid4().hex[:10]}.png"
     path = output_path_for(filename, category)
-    if image_data["type"] == "b64":
+    ct = (content_type or "").lower()
+    if "jpeg" in ct or "jpg" in ct:
+        filename = filename[:-4] + ".jpg"
+        path = output_path_for(filename, category)
+    elif "webp" in ct:
+        filename = filename[:-4] + ".webp"
+        path = output_path_for(filename, category)
+    with open(path, "wb") as f:
+        f.write(content)
+    return output_url_for(filename, category)
+
+
+async def fetch_remote_image_to_output(url: str, prefix="online_", category="output") -> str:
+    """从上游 CDN 拉取图片并写入本地 assets/output。"""
+    clean = str(url or "").strip()
+    if not clean.startswith(("http://", "https://")):
+        raise ValueError("非 HTTP 图片地址")
+    timeout = httpx.Timeout(connect=30.0, read=300.0, write=60.0, pool=20.0)
+    last_error = None
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        for attempt in range(2):
+            try:
+                response = await client.get(clean, headers=REMOTE_ASSET_FETCH_HEADERS)
+                response.raise_for_status()
+                content_type = response.headers.get("Content-Type", "")
+                path_ext = os.path.splitext(urllib.parse.unquote(urllib.parse.urlparse(clean).path))[1].lower()
+                if "jpeg" not in content_type and "jpg" not in content_type and path_ext in {".jpg", ".jpeg"}:
+                    content_type = "image/jpeg"
+                elif "webp" not in content_type and path_ext == ".webp":
+                    content_type = "image/webp"
+                return _write_image_bytes_to_output(response.content, content_type, prefix, category)
+            except Exception as exc:
+                last_error = exc
+                if attempt == 0:
+                    await asyncio.sleep(0.6)
+                    continue
+                raise exc from last_error
+    raise last_error or RuntimeError("下载图片失败")
+
+
+async def save_ai_image_to_output(image_data, prefix="online_", category="output"):
+    if image_data.get("type") == "b64":
+        filename = f"{prefix}{uuid.uuid4().hex[:10]}.png"
+        path = output_path_for(filename, category)
         with open(path, "wb") as f:
             f.write(base64.b64decode(image_data["value"]))
         return output_url_for(filename, category)
-    value = image_data["value"]
+    value = str(image_data.get("value") or "").strip()
+    if not value:
+        raise HTTPException(status_code=502, detail="生图结果为空")
+    if value.startswith("data:") and ";base64," in value:
+        raw = value.split(";base64,", 1)[1]
+        filename = f"{prefix}{uuid.uuid4().hex[:10]}.png"
+        path = output_path_for(filename, category)
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(raw))
+        return output_url_for(filename, category)
     if value.startswith("/output/") or value.startswith("/assets/"):
-        return value
-    try:
-        timeout = httpx.Timeout(connect=20.0, read=300.0, write=60.0, pool=20.0)
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            response = await client.get(value)
-            response.raise_for_status()
-            content_type = response.headers.get("Content-Type", "")
-            if "jpeg" in content_type or "jpg" in content_type:
-                filename = filename[:-4] + ".jpg"
-                path = output_path_for(filename, category)
-            elif "webp" in content_type:
-                filename = filename[:-4] + ".webp"
-                path = output_path_for(filename, category)
-            with open(path, "wb") as f:
-                f.write(response.content)
-            return output_url_for(filename, category)
-    except Exception as e:
-        print(f"保存上游图片失败: {e}")
-        return value
+        if output_file_from_url(value):
+            return value
+        raise HTTPException(status_code=502, detail="本地图片文件不存在")
+    if value.startswith(("http://", "https://")):
+        try:
+            return await fetch_remote_image_to_output(value, prefix=prefix, category=category)
+        except Exception as e:
+            print(f"保存上游图片失败: {e}")
+            raise HTTPException(status_code=502, detail=f"无法将生成图片保存到本地，请稍后重试下载：{e}") from e
+    raise HTTPException(status_code=502, detail="不支持的图片地址格式")
 
 async def save_remote_video_to_output(url, prefix="video_", category="output"):
     if not url:
@@ -2087,17 +2254,37 @@ def upstream_message_from_record(item):
         return {"role": role, "content": content}
     return {"role": role, "content": item.get("content", "")}
 
-def build_enhance_user_message(text: str, refs: list, *, max_images: int = 4, empty_text: str = ""):
-    """构建 Enhance 用户消息；有参考图时使用 OpenAI 多模态 content 数组。"""
+def build_enhance_user_message(
+    text: str,
+    refs: list,
+    *,
+    videos: list = None,
+    audios: list = None,
+    max_images: int = 8,
+    empty_text: str = "请根据上传的所有参考内容完成反推，只输出最终结果。",
+):
+    """构建 Enhance 用户消息；默认附带提示词、参考图、参考视频/音频链接。"""
     image_refs = [
         ref for ref in (refs or [])
         if ref.get("url") and str(ref.get("role") or "").strip().lower() != "mask"
     ]
+    lines = []
     prompt_text = (text or "").strip()
-    if not image_refs:
-        return prompt_text
-    content = []
-    content.append({"type": "text", "text": prompt_text or empty_text})
+    if prompt_text:
+        lines.append(prompt_text)
+    for url in (videos or []):
+        u = str(url or "").strip()
+        if u:
+            lines.append(f"参考视频：{u}")
+    for url in (audios or []):
+        u = str(url or "").strip()
+        if u:
+            lines.append(f"参考音频：{u}")
+    text_block = "\n\n".join(lines)
+    has_media = bool(image_refs or (videos or []) or (audios or []))
+    if not has_media:
+        return text_block or prompt_text
+    content = [{"type": "text", "text": text_block or empty_text}]
     for ref in image_refs[:max_images]:
         url = reference_to_data_url(ref, max_size=1536)
         if url:
@@ -2142,11 +2329,30 @@ def view_image(filename: str, type: str = "input", subfolder: str = ""):
 
 @app.get("/api/download-output")
 def download_output(url: str, name: str = ""):
-    path = output_file_from_url(url)
-    if not path:
-        raise HTTPException(status_code=404, detail="文件不存在")
-    filename = os.path.basename(name) if name else os.path.basename(path)
-    return FileResponse(path, media_type=content_type_for_path(path), filename=filename)
+    clean = str(url or "").strip()
+    path = output_file_from_url(clean)
+    if path:
+        filename = os.path.basename(name) if name else os.path.basename(path)
+        return FileResponse(path, media_type=content_type_for_path(path), filename=filename)
+    if clean.startswith(("http://", "https://")):
+        try:
+            response = requests.get(
+                clean,
+                headers=REMOTE_ASSET_FETCH_HEADERS,
+                timeout=120,
+            )
+            response.raise_for_status()
+            content_type = response.headers.get("Content-Type") or "application/octet-stream"
+            path_name = os.path.basename(urllib.parse.unquote(urllib.parse.urlparse(clean).path))
+            filename = os.path.basename(name) if name else path_name or "download.png"
+            return Response(
+                content=response.content,
+                media_type=content_type,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"下载失败：{exc}") from exc
+    raise HTTPException(status_code=404, detail="文件不存在")
 
 def comfy_upload_image_bytes(content: bytes, filename: str, content_type: str = "image/png"):
     """Upload to the first available ComfyUI instance and persist a local input copy."""
@@ -3296,55 +3502,38 @@ async def chat_stream(payload: ChatRequest, request: Request, x_user_id: str = H
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
-@app.post("/api/prompt/enhance")
-async def api_prompt_enhance(payload: PromptEnhanceRequest):
-    mode = (payload.mode or "").strip()
-    if mode not in pe.ENHANCE_MODES:
-        raise HTTPException(status_code=400, detail=f"未知的优化模式：{mode}")
+@app.get("/api/enhance-system-prompts")
+async def get_enhance_system_prompts_api():
+    return {"prompts": load_enhance_system_prompts()}
 
-    user_text = (payload.prompt or "").strip()
-    if mode == "character_turnaround":
-        return {
-            "prompt": pe.build_character_turnaround(user_text),
-            "mode": mode,
-            "model": "",
-            "provider": "",
-        }
-    if mode == "image_upscale":
-        return {
-            "prompt": pe.build_image_upscale(user_text),
-            "mode": mode,
-            "model": "",
-            "provider": "",
-        }
+@app.put("/api/enhance-system-prompts")
+async def put_enhance_system_prompts_api(payload: EnhanceSystemPromptsPayload):
+    prompts = save_enhance_system_prompts(payload.prompts or [])
+    return {"prompts": prompts}
 
-    refs = [ref.dict() for ref in payload.reference_images if ref.url]
-    if mode == "panorama":
-        if not user_text and not refs:
-            raise HTTPException(status_code=400, detail="请先输入提示词或上传参考图片")
-    elif not user_text:
-        raise HTTPException(status_code=400, detail="请先输入提示词")
+@app.post("/api/enhance-system-prompts/{prompt_id}/reset")
+async def reset_enhance_system_prompt_api(prompt_id: str):
+    defaults = {item["id"] for item in pe.default_enhance_prompts()}
+    pid = str(prompt_id or "").strip()
+    if pid not in defaults:
+        raise HTTPException(status_code=404, detail="只能恢复内置系统提示词")
+    saved = [item for item in _load_saved_enhance_prompts_raw() if isinstance(item, dict) and item.get("id") != pid]
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with ENHANCE_SYSTEM_PROMPTS_LOCK:
+        with open(ENHANCE_SYSTEM_PROMPTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(saved, f, ensure_ascii=False, indent=2)
+    return {"prompts": load_enhance_system_prompts()}
 
-    system = pe.get_enhance_system_prompt(mode)
-    if not system:
-        raise HTTPException(status_code=400, detail="该模式不支持远程优化")
-
+async def run_enhance_llm(system: str, user_content, provider_id: str = ""):
     provider_id = pe.resolve_enhance_provider_id(
         load_api_providers,
         get_primary_provider_id,
         get_api_provider,
         BUILTIN_APIMART_ID,
-        payload.provider or "",
+        provider_id or "",
     )
     api_provider = get_api_provider(provider_id)
     chat_base, chat_hdrs, model = resolve_chat_provider(provider_id, pe.ENHANCE_CHAT_MODEL)
-    user_content = user_text
-    if mode == "panorama" and refs:
-        user_content = build_enhance_user_message(
-            user_text,
-            refs,
-            empty_text="请根据上传的场景参考图，反推并生成360度全景空间描述。",
-        )
     req_body = {
         "model": model,
         "messages": [
@@ -3354,7 +3543,6 @@ async def api_prompt_enhance(payload: PromptEnhanceRequest):
     }
     if is_apimart_provider(api_provider):
         req_body["stream"] = False
-
     try:
         async with httpx.AsyncClient(timeout=AI_REQUEST_TIMEOUT) as client:
             response = await client.post(
@@ -3371,11 +3559,45 @@ async def api_prompt_enhance(payload: PromptEnhanceRequest):
         ) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"请求上游接口失败：{exc}") from exc
-
     result = text_from_chat_response(raw).strip()
     if not result:
         raise HTTPException(status_code=502, detail="模型返回了空内容")
+    return result, model, provider_id
 
+@app.post("/api/prompt/enhance")
+async def api_prompt_enhance(payload: PromptEnhanceRequest):
+    mode = (payload.mode or "").strip()
+    item = find_enhance_system_prompt(mode)
+    if not item:
+        raise HTTPException(status_code=400, detail=f"未知的优化模式：{mode}")
+
+    user_text = (payload.prompt or "").strip()
+    refs = [ref.dict() for ref in payload.reference_images if ref.url]
+    videos = [str(v).strip() for v in (payload.reference_videos or []) if str(v or "").strip()]
+    audios = [str(a).strip() for a in (payload.reference_audios or []) if str(a or "").strip()]
+    has_any_input = bool(user_text or refs or videos or audios)
+
+    if item.get("kind") == "local":
+        if item.get("id") == "image_upscale":
+            pass
+        elif not user_text:
+            raise HTTPException(status_code=400, detail="请先输入提示词")
+        return {
+            "prompt": pe.run_local_enhance(item, user_text),
+            "mode": mode,
+            "model": "",
+            "provider": "",
+        }
+
+    if not has_any_input:
+        raise HTTPException(status_code=400, detail="请先输入提示词或上传参考内容")
+
+    system = str(item.get("system_prompt") or "").strip()
+    if not system:
+        raise HTTPException(status_code=400, detail="该系统提示词为空")
+
+    user_content = build_enhance_user_message(user_text, refs, videos=videos, audios=audios)
+    result, model, provider_id = await run_enhance_llm(system, user_content, payload.provider or "")
     return {
         "prompt": result,
         "mode": mode,
@@ -4058,6 +4280,8 @@ async def get_canvas_comfy_task(task_id: str):
 
 # --- RunningHub API ---
 RUNNINGHUB_BASE_URL = "https://www.runninghub.cn"
+RUNNINGHUB_TASK_TIMEOUT = 1200  # RunningHub 生图最长等待 20 分钟
+RUNNINGHUB_POLL_INTERVAL = 30  # 轮询间隔（秒）
 RUNNINGHUB_API_KEY_ENV = "RUNNINGHUB_API_KEY"
 RUNNINGHUB_CONFIG_FILE = os.path.join(DATA_DIR, "runninghub.json")
 RUNNINGHUB_LOCK = Lock()
@@ -4912,12 +5136,12 @@ def runninghub_download_outputs(urls: List[str]) -> List[str]:
             local_urls.append(remote)
     return local_urls
 
-def runninghub_wait_outputs(api_key: str, task_id: str, timeout_sec=600):
+def runninghub_wait_outputs(api_key: str, task_id: str, timeout_sec=RUNNINGHUB_TASK_TIMEOUT):
     """轮询 openapi/outputs，并在必要时回退到 v2/query 获取 results.url。"""
     deadline = time.time() + timeout_sec
     last_code = None
     last_msg = ""
-    poll_interval = 3
+    poll_interval = RUNNINGHUB_POLL_INTERVAL
     empty_success_hits = 0
     max_empty_success_hits = 20
     while time.time() < deadline:

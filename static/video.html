@@ -12,7 +12,7 @@
     <script src="/static/studio-panel-bridge.js?v=20260530-task-fix"></script>
     <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
     <script src="/static/studio-media-ref-upload.js?v=20260530-global"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-media-ref">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-ref-fixed-size">
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-panel-radius">
     <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
@@ -20,8 +20,8 @@
     <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260603-panorama-vision">
-    <script src="/static/studio-prompt-enhance.js?v=20260603-panorama-vision"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
+    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         :root { --accent:#ff4d94; --bg:#161616; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -50,7 +50,7 @@
             <section class="tool-panel">
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.prompt">提示词</span></div>
-                    <textarea id="promptInput" rows="3" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
+                    <textarea id="promptInput" rows="12" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                 </div>
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.referenceImages">参考图</span></div>
@@ -158,6 +158,12 @@
                 galleryRelay: mediaRelay,
             });
         }
+        window.getEnhanceReferenceVideos = function(){
+            return videoRefGrid?.getUrls?.() || [];
+        };
+        window.getEnhanceReferenceAudios = function(){
+            return audioRefGrid?.getUrls?.() || [];
+        };
         function buildVideoPayload(){
             const payload = {
                 prompt: document.getElementById('promptInput').value.trim(),

@@ -8,6 +8,7 @@
     --panel-gap: 10px;
     --panel-label-gap: 4px;
     --panel-padding: 12px;
+    --ref-slot-size: 92px;
 }
 
 html.embed-panel,
@@ -96,6 +97,8 @@ body.mg-studio.embed-panel .options-panel {
 
 .options-panel .ref-grid {
     gap: var(--panel-gap) !important;
+    width: fit-content;
+    max-width: 100%;
 }
 
 .options-panel .model-picker-section,
@@ -330,8 +333,17 @@ select.size-select:hover:not(:focus),
 
 .ref-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, var(--ref-slot-size));
     gap: var(--panel-gap);
+    width: fit-content;
+    max-width: 100%;
+}
+
+.ref-grid .upload-item {
+    width: var(--ref-slot-size);
+    height: var(--ref-slot-size);
+    max-width: var(--ref-slot-size);
+    aspect-ratio: auto;
 }
 
 .upload-item {
@@ -613,6 +625,8 @@ select.size-select:hover:not(:focus),
     margin-top: 12px;
 }
 .media-ref-drop-zone {
+    width: fit-content;
+    max-width: 100%;
     border-radius: 8px;
     transition: box-shadow 0.22s var(--easing, cubic-bezier(0.22, 1, 0.36, 1)),
         background 0.22s var(--easing, cubic-bezier(0.22, 1, 0.36, 1)),

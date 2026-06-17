@@ -118,9 +118,9 @@
 
     window.pollCanvasRunningHubTask = async function(taskId, options = {}) {
 
-        const interval = Number(options.interval) || 2000;
+        const interval = Number(options.interval) || 30000;
 
-        const timeout = Number(options.timeout) || 660000;
+        const timeout = Number(options.timeout) || 1200000;
 
         const started = Date.now();
 

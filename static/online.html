@@ -21,7 +21,7 @@
     <script src="/static/studio-ref-upload.js?v=20260530-no-slot-label"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-ref-fixed-size">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --card:#1a1a1a; --easing:var(--mg-ease,cubic-bezier(0.22,1,0.36,1)); }
@@ -39,7 +39,7 @@
         .upload-item.drop-before::before { left:-5px; }
         .upload-item.drop-after::after { right:-5px; }
         .upload-item.is-dragging { opacity:.45; }
-        .ref-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--panel-gap,10px); }
+        .ref-grid { display:grid; grid-template-columns:repeat(3,var(--ref-slot-size,92px)); gap:var(--panel-gap,10px); width:fit-content; max-width:100%; }
         .ref-slot-btn { position:absolute; z-index:10; opacity:0; pointer-events:none; transition:opacity .18s var(--easing), transform .12s var(--easing), background .12s var(--easing), color .12s var(--easing), border-color .12s var(--easing); }
         .upload-item:hover .ref-slot-btn { opacity:1; pointer-events:auto; }
         .upload-item.is-board-target .ref-board-btn { opacity:1; pointer-events:auto; background:#ff4d94; color:#fff; border-color:#ff4d94; }
@@ -172,8 +172,9 @@
     <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260603-panorama-vision">
-    <script src="/static/studio-prompt-enhance.js?v=20260603-panorama-vision"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
+    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
+    <script src="/static/studio-download.js?v=20260530-gemini-dl"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -206,7 +207,7 @@
                         <div class="control-label mb-1">
                             <span data-i18n="online.promptLabel">提示词</span>
                         </div>
-                        <textarea id="promptInput" rows="3" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
+                        <textarea id="promptInput" rows="12" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                     </div>
                     <div>
                         <div class="control-label mb-1">
@@ -1147,7 +1148,7 @@
                     <button type="button" class="cell-action-btn${pinned ? ' active' : ''}" data-action="pin" title="${tr('online.pin')}"><i data-lucide="arrow-up-to-line"></i></button>
                     <button type="button" class="cell-action-btn${fav ? ' fav-active active' : ''}" data-action="favorite" title="${tr('online.favorite')}"><i data-lucide="heart"></i></button>
                     <button type="button" class="cell-action-btn" data-action="apply" title="${tr('online.applyParams')}"><i data-lucide="clipboard-copy"></i></button>
-                    <a href="${escapeHtml(url)}" download class="cell-action-btn" title="${tr('online.download')}" onclick="event.stopPropagation()"><i data-lucide="download"></i></a>
+                    <button type="button" class="cell-action-btn" data-action="download" title="${tr('online.download')}"><i data-lucide="download"></i></button>
                     <button type="button" class="cell-action-btn" data-action="delete" title="${tr('online.delete')}"><i data-lucide="trash-2"></i></button>
                 </div>
             </div>`;
@@ -1179,6 +1180,11 @@
                 cell.querySelector('[data-action="pin"]')?.addEventListener('click', e => togglePin(data, e));
                 cell.querySelector('[data-action="favorite"]')?.addEventListener('click', e => toggleFavorite(data, e));
                 cell.querySelector('[data-action="apply"]')?.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); applyRecordParams(data); });
+                cell.querySelector('[data-action="download"]')?.addEventListener('click', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if(global.downloadStudioAsset) global.downloadStudioAsset(data.images[0], `online-image-${Date.now()}.png`);
+                });
                 cell.querySelector('[data-action="delete"]')?.addEventListener('click', e => deleteHistoryItem(data.timestamp, e));
             });
             lucide.createIcons();
@@ -2225,13 +2231,21 @@
         async function downloadLightboxImage(e){
             e.stopPropagation();
             const merged = await getViewerMergedCanvas();
-            if(!merged) return;
-            const link = document.createElement('a');
-            link.href = merged.toDataURL('image/png');
-            link.download = `online-image-${Date.now()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+            if(merged){
+                try {
+                    const link = document.createElement('a');
+                    link.href = merged.toDataURL('image/png');
+                    link.download = `online-image-${Date.now()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    return;
+                } catch (_) {}
+            }
+            const url = currentLightboxData?.images?.[0];
+            if(url && global.downloadStudioAsset){
+                await global.downloadStudioAsset(url, `online-image-${Date.now()}.png`);
+            }
         }
         function applyRecordParams(data){
             if(!data) return;

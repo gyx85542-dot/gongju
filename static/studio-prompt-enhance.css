@@ -20,6 +20,15 @@
     box-sizing: border-box;
 }
 
+/* 全局提示词输入框：相对原 rows=3 高度 ×4（累计 ×2 ×2） */
+textarea#promptInput,
+textarea#globalPromptInput,
+.options-panel .tool-panel textarea.nano-input,
+.options-panel textarea.wf-textarea,
+.prompt-enhance-wrap > textarea {
+    min-height: 15rem;
+}
+
 .prompt-enhance-actions {
     display: flex;
     justify-content: flex-end;

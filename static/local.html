@@ -24,7 +24,7 @@
     <script src="/static/studio-ref-upload.js?v=20260530-ref-upload-fix"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-panel-resize">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-ref-fixed-size">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --card:#1a1a1a; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -79,8 +79,8 @@
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
     <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260603-panorama-vision">
-    <script src="/static/studio-prompt-enhance.js?v=20260603-panorama-vision"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
+    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -268,7 +268,7 @@
                 prompts.forEach(f => {
                     html += `<div>
                         <div class="control-label mb-1"><span>${escapeHtml(f.name || f.input)}</span></div>
-                        <textarea class="nano-input w-full outline-none resize-none" rows="3" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value);syncGenBtnState()">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
+                        <textarea class="nano-input w-full outline-none resize-none" rows="12" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value);syncGenBtnState()">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
                     </div>`;
                 });
                 if(images.length){

@@ -17,12 +17,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
     <script src="/static/i18n.js?v=20260530-rh-options"></script>
-    <script src="/static/studio-panel-bridge.js?v=20260530-rh-resume"></script>
+    <script src="/static/studio-panel-bridge.js?v=20260530-rh-prompt"></script>
     <script src="/static/studio-ref-upload.js?v=20260530-ref-upload-fix"></script>
     <script src="/static/studio-media-ref-upload.js?v=20260530-global"></script>
     <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
     <script src="/static/image-preview.js?v=20260516"></script>
-    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-media-ref">
+    <link rel="stylesheet" href="/static/studio-panel.css?v=20260530-ref-fixed-size">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
         :root { --accent:#ff4d94; --bg:#101010; --easing:cubic-bezier(0.22,1,0.36,1); }
@@ -68,8 +68,8 @@
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
     <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260603-panorama-vision">
-    <script src="/static/studio-prompt-enhance.js?v=20260603-panorama-vision"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
+    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -86,13 +86,6 @@
                         <div class="control-label mb-1"><span data-i18n="rhPage.workflow">工作流</span></div>
                         <select id="workflowSelect" class="size-select" onchange="selectWorkflow(this.value)"></select>
                     </label>
-                </section>
-                <section class="tool-panel" id="globalPromptSection">
-                    <div>
-                        <div class="control-label mb-1"><span data-i18n="rhPage.mainPrompt">提示词</span></div>
-                        <textarea id="globalPromptInput" class="nano-input w-full outline-none resize-none" rows="4" placeholder="" oninput="onGlobalPromptInput()"></textarea>
-                        <p class="text-[10px] text-[#737373] mt-1 leading-relaxed" data-i18n="rhPage.mainPromptHint">将填入工作流中的文本参数；请在设置里配置 nodeId 与 fieldName（如 6 / text）。</p>
-                    </div>
                 </section>
                 <div id="dynamicPanel"></div>
                 <span id="genBtnWrap" class="generate-btn-wrap">
@@ -234,9 +227,8 @@
             if(t === 'image') return 'image';
             if(t === 'video') return 'video';
             if(t === 'audio') return 'audio';
+            if(t === 'number' || t === 'boolean') return 'setting';
             if(t === 'text' || t === 'textarea') return 'prompt';
-            const key = `${f.fieldName||''} ${f.name||''}`.toLowerCase();
-            if(/prompt|text|description|caption|提示|正向|负向/.test(key)) return 'prompt';
             return 'setting';
         }
         function promptFields(){ return effectiveFields().filter(f => rhFieldKind(f) === 'prompt'); }
@@ -245,17 +237,6 @@
             if(name) return name;
             if((prompts || promptFields()).length === 1) return tr('rhPage.mainPrompt');
             return String(f.fieldName || '').trim() || tr('rhPage.mainPrompt');
-        }
-        function syncPromptSectionVisibility(){
-            const section = document.getElementById('globalPromptSection');
-            if(!section) return;
-            const hasExposedPrompt = promptFields().length > 0;
-            section.style.display = hasExposedPrompt ? 'none' : '';
-        }
-        function onGlobalPromptInput(){
-            const v = document.getElementById('globalPromptInput')?.value || '';
-            promptFields().forEach(f => { fieldValues[f.id] = v; });
-            syncGenBtnState();
         }
         function syncGenBtnTip(showTip){
             const wrap = document.getElementById('genBtnWrap');
@@ -267,7 +248,8 @@
             const btn = document.getElementById('genBtn');
             if(!btn) return;
             const wfReady = workflows.length > 0 && selectedId && String(currentWorkflow?.workflow_id || '').trim();
-            const promptMissing = !collectPrimaryPrompt();
+            const needsPrompt = promptFields().length > 0;
+            const promptMissing = needsPrompt && !collectPrimaryPrompt();
             const atCapacity = activePendingCount() >= RH_MAX_CONCURRENT;
             btn.disabled = !wfReady || promptMissing || atCapacity;
             const wrap = document.getElementById('genBtnWrap');
@@ -351,7 +333,6 @@
                     }
                 });
                 renderDynamicPanel();
-                syncPromptSectionVisibility();
                 syncGenBtnState();
             } catch(e){
                 alert(tr('rhPage.loadFailed'));
@@ -375,7 +356,7 @@
             if(prompts.length || images.length || videos.length || audios.length){
                 html += `<section class="tool-panel">`;
                 prompts.forEach(f => {
-                    const rows = prompts.length === 1 ? 4 : (f.type === 'textarea' ? 4 : 2);
+                    const rows = prompts.length === 1 ? 16 : (f.type === 'textarea' ? 16 : 8);
                     html += `<div>
                         <div class="control-label mb-1"><span>${escapeHtml(promptFieldLabel(f, prompts))}</span></div>
                         <textarea class="nano-input w-full outline-none resize-none" rows="${rows}" data-field-id="${escapeAttr(f.id)}" oninput="setFieldValue('${escapeAttr(f.id)}',this.value);syncGenBtnState()">${escapeHtml(fieldValues[f.id] ?? '')}</textarea>
@@ -427,7 +408,6 @@
             [...videos, ...audios].forEach(f => mountRhMediaField(f));
             lucide.createIcons();
             syncOutputDragState();
-            syncPromptSectionVisibility();
             syncGenBtnState();
         }
 
@@ -595,7 +575,6 @@
         }
 
         function collectRunFields(){
-            if(!promptFields().length) onGlobalPromptInput();
             const out = { ...fieldValues };
             effectiveFields().forEach(f => {
                 const t = rhEffectiveFieldType(f);
@@ -615,14 +594,12 @@
         }
         function collectPrimaryPrompt(){
             const exposed = promptFields();
-            if(exposed.length){
-                for(const f of exposed){
-                    const v = String(fieldValues[f.id] ?? '').trim();
-                    if(v) return v;
-                }
-                return '';
+            if(!exposed.length) return '';
+            for(const f of exposed){
+                const v = String(fieldValues[f.id] ?? '').trim();
+                if(v) return v;
             }
-            return String(document.getElementById('globalPromptInput')?.value || '').trim();
+            return '';
         }
         function collectReferenceImages(){
             return effectiveFields().filter(f => rhFieldKind(f)==='image').map(f => {
@@ -635,7 +612,7 @@
             if(!selectedId){ alert(tr('rhPage.selectWorkflow')); return false; }
             const cfg = await fetch('/api/runninghub/config').then(r=>r.json()).catch(()=>({}));
             if(!cfg.has_key){ alert(tr('rhPage.noApiKey')); openRhSettings(); return false; }
-            if(!collectPrimaryPrompt()){ alert(tr('rhPage.promptRequired')); return false; }
+            if(promptFields().length && !collectPrimaryPrompt()){ alert(tr('rhPage.promptRequired')); return false; }
             for(const f of effectiveFields().filter(x => rhFieldKind(x)==='image')){
                 const url = StudioRefUpload.normalizeImageUrl(fieldImageUrls[f.id] || fieldValues[f.id] || '');
                 if(!url || url.startsWith('blob:')){ alert(tr('rhPage.imageRequired')); return false; }
@@ -959,13 +936,9 @@
             Object.entries(saved).forEach(([fid, val]) => { fieldValues[fid] = val; });
             const promptText = String(data.prompt || '').trim();
             if(promptText){
-                const prompts = promptFields();
-                if(prompts.length) prompts.forEach((f, i) => { if(i === 0 || !String(fieldValues[f.id] ?? '').trim()) fieldValues[f.id] = promptText; });
-                else {
-                    const globalIn = document.getElementById('globalPromptInput');
-                    if(globalIn) globalIn.value = promptText;
-                    onGlobalPromptInput();
-                }
+                promptFields().forEach((f, i) => {
+                    if(i === 0 || !String(fieldValues[f.id] ?? '').trim()) fieldValues[f.id] = promptText;
+                });
             }
             const refs = data.params?.reference_images || [];
             effectiveFields().filter(f => rhFieldKind(f)==='image').forEach((f, i) => {

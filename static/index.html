@@ -26,7 +26,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
-    <script src="/static/i18n.js?v=20260525-comfyui"></script>
+    <script src="/static/i18n.js?v=20260530-sp-settings"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-cell-hover">
     <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
@@ -781,6 +781,10 @@
                     <span class="side-pill-icon"><i data-lucide="settings-2"></i></span>
                     <span class="side-pill-text" data-i18n="common.runninghubSettings">RunningHub 设置</span>
                 </button>
+                <button class="side-pill" onclick="switchUI(this, 'system-prompt-settings')" type="button" title="System Prompt">
+                    <span class="side-pill-icon"><i data-lucide="scroll-text"></i></span>
+                    <span class="side-pill-text" data-i18n="common.systemPromptSettings">System Prompt</span>
+                </button>
             </div>
         </aside>
         <script>
@@ -815,7 +819,7 @@
                         <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260530-gpt-image2-size" class="active" scrolling="no"></iframe>
                         <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260530-pending-fix" scrolling="no"></iframe>
                         <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260530-task-fix" scrolling="no"></iframe>
-                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-rh-media" scrolling="no"></iframe>
+                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260530-rh-prompt" scrolling="no"></iframe>
                         <div id="studioPanelResizeHandle" class="studio-panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize parameter panel" title="拖拽调整参数面板宽度"></div>
                     </div>
                     <div class="studio-gallery-wrap studio-module">
@@ -827,6 +831,7 @@
                 <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260530-provider-sync" scrolling="yes"></iframe>
                 <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260530-no-canvas" scrolling="yes"></iframe>
                 <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260530-rh-toast" scrolling="yes"></iframe>
+                <iframe id="frame-system-prompt-settings" data-src="/static/system-prompt-settings.html?v=20260530-sp-unified" scrolling="yes"></iframe>
             </div>
 
             <div class="nano-monitor is-hidden" id="nano-monitor">
@@ -972,6 +977,7 @@
     </div>
 
     <script src="/static/studio-history-meta.js?v=20260530-apply-route"></script>
+    <script src="/static/studio-download.js?v=20260530-gemini-dl"></script>
     <script src="/static/studio-media-viewer.js?v=20260530-ref-thumb"></script>
     <script>
         function generateUUID() {
@@ -987,7 +993,7 @@
         localStorage.setItem("client_id", CID);
         const ACTIVE_PAGE_KEY = 'studio_active_page';
         const DEFAULT_PAGE_ID = 'online';
-        const PAGE_IDS = ['online','local','video','gpt-chat','runninghub','api-settings','comfyui-settings','runninghub-settings'];
+        const PAGE_IDS = ['online','local','video','gpt-chat','runninghub','api-settings','comfyui-settings','runninghub-settings','system-prompt-settings'];
 
         const STUDIO_PAGE_IDS = ['online','local','video','runninghub'];
         const STUDIO_AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
@@ -1125,7 +1131,7 @@
         }
 
         function preloadFullStageFrames(){
-            ['gpt-chat', 'api-settings', 'comfyui-settings', 'runninghub-settings'].forEach((id, index) => {
+            ['gpt-chat', 'api-settings', 'comfyui-settings', 'runninghub-settings', 'system-prompt-settings'].forEach((id, index) => {
                 setTimeout(() => {
                     ensureFrameLoaded(document.getElementById('frame-' + id));
                 }, index * 300);
