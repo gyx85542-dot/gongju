@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -68,8 +68,8 @@
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
     <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
-    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260809-enhance-confirm-out">
+    <script src="/static/studio-prompt-enhance.js?v=20260809-enhance-confirm-out"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -83,7 +83,7 @@
             <div class="lg:col-span-3 options-panel h-full min-h-0 studio-panel-col">
                 <section class="tool-panel">
                     <label class="block">
-                        <div class="control-label mb-1"><span data-i18n="rhPage.workflow">工作流</span></div>
+                        <div class="control-label mb-1"><span data-i18n="rhPage.workflow">工作�?/span></div>
                         <select id="workflowSelect" class="size-select" onchange="selectWorkflow(this.value)"></select>
                     </label>
                 </section>
@@ -190,6 +190,78 @@
         let rhMediaGrids = {}, rhMediaRelay = null;
         let allHistory = [], pendingJobs = [], historyLoading = false, currentLightboxData = null;
         let pinnedIds = [], favoriteIds = [], displayOrder = [];
+        const RH_FORM_CACHE_KEY = 'rh_workflow_form_cache_v1';
+
+        function rhCacheableUrl(url){
+            const s = String(url || '').trim();
+            if(!s || s.startsWith('blob:')) return '';
+            return s;
+        }
+        function readRhFormCacheStore(){
+            try {
+                const raw = sessionStorage.getItem(RH_FORM_CACHE_KEY);
+                if(!raw) return {};
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch(e){ return {}; }
+        }
+        function writeRhFormCacheStore(store){
+            try { sessionStorage.setItem(RH_FORM_CACHE_KEY, JSON.stringify(store || {})); } catch(e){}
+        }
+        function persistCurrentWorkflowForm(){
+            if(!selectedId) return;
+            const values = {};
+            Object.entries(fieldValues || {}).forEach(([fid, val]) => {
+                if(val === undefined || val === null) return;
+                if(typeof val === 'string' && val.startsWith('blob:')) return;
+                values[fid] = val;
+            });
+            const images = {};
+            Object.entries(fieldImageUrls || {}).forEach(([fid, url]) => {
+                const u = rhCacheableUrl(url);
+                if(u) images[fid] = u;
+            });
+            const media = {};
+            Object.entries(fieldMediaUrls || {}).forEach(([fid, url]) => {
+                const u = rhCacheableUrl(url);
+                if(u) media[fid] = u;
+            });
+            // Prefer live media grid urls when present
+            Object.entries(rhMediaGrids || {}).forEach(([fid, grid]) => {
+                const u = rhCacheableUrl(grid?.getUrls?.()?.[0] || '');
+                if(u){
+                    media[fid] = u;
+                    values[fid] = u;
+                }
+            });
+            const store = readRhFormCacheStore();
+            store[selectedId] = { values, images, media, savedAt: Date.now() };
+            writeRhFormCacheStore(store);
+        }
+        function applyCachedWorkflowForm(workflowId){
+            if(!workflowId) return false;
+            const snap = readRhFormCacheStore()[workflowId];
+            if(!snap || typeof snap !== 'object') return false;
+            const known = new Set((currentWorkflow?.fields || []).map(f => f.id));
+            Object.entries(snap.values || {}).forEach(([fid, val]) => {
+                if(!known.has(fid) || val === undefined || val === null) return;
+                if(typeof val === 'string' && val.startsWith('blob:')) return;
+                fieldValues[fid] = val;
+            });
+            Object.entries(snap.images || {}).forEach(([fid, url]) => {
+                const u = rhCacheableUrl(url);
+                if(!known.has(fid) || !u) return;
+                fieldImageUrls[fid] = u;
+                fieldValues[fid] = u;
+            });
+            Object.entries(snap.media || {}).forEach(([fid, url]) => {
+                const u = rhCacheableUrl(url);
+                if(!known.has(fid) || !u) return;
+                fieldMediaUrls[fid] = u;
+                fieldValues[fid] = u;
+            });
+            return true;
+        }
 
         function openRhSettings(){
             try { window.parent.postMessage({ type:'studio-navigate', page:'runninghub-settings' }, '*'); } catch(e) {}
@@ -306,6 +378,7 @@
 
         async function selectWorkflow(id){
             if(!id) return;
+            if(selectedId && selectedId !== id) persistCurrentWorkflowForm();
             selectedId = id;
             document.getElementById('workflowSelect').value = id;
             try {
@@ -325,6 +398,8 @@
                         }
                         return;
                     }
+                    // Image defaults are RH server filenames; don't treat them as filled uploads.
+                    if(dt === 'image') return;
                     const eff = rhEffectiveFieldType(f);
                     if(eff === 'select' && (f.options||[]).length){
                         fieldValues[f.id] = rhCanonicalOption(f.options, f.default);
@@ -332,6 +407,7 @@
                         fieldValues[f.id] = f.default;
                     }
                 });
+                applyCachedWorkflowForm(id);
                 renderDynamicPanel();
                 syncGenBtnState();
             } catch(e){
@@ -364,7 +440,7 @@
                 });
                 if(images.length){
                     html += `<div>
-                        <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图片</span></div>
+                        <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图�?/span></div>
                         <div id="rhRefGrid" class="ref-grid"></div>
                     </div>`;
                 }
@@ -435,6 +511,7 @@
                 delete fieldMediaUrls[fieldId];
                 delete fieldValues[fieldId];
             }
+            persistCurrentWorkflowForm();
         }
         function mountRhMediaField(field){
             if(!field?.id || !window.StudioMediaRefUpload) return;
@@ -481,6 +558,7 @@
                     delete fieldValues[fieldId];
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     delete fieldImageUrls[fieldId];
+                    persistCurrentWorkflowForm();
                 },
                 onBoardPickUI: syncOutputDragState
             });
@@ -529,6 +607,7 @@
             fieldValues[id] = value;
             const f = effectiveFields().find(x => x.id === id);
             if(f && rhFieldKind(f) === 'prompt') syncGenBtnState();
+            persistCurrentWorkflowForm();
         }
         function setBatchCount(n){
             batchCount = Math.min(4, Math.max(1, Number(n)||1));
@@ -553,6 +632,7 @@
                     if(fieldImageUrls[fieldId]?.startsWith('blob:')) try { URL.revokeObjectURL(fieldImageUrls[fieldId]); } catch(e){}
                     fieldImageUrls[fieldId] = savedUrl;
                     fieldValues[fieldId] = savedUrl;
+                    persistCurrentWorkflowForm();
                 }
                 refreshRefGrid();
                 syncGenBtnState();
@@ -560,6 +640,7 @@
                 alert(tr('comfy.imageUploadFailed'));
                 delete fieldValues[fieldId];
                 delete fieldImageUrls[fieldId];
+                persistCurrentWorkflowForm();
                 refreshRefGrid();
                 syncGenBtnState();
             }
@@ -569,6 +650,7 @@
             if(!normalized || !fieldId) return;
             fieldImageUrls[fieldId] = normalized;
             fieldValues[fieldId] = normalized;
+            persistCurrentWorkflowForm();
             refreshRefGrid();
             syncGenBtnState();
             cancelBoardPick();
@@ -654,12 +736,15 @@
             resumingJobIds.add(job.id);
             try {
                 const data = await pollCanvasRunningHubTask(job.task_id);
-                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
-                if(!images?.length) throw new Error(tr('rhPage.noOutput'));
+                const images = Array.isArray(data.images) ? data.images : [];
+                const videos = Array.isArray(data.videos) ? data.videos : [];
+                const audios = Array.isArray(data.audios) ? data.audios : [];
+                if(!images.length && !videos.length && !audios.length) throw new Error(tr('rhPage.noOutput'));
                 upsertHistoryItem({
                     prompt: data.prompt || job.prompt || '',
                     images,
-                    videos: data.videos || [],
+                    videos,
+                    audios,
                     timestamp: data.timestamp || Date.now()/1000,
                     type: HISTORY_TYPE,
                     workflow_id: data.workflow_id || selectedId,
@@ -734,12 +819,15 @@
                 renderOutputGrid();
 
                 const data = await pollCanvasRunningHubTask(taskId);
-                const images = data.images?.length ? data.images : (data.outputs || []).filter(u => !String(u).toLowerCase().match(/\.(mp4|webm|mov)(\?|$)/));
-                if(!images?.length) throw new Error(tr('rhPage.noOutput'));
+                const images = Array.isArray(data.images) ? data.images : [];
+                const videos = Array.isArray(data.videos) ? data.videos : [];
+                const audios = Array.isArray(data.audios) ? data.audios : [];
+                if(!images.length && !videos.length && !audios.length) throw new Error(tr('rhPage.noOutput'));
                 upsertHistoryItem({
                     prompt: data.prompt || snap.prompt || '',
                     images,
-                    videos: data.videos || [],
+                    videos,
+                    audios,
                     timestamp: data.timestamp || Date.now()/1000,
                     type: HISTORY_TYPE,
                     workflow_id: data.workflow_id || snap.workflow_id,
@@ -833,7 +921,7 @@
             return out;
         }
         function upsertHistoryItem(item){
-            if(!item?.images?.[0] && !(item?.videos?.[0])) return;
+            if(!item?.images?.[0] && !item?.videos?.[0] && !item?.audios?.[0]) return;
             const key = historyKey(item);
             const idx = allHistory.findIndex(h => historyKey(h) === key);
             if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
@@ -842,6 +930,7 @@
         }
         function mediaPreview(item){
             if(item?.videos?.[0]) return { kind:'video', url: item.videos[0] };
+            if(item?.audios?.[0]) return { kind:'audio', url: item.audios[0] };
             return { kind:'image', url: item.images?.[0] || '' };
         }
         function renderOutputGrid(){
@@ -955,6 +1044,7 @@
                     fieldMediaUrls[f.id] = url;
                 }
             });
+            persistCurrentWorkflowForm();
             renderDynamicPanel();
             syncGenBtnState();
         }
@@ -1037,7 +1127,7 @@
                 renderOutputGrid = function(){ bridge.notifyPending(pendingJobs); bridge.notifyRefresh(); };
                 loadAllHistory = async function(){ bridge.notifyRefresh(); };
                 upsertHistoryItem = function(item){
-                    if(!item?.images?.[0] && !item?.videos?.[0]) return;
+                    if(!item?.images?.[0] && !item?.videos?.[0] && !item?.audios?.[0]) return;
                     bridge.notifyAddItem(item);
                 };
             }

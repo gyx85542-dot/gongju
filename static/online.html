@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -172,8 +172,8 @@
     <script src="/static/studio-provider-label.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-api-providers.js?v=20260530-provider-sync"></script>
     <script src="/static/studio-pullup-select.js?v=20260530-apimart-bear"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
-    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260809-enhance-confirm-out">
+    <script src="/static/studio-prompt-enhance.js?v=20260809-enhance-confirm-out"></script>
     <script src="/static/studio-download.js?v=20260530-gemini-dl"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
@@ -205,9 +205,9 @@
                 <section class="tool-panel">
                     <div>
                         <div class="control-label mb-1">
-                            <span data-i18n="online.promptLabel">提示词</span>
+                            <span data-i18n="online.promptLabel">提示�?/span>
                         </div>
-                        <textarea id="promptInput" rows="12" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
+                        <textarea id="promptInput" rows="12" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画�?.." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                     </div>
                     <div>
                         <div class="control-label mb-1">
@@ -238,6 +238,16 @@
                                 <option value="4k">4K</option>
                             </select>
                         </label>
+                        <label id="qualityField" class="size-field">
+                            <div class="control-label mb-1">
+                                <span data-i18n="online.quality">Quality</span>
+                            </div>
+                            <select id="qualitySelect" class="size-select" onchange="setQuality(this.value)">
+                                <option value="low">low</option>
+                                <option value="medium" selected>medium</option>
+                                <option value="high">high</option>
+                            </select>
+                        </label>
                         <label id="ratioField" class="size-field">
                             <div class="control-label mb-1">
                                 <span data-i18n="online.aspect">Aspect</span>
@@ -250,8 +260,8 @@
                                 <div id="ratioSelectMenu" class="ratio-select-menu pullup-select-menu hidden"></div>
                             </div>
                             <span class="size-pair">
-                                <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="宽" data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
-                                <input id="ratioCustomHeight" class="size-custom" type="number" min="1" step="1" placeholder="高" data-i18n-placeholder="online.ratioHeight" oninput="setCustomRatio()">
+                                <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="�? data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
+                                <input id="ratioCustomHeight" class="size-custom" type="number" min="1" step="1" placeholder="�? data-i18n-placeholder="online.ratioHeight" oninput="setCustomRatio()">
                             </span>
                         </label>
                     </div>
@@ -403,6 +413,7 @@
         let apiProviders = [];
         let ratio = '1:1';
         let resolution = '1k';
+        let quality = 'medium';
         let customRatioWidth = '';
         let customRatioHeight = '';
         let models = {gpt:'gpt-image-2', nano:'nano-banana-pro'};
@@ -481,11 +492,15 @@
         ];
 
         function normalizeModelKey(model){ return String(model || '').trim().toLowerCase(); }
-        function isGptImage2Model(model){ return normalizeModelKey(model) === 'gpt-image-2'; }
+        function isGptImage2Model(model){
+            const m = normalizeModelKey(model);
+            return m === 'gpt-image-2' || m.startsWith('gpt-image-2-');
+        }
         function isGeminiImageModel(model){
             const m = normalizeModelKey(model);
             return m === 'gemini-3-pro-image-preview' || m === 'gemini-3.1-flash-image-preview';
         }
+        function supportsQuality(model){ return isGptImage2Model(model); }
         function supportsAutoRatio(model){
             return isGptImage2Model(model) || isGeminiImageModel(model);
         }
@@ -684,6 +699,9 @@
         }
         function setModel(next){
             selectedModel = next;
+            if(supportsQuality(selectedModel) && !['low', 'medium', 'high'].includes(quality)){
+                quality = 'medium';
+            }
             syncRatioForModel();
             renderRatioSelect();
             updateSizeUI();
@@ -734,17 +752,30 @@
             resolution = (next === '2k' || next === '4k') ? next : '1k';
             updateSizeUI();
         }
+        function setQuality(next){
+            const value = String(next || '').trim().toLowerCase();
+            quality = (value === 'low' || value === 'high') ? value : 'medium';
+            updateSizeUI();
+        }
+        function currentQuality(){
+            return (quality === 'low' || quality === 'high') ? quality : 'medium';
+        }
 
         function updateSizeUI(){
             const ratioField = document.getElementById('ratioField');
             const ratioCustomWidthInput = document.getElementById('ratioCustomWidth');
             const ratioCustomHeightInput = document.getElementById('ratioCustomHeight');
             const resolutionSelect = document.getElementById('resolutionSelect');
+            const qualityField = document.getElementById('qualityField');
+            const qualitySelect = document.getElementById('qualitySelect');
             renderRatioSelect();
             ratioField?.classList.toggle('custom', ratio === 'custom');
             ratioCustomWidthInput.value = customRatioWidth;
             ratioCustomHeightInput.value = customRatioHeight;
             resolutionSelect.value = resolution;
+            const showQuality = supportsQuality(selectedModel);
+            if(qualityField) qualityField.style.display = showQuality ? '' : 'none';
+            if(qualitySelect) qualitySelect.value = currentQuality();
             updateResolutionUI();
         }
 
@@ -1337,6 +1368,9 @@
             if(Object.prototype.hasOwnProperty.call(imageReq, 'resolution')){
                 payload.resolution = imageReq.resolution;
             }
+            if(supportsQuality(selectedModel)){
+                payload.quality = currentQuality();
+            }
             const jobs = [];
             for(let i = 0; i < batchCount; i++){
                 const jobId = `pending_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1360,7 +1394,7 @@
 
         function lightboxItems(){ return sortedHistory(); }
         function formatViewerTime(ts){
-            if(!ts) return '—';
+            if(!ts) return '�?;
             try { return new Date(Number(ts) * 1000).toLocaleString(); } catch(e) { return String(ts); }
         }
         function isViewerEditedImage(data){
@@ -1378,20 +1412,20 @@
                 return data.provider_name
                     || providerById(data.params?.provider_id || data.provider_id)?.name
                     || data.provider_id
-                    || '—';
+                    || '�?;
             }
             if(model) return model;
             return data.provider_name
                 || providerById(data.params?.provider_id || data.provider_id)?.name
                 || data.provider_id
-                || '—';
+                || '�?;
         }
         function viewerMetaRows(data){
             const rows = [];
             const edited = isViewerEditedImage(data);
             const providerName = viewerProviderSource(data);
-            const modelName = data.params?.model || data.model || '—';
-            const size = data.params?.size || '—';
+            const modelName = data.params?.model || data.model || '�?;
+            const size = data.params?.size || '�?;
             if(data._displaySize) rows.unshift({ label: tr('online.viewerResolution') || 'Resolution', value: data._displaySize });
             if(!edited){
                 rows.push({ label: tr('api.provider') || 'Platform', value: providerName });
@@ -1401,7 +1435,7 @@
             }
             if(data.seed != null) rows.push({ label: 'Seed', value: String(data.seed) });
             rows.push({ label: tr('online.viewerCreated') || 'Created', value: formatViewerTime(data.timestamp) });
-            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '✓' });
+            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '�? });
             return rows;
         }
         function renderViewerRefThumbs(data){
@@ -2259,7 +2293,13 @@
             updateSizeUI();
             const size = data.params?.size || '1024x1024';
             const savedRes = data.params?.resolution;
+            const savedQuality = String(data.params?.quality || '').trim().toLowerCase();
             if(savedRes) setResolution(savedRes);
+            if(savedQuality === 'low' || savedQuality === 'medium' || savedQuality === 'high'){
+                setQuality(savedQuality);
+            } else if(supportsQuality(selectedModel)){
+                setQuality('medium');
+            }
             if(size === 'auto' || /^auto:(1k|2k|4k)$/i.test(String(size).trim())){
                 setRatio('auto');
                 if(!savedRes) setResolution(inferResolutionFromSize(size));

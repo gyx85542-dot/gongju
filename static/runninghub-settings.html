@@ -17,7 +17,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/static/theme.js?v=20260520-magnific-light"></script>
-    <script src="/static/i18n.js?v=20260530-rh-options"></script>
+    <script src="/static/i18n.js?v=20260809-rh-reorder2"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260520-ui-fix">
     <link rel="stylesheet" href="/static/runninghub-settings.css?v=20260530-rh-toast">
     <link rel="stylesheet" href="/static/settings-magnific.css?v=20260530-field-schema">
@@ -35,11 +35,25 @@
         .page-head .sub { margin-top: 8px; font-size: 12.5px; line-height: 1.55; font-weight: 600; max-width: 640px; }
         .page-head .status { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; min-height: 16px; }
         .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; align-items: start; }
-        .workflow-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 4px; }
-        .workflow-card { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 8px 10px; display: flex; align-items: center; gap: 10px; min-height: 48px; }
+        .workflow-list { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 4px; user-select: none; }
+        .workflow-list-hint { padding: 0 4px 6px; font-size: 10.5px; font-weight: 650; line-height: 1.4; opacity: 0.55; }
+        .workflow-card { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 8px 8px 8px 10px; display: flex; align-items: center; gap: 6px; min-height: 48px; cursor: pointer; position: relative; }
+        .workflow-card.is-dragging { opacity: 0.35; }
+        .workflow-card.drag-over-before { box-shadow: inset 0 2px 0 0 rgba(255,77,148,0.85); }
+        .workflow-card.drag-over-after { box-shadow: inset 0 -2px 0 0 rgba(255,77,148,0.85); }
+        .workflow-drag { width: 22px; height: 32px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; opacity: 0.55; cursor: grab; color: inherit; touch-action: none; }
+        .workflow-drag:active, .workflow-list.is-reordering .workflow-drag { cursor: grabbing; }
+        .workflow-card:hover .workflow-drag { opacity: 0.95; }
+        .workflow-drag svg { pointer-events: none; }
         .workflow-mark { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .workflow-main { min-width: 0; flex: 1; }
         .workflow-name { min-width: 0; font-size: 12.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .workflow-meta { margin-top: 1px; font-size: 10px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .workflow-move { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+        .workflow-move-btn { width: 22px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 4px; opacity: 0.45; color: inherit; }
+        .workflow-move-btn:hover:not(:disabled) { opacity: 1; background: rgba(255,255,255,0.08); }
+        .workflow-move-btn:disabled { opacity: 0.18; cursor: default; }
+        .workflow-move-btn svg { width: 12px; height: 12px; pointer-events: none; }
         .field-frame input, .field-frame select, .field-frame textarea { width: 100%; border: 0; background: transparent; outline: none; }
         .field-frame input, .field-frame select { height: 30px; padding: 0 10px; font-size: 12px; font-weight: 650; }
         .field-frame textarea { min-height: 72px; padding: 8px 10px; resize: vertical; font-size: 12px; font-weight: 650; }
@@ -83,6 +97,7 @@
             <div class="layout">
                 <aside class="sidebar">
                     <div class="side-section-title" data-i18n="rh.workflowList">工作流列表</div>
+                    <div class="workflow-list-hint" data-i18n="rh.reorderHint">按住左侧把手拖动，或点右侧箭头调整顺序；保存后生效</div>
                     <div id="workflowList" class="workflow-list"></div>
                     <button class="add-btn" type="button" onclick="addWorkflow()" data-i18n-title="rh.addWorkflow"><i data-lucide="plus" class="w-4 h-4"></i></button>
                 </aside>
@@ -379,24 +394,157 @@
             return (config.workflows || []).find(w => w.id === selectedId) || null;
         }
 
+        let rhDragFromIndex = -1;
+        let rhDragHoverIndex = -1;
+        let rhDragBefore = true;
+        let rhDragMoved = false;
+        let rhDragSuppressClick = false;
+        let rhDragPointerId = null;
+
+        function clearWorkflowDragIndicators(){
+            workflowList.classList.remove('is-reordering');
+            workflowList.querySelectorAll('.workflow-card.drag-over-before, .workflow-card.drag-over-after, .workflow-card.is-dragging').forEach(el => {
+                el.classList.remove('drag-over-before', 'drag-over-after', 'is-dragging');
+            });
+        }
+        function reorderWorkflow(fromIndex, toIndex){
+            const items = config.workflows || [];
+            if(!items.length) return false;
+            fromIndex = Number(fromIndex);
+            toIndex = Number(toIndex);
+            if(!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) return false;
+            if(fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) return false;
+            if(fromIndex === toIndex) return false;
+            syncEditorToModel();
+            const [moved] = items.splice(fromIndex, 1);
+            items.splice(toIndex, 0, moved);
+            renderWorkflowList();
+            renderEditor();
+            return true;
+        }
+        window.moveWorkflow = function(index, delta, ev){
+            ev?.preventDefault?.();
+            ev?.stopPropagation?.();
+            rhDragSuppressClick = true;
+            reorderWorkflow(index, index + delta);
+            setTimeout(() => { rhDragSuppressClick = false; }, 0);
+        };
+        function rhDropIndexFromPointer(clientY){
+            const cards = [...workflowList.querySelectorAll('.workflow-card')];
+            if(!cards.length || rhDragFromIndex < 0) return rhDragFromIndex;
+            let hover = cards[cards.length - 1];
+            let before = false;
+            for(const card of cards){
+                const rect = card.getBoundingClientRect();
+                if(clientY < rect.top + rect.height / 2){
+                    hover = card;
+                    before = true;
+                    break;
+                }
+                if(clientY <= rect.bottom){
+                    hover = card;
+                    before = false;
+                    break;
+                }
+            }
+            rhDragHoverIndex = Number(hover.dataset.index);
+            rhDragBefore = before;
+            cards.forEach(card => {
+                const active = card === hover;
+                card.classList.toggle('drag-over-before', active && before);
+                card.classList.toggle('drag-over-after', active && !before);
+            });
+            let toIndex = before ? rhDragHoverIndex : rhDragHoverIndex + 1;
+            if(rhDragFromIndex < toIndex) toIndex -= 1;
+            return Math.max(0, Math.min((config.workflows || []).length - 1, toIndex));
+        }
+        function onWorkflowPointerMove(e){
+            if(rhDragFromIndex < 0 || (rhDragPointerId !== null && e.pointerId !== rhDragPointerId)) return;
+            rhDragMoved = true;
+            rhDragSuppressClick = true;
+            rhDropIndexFromPointer(e.clientY);
+        }
+        function onWorkflowPointerUp(e){
+            if(rhDragFromIndex < 0 || (rhDragPointerId !== null && e.pointerId !== rhDragPointerId)) return;
+            endWorkflowPointerDrag(e.clientY);
+        }
+        function onWorkflowPointerCancel(e){
+            if(rhDragFromIndex < 0 || (rhDragPointerId !== null && e.pointerId !== rhDragPointerId)) return;
+            rhDragMoved = false;
+            endWorkflowPointerDrag(e.clientY);
+        }
+        function unbindWorkflowPointerListeners(){
+            window.removeEventListener('pointermove', onWorkflowPointerMove, true);
+            window.removeEventListener('pointerup', onWorkflowPointerUp, true);
+            window.removeEventListener('pointercancel', onWorkflowPointerCancel, true);
+        }
+        function endWorkflowPointerDrag(clientY){
+            if(rhDragFromIndex < 0) return;
+            const from = rhDragFromIndex;
+            const to = rhDragMoved ? rhDropIndexFromPointer(clientY) : from;
+            rhDragFromIndex = -1;
+            rhDragHoverIndex = -1;
+            rhDragPointerId = null;
+            unbindWorkflowPointerListeners();
+            clearWorkflowDragIndicators();
+            if(rhDragMoved && from !== to){
+                rhDragSuppressClick = true;
+                reorderWorkflow(from, to);
+            }
+            rhDragMoved = false;
+            setTimeout(() => { rhDragSuppressClick = false; }, 0);
+        }
+        function bindWorkflowListDnD(){
+            if(workflowList.dataset.dndBound === '1') return;
+            workflowList.dataset.dndBound = '1';
+            workflowList.addEventListener('pointerdown', e => {
+                const handle = e.target.closest?.('.workflow-drag');
+                if(!handle || !workflowList.contains(handle)) return;
+                const card = handle.closest('.workflow-card');
+                if(!card) return;
+                e.preventDefault();
+                e.stopPropagation();
+                unbindWorkflowPointerListeners();
+                rhDragFromIndex = Number(card.dataset.index);
+                rhDragHoverIndex = rhDragFromIndex;
+                rhDragBefore = true;
+                rhDragMoved = false;
+                rhDragSuppressClick = false;
+                rhDragPointerId = e.pointerId;
+                workflowList.classList.add('is-reordering');
+                card.classList.add('is-dragging');
+                window.addEventListener('pointermove', onWorkflowPointerMove, true);
+                window.addEventListener('pointerup', onWorkflowPointerUp, true);
+                window.addEventListener('pointercancel', onWorkflowPointerCancel, true);
+            });
+        }
+
         function renderWorkflowList(){
             const items = config.workflows || [];
             if(!items.length){
                 workflowList.innerHTML = `<div class="hint" style="padding:8px 4px">${tr('rh.emptyList')}</div>`;
                 return;
             }
-            workflowList.innerHTML = items.map(item => {
+            workflowList.innerHTML = items.map((item, index) => {
                 const active = item.id === selectedId ? 'active' : '';
+                const atTop = index === 0;
+                const atBottom = index === items.length - 1;
                 return `
-                    <button class="workflow-card ${active}" type="button" onclick="selectWorkflow('${escapeHtml(item.id)}')">
+                    <div class="workflow-card ${active}" role="button" tabindex="0" data-index="${index}" data-id="${escapeAttr(item.id)}" onclick="selectWorkflow('${escapeAttr(item.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectWorkflow('${escapeAttr(item.id)}')}">
+                        <span class="workflow-drag" title="${escapeAttr(tr('rh.dragHandle'))}" aria-label="${escapeAttr(tr('rh.dragHandle'))}"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i></span>
                         <span class="workflow-mark"><i data-lucide="zap" class="w-4 h-4"></i></span>
-                        <span class="min-w-0">
+                        <span class="workflow-main">
                             <div class="workflow-name">${escapeHtml(item.name || item.id)}</div>
                             <div class="workflow-meta">${escapeHtml(item.workflow_id || tr('rh.noWorkflowId'))}</div>
                         </span>
-                    </button>
+                        <span class="workflow-move">
+                            <button class="workflow-move-btn" type="button" ${atTop ? 'disabled' : ''} title="${escapeAttr(tr('rh.moveUp'))}" aria-label="${escapeAttr(tr('rh.moveUp'))}" onclick="moveWorkflow(${index}, -1, event)"><i data-lucide="chevron-up"></i></button>
+                            <button class="workflow-move-btn" type="button" ${atBottom ? 'disabled' : ''} title="${escapeAttr(tr('rh.moveDown'))}" aria-label="${escapeAttr(tr('rh.moveDown'))}" onclick="moveWorkflow(${index}, 1, event)"><i data-lucide="chevron-down"></i></button>
+                        </span>
+                    </div>
                 `;
             }).join('');
+            bindWorkflowListDnD();
             refreshIcons();
         }
 
@@ -742,6 +890,7 @@
         }
 
         window.selectWorkflow = function(id){
+            if(rhDragSuppressClick) return;
             syncEditorToModel();
             selectedId = id;
             const wf = currentWorkflow();

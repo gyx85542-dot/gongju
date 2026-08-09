@@ -22,5 +22,5 @@
 
 ## 范围
 
-- 主路径：`static/index.html` + `static/studio-media-viewer.js` + `static/studio-media-viewer.css` + i18n
-- 不引入第三方画布库；`online.html` 独立 viewer 本轮可不跟（若时间允许再同步）
+- 主路径：static/index.html + static/studio-media-viewer.js + static/studio-media-viewer.css + i18n
+- 不引入第三方画布库；online.html 独立 viewer 本轮可不跟（若时间允许再同步）

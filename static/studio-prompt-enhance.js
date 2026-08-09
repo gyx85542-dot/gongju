@@ -25,14 +25,22 @@
             .replace(/"/g, '&quot;');
     }
 
+    function normalizeKind(kind) {
+        return kind === 'fixed' || kind === 'local' || kind === 'llm' ? kind : 'llm';
+    }
+
     function getAllModes() {
-        return (enhancePrompts || []).map((item) => ({
-            id: item.id,
-            label: item.name || item.id,
-            kind: item.kind || 'llm',
-            builtin: !!item.builtin,
-            local: item.kind === 'local',
-        }));
+        return (enhancePrompts || []).map((item) => {
+            const kind = normalizeKind(item.kind);
+            return {
+                id: item.id,
+                label: item.name || item.id,
+                kind,
+                builtin: !!item.builtin,
+                fixed: kind === 'fixed',
+                local: kind === 'local',
+            };
+        });
     }
 
     async function loadEnhancePrompts() {
@@ -95,10 +103,8 @@
 
     function canRunEnhance(modeId, ctx) {
         const meta = getPromptMeta(modeId);
-        if (meta?.local) {
-            if (modeId === 'image_upscale') return true;
-            return !!ctx.prompt;
-        }
+        if (meta?.fixed) return true;
+        if (meta?.local) return !!ctx.prompt;
         return !!(ctx.prompt || ctx.images.length || ctx.videos.length || ctx.audios.length);
     }
 
@@ -167,6 +173,7 @@
     function closeMenu(state) {
         if (!state?.menu) return;
         state.menu.classList.add('hidden');
+        state.trigger?.closest?.('.prompt-enhance-select-wrap')?.classList.remove('is-enhance-open');
         openMenus.delete(state);
     }
 
@@ -210,8 +217,12 @@
     }
 
     function buildMenu(state) {
+        // Outer popover: dock (scrollable options) + confirm outside below the dock
+        const popover = document.createElement('div');
+        popover.className = 'prompt-enhance-popover hidden';
+
         const menu = document.createElement('div');
-        menu.className = 'prompt-enhance-menu pullup-select-menu hidden';
+        menu.className = 'prompt-enhance-menu pullup-select-menu';
         menu.setAttribute('role', 'listbox');
         menu.innerHTML =
             `<div class="prompt-enhance-menu-title">选择优化模式</div>` +
@@ -252,8 +263,9 @@
             }
         });
         actions.appendChild(confirm);
-        menu.appendChild(actions);
-        return menu;
+        popover.appendChild(menu);
+        popover.appendChild(actions);
+        return popover;
     }
 
     function wrapTextarea(textarea) {
@@ -288,7 +300,6 @@
 
         const menu = buildMenu(state);
         state.menu = menu;
-        menu.classList.add('pullup-open-up');
 
         const trigger = document.createElement('button');
         trigger.type = 'button';
@@ -310,6 +321,7 @@
                 return;
             }
             menu.classList.remove('hidden');
+            selectWrap.classList.add('is-enhance-open');
             openMenus.add(state);
         });
 

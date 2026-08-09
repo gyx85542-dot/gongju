@@ -39,6 +39,7 @@ function setViewerMediaMode(kind){
   const video = document.getElementById('viewerVideoEl');
   const audio = document.getElementById('viewerAudioEl');
   const draw = document.getElementById('viewerDrawCanvas');
+  const textLayer = document.getElementById('viewerTextLayer');
   const crop = document.getElementById('viewerCropLayer');
   const brush = document.getElementById('viewerBrushCursor');
   const editSection = document.getElementById('lightboxEditSection');
@@ -47,6 +48,13 @@ function setViewerMediaMode(kind){
   if(video){ video.style.display = kind === 'video' ? 'block' : 'none'; if(kind !== 'video'){ video.pause(); video.removeAttribute('src'); } }
   if(audio){ audio.style.display = kind === 'audio' ? 'block' : 'none'; if(kind !== 'audio'){ audio.pause(); audio.removeAttribute('src'); } }
   if(draw) draw.classList.toggle('hidden', kind !== 'image');
+  if(textLayer){
+    if(kind !== 'image'){
+      textLayer.classList.add('hidden');
+      textLayer.classList.remove('viewer-text-active');
+      clearViewerTexts();
+    }
+  }
   if(crop) crop.classList.add('hidden');
   if(brush) brush.classList.remove('visible');
   if(editSection) editSection.classList.toggle('hidden', kind !== 'image');
@@ -65,7 +73,7 @@ function formatViewerTime(ts){
 }
 function isViewerEditedImage(data){
     const editType = data?.params?.edit_type;
-    return editType === 'brush' || editType === 'crop';
+    return editType === 'brush' || editType === 'crop' || editType === 'text';
 }
 function viewerProviderSource(data){
     const type = String(data?.type || '').trim().toLowerCase();
@@ -390,10 +398,29 @@ function renderViewerMetaGrid(container, rows){
     `).join('');
 }
 
-const viewerEdit = { mode: 'brush', drawing: false, undoStack: [], lastPoint: null, cropDrag: null, cropRatio: '1:1', brushHue: 339, lastPointer: null };
+const viewerEdit = {
+    mode: 'brush',
+    tool: 'draw',
+    drawing: false,
+    undoStack: [],
+    lastPoint: null,
+    cropDrag: null,
+    cropRatio: '1:1',
+    brushHue: 339,
+    lastPointer: null,
+    texts: [],
+    selectedTextId: null,
+    textUndoStack: [],
+    textDrag: null,
+    textSeq: 0,
+    defaultTextFontRatio: 48,
+};
 const VIEWER_BRUSH_RATIO_MIN = 5;
 const VIEWER_BRUSH_RATIO_MAX = 150;
 const VIEWER_BRUSH_RATIO_DEFAULT = 16;
+const VIEWER_TEXT_RATIO_MIN = 12;
+const VIEWER_TEXT_RATIO_MAX = 180;
+const VIEWER_TEXT_RATIO_DEFAULT = 48;
 
 function getViewerImageMinDim(){
     const img = document.getElementById('lightboxImg');
@@ -425,13 +452,261 @@ function syncViewerBrushSizeUI(){
 
 function adjustViewerBrushSize(delta){
     const slider = document.getElementById('viewerBrushSize');
-    if(!slider || viewerEdit.mode !== 'brush') return;
+    if(!slider || viewerEdit.mode !== 'brush' || viewerEdit.tool !== 'draw') return;
     const next = Math.max(VIEWER_BRUSH_RATIO_MIN, Math.min(VIEWER_BRUSH_RATIO_MAX, Number(slider.value || VIEWER_BRUSH_RATIO_DEFAULT) + delta));
     if(next === Number(slider.value)) return;
     slider.value = String(next);
     syncViewerBrushSizeUI();
     slider.dispatchEvent(new Event('input', { bubbles: true }));
     if(viewerEdit.lastPointer) updateViewerBrushCursor(viewerEdit.lastPointer);
+}
+
+function getViewerTextFontRatio(){
+    const slider = document.getElementById('viewerTextSize');
+    const raw = Number(slider?.value || viewerEdit.defaultTextFontRatio || VIEWER_TEXT_RATIO_DEFAULT);
+    return Math.max(VIEWER_TEXT_RATIO_MIN, Math.min(VIEWER_TEXT_RATIO_MAX, raw));
+}
+
+function getViewerTextFontSizePx(ratio = getViewerTextFontRatio()){
+    return Math.max(8, Math.round(getViewerImageMinDim() * (ratio / 1000)));
+}
+
+function syncViewerTextSizeUI(fromModel){
+    const slider = document.getElementById('viewerTextSize');
+    const valEl = document.getElementById('viewerTextSizeVal');
+    if(!slider) return;
+    let ratioVal = getViewerTextFontRatio();
+    if(fromModel && viewerEdit.selectedTextId){
+        const item = viewerEdit.texts.find(t => t.id === viewerEdit.selectedTextId);
+        if(item){
+            const minDim = getViewerImageMinDim();
+            ratioVal = Math.max(VIEWER_TEXT_RATIO_MIN, Math.min(VIEWER_TEXT_RATIO_MAX, Math.round((item.fontSize / minDim) * 1000)));
+            slider.value = String(ratioVal);
+        }
+    } else {
+        slider.value = String(ratioVal);
+    }
+    viewerEdit.defaultTextFontRatio = ratioVal;
+    if(valEl) valEl.textContent = `${(ratioVal / 10).toFixed(1)}%`;
+}
+
+function viewerTextSnapshot(){
+    return {
+        texts: viewerEdit.texts.map(t => ({ ...t })),
+        selectedTextId: viewerEdit.selectedTextId,
+        defaultTextFontRatio: viewerEdit.defaultTextFontRatio,
+    };
+}
+
+function pushViewerTextUndo(){
+    viewerEdit.textUndoStack.push(viewerTextSnapshot());
+    if(viewerEdit.textUndoStack.length > 40) viewerEdit.textUndoStack.shift();
+}
+
+function clearViewerTexts(){
+    viewerEdit.texts = [];
+    viewerEdit.selectedTextId = null;
+    viewerEdit.textUndoStack = [];
+    viewerEdit.textDrag = null;
+    const layer = document.getElementById('viewerTextLayer');
+    if(layer) layer.innerHTML = '';
+}
+
+function layoutViewerTextLayer(){
+    const img = document.getElementById('lightboxImg');
+    const layer = document.getElementById('viewerTextLayer');
+    if(!img || !layer || !img.complete || !img.naturalWidth) return false;
+    const disp = getViewerImageDisplayRect(img);
+    layer.style.left = `${disp.left}px`;
+    layer.style.top = `${disp.top}px`;
+    layer.style.width = `${disp.width}px`;
+    layer.style.height = `${disp.height}px`;
+    layer.style.right = 'auto';
+    layer.style.bottom = 'auto';
+    return true;
+}
+
+function viewerTextDisplayScale(){
+    const img = document.getElementById('lightboxImg');
+    const layer = document.getElementById('viewerTextLayer');
+    if(!img?.naturalWidth || !layer) return 1;
+    const w = parseFloat(layer.style.width) || layer.getBoundingClientRect().width || img.naturalWidth;
+    return w / img.naturalWidth;
+}
+
+function renderViewerTextLayer(){
+    const layer = document.getElementById('viewerTextLayer');
+    if(!layer) return;
+    layoutViewerTextLayer();
+    const scale = viewerTextDisplayScale();
+    const selectedId = viewerEdit.selectedTextId;
+    layer.innerHTML = '';
+    viewerEdit.texts.forEach(item => {
+        const wrap = document.createElement('div');
+        wrap.className = 'viewer-text-item' + (item.id === selectedId ? ' is-selected' : '');
+        wrap.dataset.id = item.id;
+        wrap.style.left = `${item.x * scale}px`;
+        wrap.style.top = `${item.y * scale}px`;
+        const content = document.createElement('div');
+        content.className = 'viewer-text-content';
+        content.contentEditable = viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' ? 'true' : 'false';
+        content.spellcheck = false;
+        content.style.color = item.color || getViewerBrushColor();
+        content.style.fontSize = `${Math.max(8, item.fontSize * scale)}px`;
+        content.textContent = item.text || '';
+        if(!item.text) content.dataset.placeholder = tr('online.viewerTextPlaceholder') || '输入文字';
+        const handle = document.createElement('div');
+        handle.className = 'viewer-text-handle';
+        handle.dataset.role = 'scale';
+        wrap.appendChild(content);
+        wrap.appendChild(handle);
+        layer.appendChild(wrap);
+    });
+}
+
+function getViewerTextById(id){
+    return viewerEdit.texts.find(t => t.id === id) || null;
+}
+
+function selectViewerText(id, { focus = false } = {}){
+    viewerEdit.selectedTextId = id || null;
+    renderViewerTextLayer();
+    syncViewerTextSizeUI(true);
+    const item = id ? getViewerTextById(id) : null;
+    if(item?.color){
+        // sync hue bar to text color approximately via hex if possible
+        const hidden = document.getElementById('viewerBrushColor');
+        if(hidden) hidden.value = item.color;
+        const swatch = document.getElementById('viewerBrushColorSwatch');
+        if(swatch) swatch.style.background = item.color;
+        const thumb = document.getElementById('viewerHueThumb');
+        if(thumb) thumb.style.background = item.color;
+    }
+    if(focus && id){
+        requestAnimationFrame(() => {
+            const el = document.querySelector(`.viewer-text-item[data-id="${CSS.escape(String(id))}"] .viewer-text-content`);
+            if(!el) return;
+            el.focus();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+        });
+    }
+}
+
+function createViewerTextAt(naturalX, naturalY){
+    pushViewerTextUndo();
+    const id = `t${Date.now()}_${++viewerEdit.textSeq}`;
+    const fontSize = getViewerTextFontSizePx();
+    const color = getViewerBrushColor();
+    viewerEdit.texts.push({
+        id,
+        text: '',
+        x: Math.max(0, naturalX),
+        y: Math.max(0, naturalY),
+        fontSize,
+        color,
+    });
+    selectViewerText(id, { focus: true });
+}
+
+function syncViewerTextDomToModel(id){
+    const item = getViewerTextById(id);
+    const el = document.querySelector(`.viewer-text-item[data-id="${CSS.escape(String(id))}"] .viewer-text-content`);
+    if(!item || !el) return;
+    item.text = el.innerText.replace(/\u00a0/g, ' ');
+}
+
+function viewerHasEditableTexts(){
+    return viewerEdit.texts.some(t => String(t.text || '').trim().length > 0);
+}
+
+function drawViewerTextsOnCanvas(ctx, width, height){
+    if(!ctx || !viewerEdit.texts.length) return;
+    viewerEdit.texts.forEach(item => {
+        const text = String(item.text || '').replace(/\r\n/g, '\n');
+        if(!text.trim()) return;
+        const fontSize = Math.max(8, Number(item.fontSize) || 24);
+        ctx.save();
+        ctx.fillStyle = item.color || '#ff4d94';
+        ctx.textBaseline = 'top';
+        ctx.font = `700 ${fontSize}px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = Math.max(1, fontSize * 0.04);
+        ctx.shadowOffsetY = 1;
+        const lines = text.split('\n');
+        let y = Math.max(0, Math.min(height, item.y));
+        const x = Math.max(0, Math.min(width, item.x));
+        const lineHeight = fontSize * 1.25;
+        lines.forEach(line => {
+            ctx.fillText(line, x, y);
+            y += lineHeight;
+        });
+        ctx.restore();
+    });
+}
+
+function setViewerBrushTool(tool){
+    const next = tool === 'text' ? 'text' : 'draw';
+    viewerEdit.tool = next;
+    document.getElementById('viewerToolDraw')?.classList.toggle('active', next === 'draw');
+    document.getElementById('viewerToolText')?.classList.toggle('active', next === 'text');
+    document.getElementById('viewerBrushSizeRow')?.classList.toggle('hidden', next !== 'draw');
+    document.getElementById('viewerTextSizeRow')?.classList.toggle('hidden', next !== 'text');
+    document.getElementById('viewerTextHint')?.classList.toggle('hidden', next !== 'text');
+    const canvas = document.getElementById('viewerDrawCanvas');
+    const layer = document.getElementById('viewerTextLayer');
+    const inBrush = viewerEdit.mode === 'brush';
+    canvas?.classList.toggle('viewer-draw-active', inBrush && next === 'draw');
+    if(layer){
+        layer.classList.toggle('hidden', !inBrush);
+        layer.classList.toggle('viewer-text-active', inBrush && next === 'text');
+        layer.setAttribute('aria-hidden', inBrush ? 'false' : 'true');
+    }
+    if(next === 'draw'){
+        viewerEdit.selectedTextId = null;
+        hideViewerBrushCursor();
+    } else {
+        hideViewerBrushCursor();
+        if(!viewerEdit.textUndoStack.length) pushViewerTextUndo();
+        syncViewerTextSizeUI(true);
+    }
+    renderViewerTextLayer();
+    if(global.lucide) lucide.createIcons();
+}
+
+function undoViewerText(){
+    if(viewerEdit.textUndoStack.length <= 1) return;
+    viewerEdit.textUndoStack.pop();
+    const prev = viewerEdit.textUndoStack[viewerEdit.textUndoStack.length - 1];
+    if(!prev) return;
+    viewerEdit.texts = (prev.texts || []).map(t => ({ ...t }));
+    viewerEdit.selectedTextId = prev.selectedTextId || null;
+    viewerEdit.defaultTextFontRatio = prev.defaultTextFontRatio || VIEWER_TEXT_RATIO_DEFAULT;
+    renderViewerTextLayer();
+    syncViewerTextSizeUI(true);
+}
+
+function applyViewerTextColorToSelected(color, { pushUndo = false } = {}){
+    const item = getViewerTextById(viewerEdit.selectedTextId);
+    if(!item || !color) return;
+    if(pushUndo) pushViewerTextUndo();
+    item.color = color;
+    const el = document.querySelector(`.viewer-text-item[data-id="${CSS.escape(String(item.id))}"] .viewer-text-content`);
+    if(el) el.style.color = color;
+}
+
+function applyViewerTextSizeToSelected(ratio, { pushUndo = false } = {}){
+    const item = getViewerTextById(viewerEdit.selectedTextId);
+    const fontSize = getViewerTextFontSizePx(ratio);
+    viewerEdit.defaultTextFontRatio = ratio;
+    if(!item) return;
+    if(pushUndo) pushViewerTextUndo();
+    item.fontSize = fontSize;
+    renderViewerTextLayer();
 }
 const VIEWER_CROP_RATIOS = [
     { id: '1:1', label: '1:1', w: 1, h: 1 },
@@ -613,10 +888,7 @@ function getViewerBrushColor(){
     return document.getElementById('viewerBrushColor')?.value || viewerBrushColorFromHue(viewerEdit.brushHue ?? 339);
 }
 
-function setViewerBrushHue(hue){
-    const nextHue = ((Number(hue) % 360) + 360) % 360;
-    viewerEdit.brushHue = nextHue;
-    const color = viewerBrushColorFromHue(nextHue);
+function applyViewerBrushColorUI(color, { hue = null, showThumb = true } = {}){
     const hidden = document.getElementById('viewerBrushColor');
     const thumb = document.getElementById('viewerHueThumb');
     const bar = document.getElementById('viewerHueBar');
@@ -624,12 +896,35 @@ function setViewerBrushHue(hue){
     const cursor = document.getElementById('viewerBrushCursor');
     if(hidden) hidden.value = color;
     if(thumb){
-        thumb.style.left = `${(nextHue / 360) * 100}%`;
+        if(hue != null) thumb.style.left = `${(((Number(hue) % 360) + 360) % 360 / 360) * 100}%`;
         thumb.style.background = color;
+        thumb.style.opacity = showThumb ? '1' : '0.35';
     }
     if(swatch) swatch.style.background = color;
-    if(bar) bar.setAttribute('aria-valuenow', String(Math.round(nextHue)));
+    if(bar && hue != null) bar.setAttribute('aria-valuenow', String(Math.round(((Number(hue) % 360) + 360) % 360)));
     if(cursor) cursor.style.borderColor = color;
+}
+
+function setViewerBrushHue(hue, { applyText = true } = {}){
+    const nextHue = ((Number(hue) % 360) + 360) % 360;
+    viewerEdit.brushHue = nextHue;
+    const color = viewerBrushColorFromHue(nextHue);
+    applyViewerBrushColorUI(color, { hue: nextHue, showThumb: true });
+    if(applyText && viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' && viewerEdit.selectedTextId){
+        applyViewerTextColorToSelected(color, { pushUndo: false });
+    }
+}
+
+function setViewerBrushColor(color, { applyText = true, pushUndo = true } = {}){
+    const next = String(color || '').trim();
+    if(!/^#[0-9a-fA-F]{6}$/.test(next)) return;
+    if(applyText && pushUndo && viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' && viewerEdit.selectedTextId){
+        pushViewerTextUndo();
+    }
+    applyViewerBrushColorUI(next, { hue: viewerEdit.brushHue, showThumb: false });
+    if(applyText && viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' && viewerEdit.selectedTextId){
+        applyViewerTextColorToSelected(next, { pushUndo: false });
+    }
 }
 
 function viewerHueFromPointer(e, bar){
@@ -645,6 +940,9 @@ function bindViewerHueBar(){
     const applyPointer = e => setViewerBrushHue(viewerHueFromPointer(e, bar));
     bar.addEventListener('pointerdown', e => {
         e.preventDefault();
+        if(viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' && viewerEdit.selectedTextId){
+            pushViewerTextUndo();
+        }
         applyPointer(e);
         bar.setPointerCapture?.(e.pointerId);
         const move = ev => applyPointer(ev);
@@ -656,14 +954,14 @@ function bindViewerHueBar(){
         bar.addEventListener('pointerup', up);
         bar.addEventListener('pointercancel', up);
     });
-    setViewerBrushHue(viewerEdit.brushHue ?? 339);
+    setViewerBrushHue(viewerEdit.brushHue ?? 339, { applyText: false });
 }
 
 function updateViewerBrushCursor(e){
     const cursor = document.getElementById('viewerBrushCursor');
     const canvas = document.getElementById('viewerDrawCanvas');
     const stage = document.getElementById('viewerStage');
-    if(viewerEdit.mode !== 'brush' || !cursor || !canvas || !stage){
+    if(viewerEdit.mode !== 'brush' || viewerEdit.tool !== 'draw' || !cursor || !canvas || !stage){
         hideViewerBrushCursor();
         return;
     }
@@ -695,7 +993,8 @@ function setViewerEditMode(mode){
     document.getElementById('viewerGridPanel')?.classList.toggle('hidden', mode !== 'grid');
     const canvas = document.getElementById('viewerDrawCanvas');
     const cropLayer = document.getElementById('viewerCropLayer');
-    canvas?.classList.toggle('viewer-draw-active', mode === 'brush');
+    const textLayer = document.getElementById('viewerTextLayer');
+    canvas?.classList.toggle('viewer-draw-active', mode === 'brush' && viewerEdit.tool === 'draw');
     cropLayer?.classList.toggle('hidden', mode !== 'crop');
 
     const ctx = canvas?.getContext('2d');
@@ -710,6 +1009,12 @@ function setViewerEditMode(mode){
         }
     }
 
+    if(mode !== 'brush'){
+        clearViewerTexts();
+        textLayer?.classList.add('hidden');
+        textLayer?.classList.remove('viewer-text-active');
+    }
+
     if(mode === 'crop'){
         hideViewerBrushCursor();
         renderViewerCropRatios();
@@ -719,6 +1024,7 @@ function setViewerEditMode(mode){
         refreshViewerGridSplitPreview();
     } else if(mode === 'brush'){
         hideViewerBrushCursor();
+        setViewerBrushTool(viewerEdit.tool || 'draw');
     }
     lucide.createIcons();
 }
@@ -730,6 +1036,8 @@ function resetViewerDrawCanvas(){
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     viewerEdit.undoStack = [];
     pushViewerDrawUndo();
+    clearViewerTexts();
+    if(viewerEdit.mode === 'brush') setViewerBrushTool(viewerEdit.tool || 'draw');
 }
 
 function layoutViewerDrawCanvas(){
@@ -755,8 +1063,10 @@ function syncViewerDrawCanvas(){
     if(!img) return;
     const run = () => {
         if(!layoutViewerDrawCanvas()) return;
+        layoutViewerTextLayer();
         resetViewerDrawCanvas();
         syncViewerBrushSizeUI();
+        syncViewerTextSizeUI();
         if(viewerEdit.mode === 'crop') initViewerCropBox();
     };
     if(img.complete && img.naturalWidth){
@@ -777,6 +1087,10 @@ function pushViewerDrawUndo(){
 }
 
 function undoViewerDraw(){
+    if(viewerEdit.mode === 'brush' && viewerEdit.tool === 'text'){
+        undoViewerText();
+        return;
+    }
     const canvas = document.getElementById('viewerDrawCanvas');
     const ctx = canvas?.getContext('2d');
     if(!canvas || !ctx || viewerEdit.undoStack.length <= 1) return;
@@ -795,7 +1109,7 @@ function viewerCanvasPoint(e, canvas){
 }
 
 function beginViewerDraw(e){
-    if(viewerEdit.mode !== 'brush') return;
+    if(viewerEdit.mode !== 'brush' || viewerEdit.tool !== 'draw') return;
     const canvas = document.getElementById('viewerDrawCanvas');
     if(!canvas) return;
     e.preventDefault();
@@ -995,12 +1309,15 @@ async function getViewerMergedCanvas(){
     const img = document.getElementById('lightboxImg');
     const drawCanvas = document.getElementById('viewerDrawCanvas');
     if(!img || !img.complete) return null;
+    if(viewerEdit.selectedTextId) syncViewerTextDomToModel(viewerEdit.selectedTextId);
+    viewerEdit.texts.forEach(t => syncViewerTextDomToModel(t.id));
     const merged = document.createElement('canvas');
     merged.width = img.naturalWidth;
     merged.height = img.naturalHeight;
     const ctx = merged.getContext('2d');
     ctx.drawImage(img, 0, 0);
     if(drawCanvas?.width) ctx.drawImage(drawCanvas, 0, 0);
+    drawViewerTextsOnCanvas(ctx, merged.width, merged.height);
     return merged;
 }
 
@@ -1290,13 +1607,15 @@ async function confirmViewerEdit(){
     try {
         let newItem = null;
         if(mode === 'brush'){
-            if(!viewerDrawCanvasHasStrokes()){
+            const hasStrokes = viewerDrawCanvasHasStrokes();
+            const hasText = viewerHasEditableTexts();
+            if(!hasStrokes && !hasText){
                 alert(tr('online.viewerNoEdit') || '请先在图片上涂抹');
                 return;
             }
             const merged = await getViewerMergedCanvas();
             if(!merged) return;
-            newItem = await importEditedViewerCanvas(merged, 'brush');
+            newItem = await importEditedViewerCanvas(merged, hasText && !hasStrokes ? 'text' : 'brush');
         } else if(mode === 'crop'){
             const cropped = await getViewerCroppedCanvas();
             if(!cropped) return;
@@ -1316,6 +1635,156 @@ async function confirmViewerEdit(){
     }
 }
 
+function viewerTextLayerPoint(e){
+    const layer = document.getElementById('viewerTextLayer');
+    const img = document.getElementById('lightboxImg');
+    if(!layer || !img?.naturalWidth) return null;
+    const rect = layer.getBoundingClientRect();
+    const scale = rect.width / img.naturalWidth;
+    if(scale <= 0) return null;
+    return {
+        x: (e.clientX - rect.left) / scale,
+        y: (e.clientY - rect.top) / scale,
+        scale,
+        displayX: e.clientX - rect.left,
+        displayY: e.clientY - rect.top,
+    };
+}
+
+function beginViewerTextPointer(e){
+    if(viewerEdit.mode !== 'brush' || viewerEdit.tool !== 'text') return;
+    const layer = document.getElementById('viewerTextLayer');
+    if(!layer || !layer.contains(e.target)) return;
+    const itemEl = e.target.closest('.viewer-text-item');
+    const handle = e.target.closest('.viewer-text-handle');
+    const content = e.target.closest('.viewer-text-content');
+    if(itemEl){
+        const id = itemEl.dataset.id;
+        if(viewerEdit.selectedTextId && viewerEdit.selectedTextId !== id){
+            syncViewerTextDomToModel(viewerEdit.selectedTextId);
+        }
+        if(handle){
+            e.preventDefault();
+            e.stopPropagation();
+            const item = getViewerTextById(id);
+            if(!item) return;
+            pushViewerTextUndo();
+            selectViewerText(id);
+            viewerEdit.textDrag = {
+                kind: 'scale',
+                id,
+                startX: e.clientX,
+                startY: e.clientY,
+                startFontSize: item.fontSize,
+            };
+            window.addEventListener('pointermove', moveViewerTextPointer);
+            window.addEventListener('pointerup', endViewerTextPointer, { once: true });
+            return;
+        }
+        if(content && viewerEdit.selectedTextId === id){
+            // allow caret placement / typing in already-selected text
+            return;
+        }
+        e.preventDefault();
+        selectViewerText(id, { focus: !!content });
+        const item = getViewerTextById(id);
+        if(!item) return;
+        pushViewerTextUndo();
+        viewerEdit.textDrag = {
+            kind: 'move',
+            id,
+            startX: e.clientX,
+            startY: e.clientY,
+            originX: item.x,
+            originY: item.y,
+            moved: false,
+        };
+        window.addEventListener('pointermove', moveViewerTextPointer);
+        window.addEventListener('pointerup', endViewerTextPointer, { once: true });
+        return;
+    }
+    // blank area → create text
+    const pt = viewerTextLayerPoint(e);
+    if(!pt) return;
+    e.preventDefault();
+    if(viewerEdit.selectedTextId) syncViewerTextDomToModel(viewerEdit.selectedTextId);
+    createViewerTextAt(pt.x, pt.y);
+}
+
+function moveViewerTextPointer(e){
+    const drag = viewerEdit.textDrag;
+    if(!drag) return;
+    const item = getViewerTextById(drag.id);
+    const scale = viewerTextDisplayScale();
+    if(!item || scale <= 0) return;
+    if(drag.kind === 'move'){
+        const dx = (e.clientX - drag.startX) / scale;
+        const dy = (e.clientY - drag.startY) / scale;
+        if(Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true;
+        item.x = Math.max(0, drag.originX + dx);
+        item.y = Math.max(0, drag.originY + dy);
+        const wrap = document.querySelector(`.viewer-text-item[data-id="${CSS.escape(String(drag.id))}"]`);
+        if(wrap){
+            wrap.style.left = `${item.x * scale}px`;
+            wrap.style.top = `${item.y * scale}px`;
+        }
+        return;
+    }
+    if(drag.kind === 'scale'){
+        const dy = e.clientY - drag.startY;
+        const dx = e.clientX - drag.startX;
+        const delta = (dx + dy) / 2 / scale;
+        item.fontSize = Math.max(8, Math.round(drag.startFontSize + delta));
+        const minDim = getViewerImageMinDim();
+        const ratio = Math.max(VIEWER_TEXT_RATIO_MIN, Math.min(VIEWER_TEXT_RATIO_MAX, Math.round((item.fontSize / minDim) * 1000)));
+        const slider = document.getElementById('viewerTextSize');
+        if(slider) slider.value = String(ratio);
+        syncViewerTextSizeUI();
+        const content = document.querySelector(`.viewer-text-item[data-id="${CSS.escape(String(drag.id))}"] .viewer-text-content`);
+        if(content) content.style.fontSize = `${Math.max(8, item.fontSize * scale)}px`;
+    }
+}
+
+function endViewerTextPointer(e){
+    const drag = viewerEdit.textDrag;
+    window.removeEventListener('pointermove', moveViewerTextPointer);
+    if(!drag) return;
+    if(drag.kind === 'move' && !drag.moved){
+        // treat as click-to-focus
+        selectViewerText(drag.id, { focus: true });
+    } else {
+        renderViewerTextLayer();
+        syncViewerTextSizeUI(true);
+    }
+    viewerEdit.textDrag = null;
+}
+
+function bindViewerTextLayer(){
+    const layer = document.getElementById('viewerTextLayer');
+    if(!layer || layer.dataset.bound) return;
+    layer.dataset.bound = '1';
+    layer.addEventListener('pointerdown', beginViewerTextPointer);
+    layer.addEventListener('input', e => {
+        const content = e.target.closest?.('.viewer-text-content');
+        const itemEl = content?.closest('.viewer-text-item');
+        if(!itemEl) return;
+        const id = itemEl.dataset.id;
+        const item = getViewerTextById(id);
+        if(!item) return;
+        if(!viewerEdit._textTypingUndo){
+            pushViewerTextUndo();
+            viewerEdit._textTypingUndo = true;
+        }
+        item.text = content.innerText.replace(/\u00a0/g, ' ');
+    });
+    layer.addEventListener('focusout', e => {
+        if(!layer.contains(e.relatedTarget)) viewerEdit._textTypingUndo = false;
+        const content = e.target.closest?.('.viewer-text-content');
+        const itemEl = content?.closest('.viewer-text-item');
+        if(itemEl) syncViewerTextDomToModel(itemEl.dataset.id);
+    });
+}
+
 function initViewerEditTools(){
     const canvas = document.getElementById('viewerDrawCanvas');
     if(!canvas || canvas.dataset.bound) return;
@@ -1328,18 +1797,32 @@ function initViewerEditTools(){
         if(!viewerEdit.drawing) hideViewerBrushCursor();
     });
     bindViewerHueBar();
+    bindViewerTextLayer();
     syncViewerBrushSizeUI();
+    syncViewerTextSizeUI();
     document.getElementById('viewerBrushSize')?.addEventListener('input', () => {
         syncViewerBrushSizeUI();
         const evt = viewerEdit.lastPointer;
         if(evt) updateViewerBrushCursor(evt);
     });
+    let textSizeUndoArmed = false;
+    document.getElementById('viewerTextSize')?.addEventListener('pointerdown', () => {
+        if(viewerEdit.selectedTextId){
+            pushViewerTextUndo();
+            textSizeUndoArmed = true;
+        }
+    });
+    document.getElementById('viewerTextSize')?.addEventListener('input', () => {
+        syncViewerTextSizeUI();
+        applyViewerTextSizeToSelected(getViewerTextFontRatio(), { pushUndo: false });
+    });
+    document.getElementById('viewerTextSize')?.addEventListener('change', () => { textSizeUndoArmed = false; });
     document.getElementById('viewerStage')?.addEventListener('pointermove', e => {
         viewerEdit.lastPointer = e;
         updateViewerBrushCursor(e);
     });
     document.getElementById('viewerStage')?.addEventListener('wheel', e => {
-        if(viewerEdit.mode !== 'brush') return;
+        if(viewerEdit.mode !== 'brush' || viewerEdit.tool !== 'draw') return;
         if(!document.getElementById('lightbox')?.classList.contains('open')) return;
         e.preventDefault();
         adjustViewerBrushSize(e.deltaY > 0 ? -2 : 2);
@@ -1446,6 +1929,9 @@ function closeLightbox(){
     lightboxIndex = -1;
     viewerEdit.drawing = false;
     viewerEdit.cropDrag = null;
+    viewerEdit.textDrag = null;
+    clearViewerTexts();
+    viewerEdit.tool = 'draw';
     setViewerEditMode('brush');
 }
 function handleOutsideClick(e){ if(e.target.id === 'lightbox') closeLightbox(); }
@@ -1535,6 +2021,8 @@ function bindViewerGlobals(){
   global.toggleViewerFavorite = toggleViewerFavorite;
   global.toggleViewerPin = toggleViewerPin;
   global.setViewerEditMode = setViewerEditMode;
+  global.setViewerBrushTool = setViewerBrushTool;
+  global.setViewerBrushColor = setViewerBrushColor;
   global.undoViewerDraw = undoViewerDraw;
   global.confirmViewerEdit = confirmViewerEdit;
   global.setViewerCropRatio = setViewerCropRatio;
@@ -1542,6 +2030,7 @@ function bindViewerGlobals(){
   global.applyViewerGridPreset = applyViewerGridPreset;
   global.refreshViewerGridSplitPreview = refreshViewerGridSplitPreview;
   global.syncViewerBrushSizeUI = syncViewerBrushSizeUI;
+  global.syncViewerTextSizeUI = syncViewerTextSizeUI;
   global.openViewerRefPreview = openViewerRefPreview;
   global.closeViewerRefPreview = closeViewerRefPreview;
   if(!global._studioViewerKeyBound){
@@ -1549,13 +2038,29 @@ function bindViewerGlobals(){
     document.addEventListener('keydown', e => {
       const open = document.getElementById('lightbox')?.classList.contains('open');
       if(!open) return;
+      const typing = e.target?.closest?.('.viewer-text-content');
       if(e.key === 'Escape'){
         const refOpen = !document.getElementById('viewerRefPreview')?.classList.contains('hidden');
         if(refOpen){ closeViewerRefPreview(); return; }
+        if(typing || viewerEdit.selectedTextId){
+          if(viewerEdit.selectedTextId) syncViewerTextDomToModel(viewerEdit.selectedTextId);
+          viewerEdit.selectedTextId = null;
+          renderViewerTextLayer();
+          if(typing) typing.blur();
+          return;
+        }
         closeLightbox();
       }
+      if(typing) return;
       if(e.key === 'ArrowLeft') viewerNav(-1);
       if(e.key === 'ArrowRight') viewerNav(1);
+      if((e.key === 'Delete' || e.key === 'Backspace') && viewerEdit.mode === 'brush' && viewerEdit.tool === 'text' && viewerEdit.selectedTextId){
+        e.preventDefault();
+        pushViewerTextUndo();
+        viewerEdit.texts = viewerEdit.texts.filter(t => t.id !== viewerEdit.selectedTextId);
+        viewerEdit.selectedTextId = null;
+        renderViewerTextLayer();
+      }
     });
   }
 }

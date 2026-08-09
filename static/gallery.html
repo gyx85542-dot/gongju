@@ -8,8 +8,8 @@
         (function(){ if(/[?&]embed(?:=1|=gallery)?(?:&|$)/.test(location.search)) document.documentElement.classList.add('embed-gallery'); })();
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="/static/i18n.js?v=20260522-audio"></script>
-    <script src="/static/studio-history-meta.js?v=20260530-meta-fix"></script>
+    <script src="/static/i18n.js?v=20260809-audio-title"></script>
+    <script src="/static/studio-history-meta.js?v=20260809-hidden"></script>
     <link rel="stylesheet" href="/static/studio-magnific.css?v=20260530-cell-hover">
     <link rel="stylesheet" href="/static/studio-borderless.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
@@ -19,7 +19,42 @@
         html.embed-gallery, html.embed-gallery body { background:#1a1a1a !important; height:100% !important; }
         .gallery-shell { height:100%; display:flex; flex-direction:column; gap:8px; padding:8px; box-sizing:border-box; background:#1a1a1a; min-height:0; }
         .output-toolbar { flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:0 2px; flex-wrap:wrap; }
-        .media-filter-tabs { display:flex; align-items:center; gap:3px; margin-right:auto; }
+        .media-filter-tabs { display:flex; align-items:center; gap:3px; }
+        .folder-select-wrap { position:relative; margin-right:auto; margin-left:6px; }
+        .folder-select-trigger {
+            height:22px; max-width:160px; padding:0 8px; border-radius:4px; border:1px solid rgba(255,255,255,.08);
+            background:#1a1a1a; color:#a3a3a3; cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+            font-size:10px; font-weight:700; letter-spacing:.02em; line-height:1;
+        }
+        .folder-select-trigger:hover { color:#e5e5e5; border-color:rgba(255,255,255,.16); }
+        .folder-select-trigger svg { width:11px !important; height:11px !important; flex-shrink:0; }
+        .folder-select-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
+        .folder-select-menu {
+            position:absolute; top:calc(100% + 4px); left:0; min-width:180px; max-width:240px; z-index:40;
+            background:#262626; border:1px solid rgba(255,255,255,.1); border-radius:6px;
+            box-shadow:0 8px 24px rgba(0,0,0,.35); padding:4px; display:none;
+        }
+        .folder-select-menu.open { display:block; }
+        .folder-menu-item {
+            width:100%; text-align:left; border:0; background:transparent; color:#d4d4d4; cursor:pointer;
+            padding:7px 8px; border-radius:4px; font-size:11px; font-weight:600; display:flex; align-items:center; gap:6px;
+        }
+        .folder-menu-item:hover { background:rgba(255,255,255,.06); }
+        .folder-menu-item.active { color:#ff4d94; background:rgba(255,77,148,.12); }
+        .folder-menu-item .folder-item-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .folder-menu-sep { height:1px; background:rgba(255,255,255,.08); margin:4px 2px; }
+        .folder-menu-actions { display:flex; gap:2px; }
+        .folder-menu-actions button {
+            border:0; background:transparent; color:#737373; cursor:pointer; width:20px; height:20px;
+            border-radius:3px; display:inline-flex; align-items:center; justify-content:center; padding:0;
+        }
+        .folder-menu-actions button:hover { color:#fff; background:rgba(255,255,255,.08); }
+        .folder-menu-actions button svg { width:11px !important; height:11px !important; }
+        .folder-picker-backdrop { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; }
+        .folder-picker-backdrop.open { display:flex; }
+        .folder-picker-panel { width:min(320px,90vw); background:#1f1f1f; border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:14px; box-shadow:0 12px 32px rgba(0,0,0,.4); }
+        .folder-picker-title { font-size:12px; font-weight:800; color:#f5f5f5; margin-bottom:10px; }
+        .folder-picker-list { display:flex; flex-direction:column; gap:4px; max-height:240px; overflow:auto; }
         .filter-tab { height:22px; min-width:22px; padding:0; border-radius: 4px; border:1px solid rgba(255,255,255,.08); background:#1a1a1a; color:#737373; cursor:pointer; line-height:1; transition:all .18s var(--easing); display:inline-flex; align-items:center; justify-content:center; }
         .filter-tab svg { width:11px !important; height:11px !important; }
         .filter-tab:hover { color:#a3a3a3; border-color:rgba(255,255,255,.14); }
@@ -197,6 +232,15 @@
         .audio-cover { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(145deg,#101010,#1a1a1a); border-radius:6px; color:#737373; }
         .audio-cover svg { width:36px !important; height:36px !important; opacity:.55; }
         .video-badge, .audio-badge { position:absolute; left:6px; bottom:6px; z-index:3; height:16px; padding:0 6px; border-radius: 4px; background:rgba(15,15,15,.78); color:#fff; font-size:8px; font-weight:800; display:flex; align-items:center; gap:3px; pointer-events:none; }
+        .audio-title {
+            position:absolute; left:6px; right:6px; bottom:26px; z-index:3;
+            max-height:2.6em; overflow:hidden;
+            font-size:11px; font-weight:750; line-height:1.3; color:#f5f5f5;
+            text-shadow:0 1px 4px rgba(0,0,0,.85);
+            display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+            pointer-events:none; word-break:break-word;
+        }
+        .audio-title.is-placeholder { color:rgba(245,245,245,.55); font-weight:650; }
         .cell-actions-top { position:absolute; top:6px; right:6px; z-index:6; display:flex; align-items:center; gap:4px; opacity:0; transition:opacity .18s; pointer-events:none; }
         .cell-actions-bottom { position:absolute; left:0; right:0; bottom:0; height:20%; min-height:32px; z-index:5; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 8px 5px; opacity:0; transition:opacity .18s; pointer-events:none; background:linear-gradient(to top,rgba(26,26,26,.92),transparent); }
         .output-grid-cell:hover .cell-actions-top,
@@ -204,14 +248,17 @@
         body.board-pick-active .output-grid-cell .cell-actions-top,
         body.board-pick-active .output-grid-cell .cell-actions-bottom { opacity:0 !important; pointer-events:none !important; }
         .cell-action-btn { width:24px; height:24px; border:none; border-radius:4px; background:rgba(49,49,49,.96); color:#a3a3a3; display:flex; align-items:center; justify-content:center; cursor:pointer; border:1px solid rgba(255,255,255,.08); padding:0; transition:background .12s var(--easing), color .12s var(--easing), border-color .12s var(--easing); }
-        .cell-action-btn:hover:not([data-action="pin"]):not([data-action="favorite"]),
-        .cell-action-btn.active:not(.fav-active):not([data-action="pin"]) { background:rgba(255,255,255,.92); color:#1a1a1a; border-color:rgba(255,255,255,.38); }
+        .cell-action-btn:hover:not([data-action="pin"]):not([data-action="favorite"]):not([data-action="hide"]),
+        .cell-action-btn.active:not(.fav-active):not(.hide-active):not([data-action="pin"]) { background:rgba(255,255,255,.92); color:#1a1a1a; border-color:rgba(255,255,255,.38); }
         .cell-action-btn[data-action="pin"]:hover,
         .cell-action-btn[data-action="pin"].active { background:#ff4d94; color:#fff; border-color:#ff4d94; }
         .cell-action-btn[data-action="favorite"]:hover,
         .cell-action-btn.fav-active,
         .cell-action-btn.fav-active:hover,
         .cell-action-btn.fav-active.active { background:#ffaa00; border-color:#ffaa00; color:#fff; }
+        .cell-action-btn[data-action="hide"]:hover,
+        .cell-action-btn.hide-active,
+        .cell-action-btn.hide-active:hover { background:#6b7280; border-color:#6b7280; color:#fff; }
         .toolbar-right { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
         body.bulk-select-mode .output-grid-cell .cell-actions-top,
         body.bulk-select-mode .output-grid-cell .cell-actions-bottom { opacity:0 !important; pointer-events:none !important; }
@@ -304,6 +351,15 @@
                 <button type="button" class="filter-tab" data-filter="video" data-i18n-tip="gallery.filterVideos" onclick="setMediaFilter('video', this)" aria-label="Videos"><i data-lucide="clapperboard"></i></button>
                 <button type="button" class="filter-tab" data-filter="audio" data-i18n-tip="gallery.filterAudio" onclick="setMediaFilter('audio', this)" aria-label="Audio"><i data-lucide="music"></i></button>
                 <button type="button" class="filter-tab" data-filter="favorite" data-i18n-tip="gallery.filterFavorites" onclick="setMediaFilter('favorite', this)" aria-label="Liked"><i data-lucide="heart"></i></button>
+                <button type="button" class="filter-tab" data-filter="hidden" data-i18n-tip="gallery.filterHidden" onclick="setMediaFilter('hidden', this)" aria-label="Hidden"><i data-lucide="eye-off"></i></button>
+            </div>
+            <div class="folder-select-wrap" id="folderSelectWrap">
+                <button type="button" id="folderSelectTrigger" class="folder-select-trigger" onclick="toggleFolderMenu(event)" data-i18n-tip="gallery.projectFolder">
+                    <i data-lucide="folder"></i>
+                    <span id="folderSelectLabel" class="folder-select-label">全部</span>
+                    <i data-lucide="chevron-down"></i>
+                </button>
+                <div id="folderSelectMenu" class="folder-select-menu" role="menu"></div>
             </div>
             <span class="board-pick-hint" data-i18n="online.boardPickHint">点击下方图片添加到参考图</span>
             <div class="toolbar-right">
@@ -319,8 +375,17 @@
                     <button type="button" id="bulkSelectAllBtn" class="tool-icon-btn" data-i18n-tip="gallery.selectAll" onclick="selectAllFilteredBulk()" aria-label="Select all filtered">
                         <i data-lucide="list-checks"></i>
                     </button>
+                    <button type="button" id="bulkMoveBtn" class="tool-icon-btn" data-i18n-tip="gallery.moveToFolder" onclick="openFolderPicker('move')" aria-label="Move to folder">
+                        <i data-lucide="folder-input"></i>
+                    </button>
+                    <button type="button" id="bulkCopyBtn" class="tool-icon-btn" data-i18n-tip="gallery.copyToFolder" onclick="openFolderPicker('copy')" aria-label="Copy to folder">
+                        <i data-lucide="copy"></i>
+                    </button>
                     <button type="button" id="bulkDownloadBtn" class="tool-icon-btn accent" data-i18n-tip="gallery.downloadSelected" onclick="downloadSelectedBulk()" aria-label="Download selected">
                         <i data-lucide="download"></i>
+                    </button>
+                    <button type="button" id="bulkHideBtn" class="tool-icon-btn" data-i18n-tip="gallery.hideSelected" onclick="hideSelectedBulk()" aria-label="Hide selected">
+                        <i data-lucide="eye-off"></i>
                     </button>
                     <button type="button" id="bulkDeleteBtn" class="tool-icon-btn danger" data-i18n-tip="gallery.deleteSelected" onclick="deleteSelectedBulk()" aria-label="Delete selected">
                         <i data-lucide="trash-2"></i>
@@ -351,6 +416,12 @@
             </div>
         </div>
     </div>
+    <div id="folderPickerBackdrop" class="folder-picker-backdrop" onclick="closeFolderPicker(event)">
+        <div class="folder-picker-panel" onclick="event.stopPropagation()">
+            <div id="folderPickerTitle" class="folder-picker-title"></div>
+            <div id="folderPickerList" class="folder-picker-list"></div>
+        </div>
+    </div>
     <script>
         lucide.createIcons();
         function tr(k){ return window.StudioI18n ? StudioI18n.t(k) : k; }
@@ -368,13 +439,16 @@
             } catch(e){ outputCols = 4; }
         }
         const META_SCOPE = 'studio';
-        const META_PIN = 'studio_pinned', META_FAV = 'studio_favorites', META_ORDER = 'studio_display_order';
+        const META_PIN = 'studio_pinned', META_FAV = 'studio_favorites', META_HIDDEN = 'studio_hidden', META_ORDER = 'studio_display_order';
         const META_FILTER = 'studio_media_filter';
         const META_COLS = 'studio_output_cols';
+        const META_FOLDERS = 'studio_folders';
+        const META_ITEM_FOLDERS = 'studio_item_folders';
+        const UNCATEGORIZED_ID = StudioHistoryMeta.UNCATEGORIZED_ID;
         const STUDIO_TYPES = new Set(['online', 'local-comfy', 'online-video', 'online-audio', 'runninghub']);
         let allHistory = [], pendingJobs = [], outputCols = 4, boardPickSlotId = '';
         let bulkSelectMode = false, selectedKeys = new Set(), bulkDrag = null, bulkDown = null;
-        const MEDIA_FILTERS = ['all', 'image', 'video', 'audio', 'favorite'];
+        const MEDIA_FILTERS = ['all', 'image', 'video', 'audio', 'favorite', 'hidden'];
         let mediaFilter = localStorage.getItem(META_FILTER) || 'all';
         if(!MEDIA_FILTERS.includes(mediaFilter)) mediaFilter = 'all';
         function normalizeIdList(raw){ return StudioHistoryMeta.normalizeIdList(raw); }
@@ -382,9 +456,24 @@
             try { return normalizeIdList(JSON.parse(localStorage.getItem(key) || '[]')); }
             catch(e){ return []; }
         }
+        function readFoldersLocal(){
+            try { return StudioHistoryMeta.normalizeFolders(JSON.parse(localStorage.getItem(META_FOLDERS) || '[]')); }
+            catch(e){ return []; }
+        }
+        function readItemFoldersLocal(){
+            try { return StudioHistoryMeta.normalizeItemFolders(JSON.parse(localStorage.getItem(META_ITEM_FOLDERS) || '{}'), readFoldersLocal()); }
+            catch(e){ return {}; }
+        }
         let pinnedIds = readIdList(META_PIN);
         let favoriteIds = readIdList(META_FAV);
+        let hiddenIds = readIdList(META_HIDDEN);
         let displayOrder = readIdList(META_ORDER);
+        let folders = readFoldersLocal();
+        let itemFolders = readItemFoldersLocal();
+        let activeFolderId = StudioHistoryMeta.readLocalActiveFolder();
+        let folderMenuOpen = false;
+        let folderPickerMode = '';
+        let folderPickerKeys = [];
         let reorderDragKey = '';
         const REORDER_MIME = 'text/mg-studio-reorder-ts';
         const channel = new BroadcastChannel('studio-gallery');
@@ -393,7 +482,7 @@
         let lastPendingFingerprint = '';
 
         function historyDataFingerprint(list){
-            return (list || []).map(item => `${historyKey(item)}:${mediaUrl(item)}:${item.type || ''}`).join('|');
+            return (list || []).map(item => `${historyKey(item)}:${mediaUrl(item)}:${item.type || ''}:${item.title || ''}`).join('|');
         }
         function pendingFingerprint(jobs){
             return (jobs || []).map(j => `${j.id}:${j.error || ''}:${j.mediaKind || 'image'}:${j.task_id || ''}`).join('|');
@@ -503,6 +592,43 @@
         })();
         let activeGalleryDrag = null;
         let galleryDragAccepted = false;
+        function audioTitleInfo(item){
+            const custom = String(item?.title || '').trim();
+            if(custom) return { text: custom, placeholder: false };
+            const prompt = String(item?.prompt || '').replace(/\s+/g, ' ').trim();
+            if(prompt){
+                const text = prompt.length > 48 ? `${prompt.slice(0, 48)}…` : prompt;
+                return { text, placeholder: true };
+            }
+            return { text: tr('gallery.untitledAudio'), placeholder: true };
+        }
+
+        async function renameAudioItem(item){
+            if(!item || !isAudioItem(item)) return;
+            const key = historyKey(item);
+            const apiTimestamp = item.timestamp;
+            if(!key || apiTimestamp == null) return;
+            const current = String(item.title || '').trim();
+            const nextRaw = prompt(tr('gallery.renameAudioPrompt'), current);
+            if(nextRaw == null) return;
+            const title = String(nextRaw).trim().slice(0, 120);
+            if(title === current) return;
+            try {
+                const res = await fetch('/api/history/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ timestamp: apiTimestamp, title })
+                }).then(r => r.json());
+                if(!res?.success || !res.item) return;
+                const idx = allHistory.findIndex(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
+                if(idx >= 0) allHistory[idx] = res.item; else allHistory.unshift(res.item);
+                syncGalleryFingerprints();
+                renderOutputGrid();
+            } catch(e){
+                console.error(e);
+            }
+        }
+
         const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
         function isAudioItem(item){
             if(item?.audios?.length) return true;
@@ -519,7 +645,14 @@
         }
         function hasMedia(item){ return isVideoItem(item) || isImageItem(item) || isAudioItem(item); }
         function pendingKind(job){ return job?.mediaKind === 'video' ? 'video' : job?.mediaKind === 'audio' ? 'audio' : 'image'; }
+        function matchesFolderFilter(item){
+            return StudioHistoryMeta.matchesFolderFilter(itemFolders, historyKey(item), activeFolderId);
+        }
         function matchesMediaFilter(item){
+            if(!matchesFolderFilter(item)) return false;
+            const hidden = isHidden(item);
+            if(mediaFilter === 'hidden') return hidden;
+            if(hidden) return false;
             if(mediaFilter === 'all') return true;
             if(mediaFilter === 'favorite') return isFavorite(item);
             if(mediaFilter === 'video') return isVideoItem(item);
@@ -527,8 +660,200 @@
             return isImageItem(item);
         }
         function matchesPendingFilter(job){
-            if(mediaFilter === 'favorite') return false;
+            if(mediaFilter === 'favorite' || mediaFilter === 'hidden') return false;
+            // Pending jobs belong to the current project view (except "全部")
+            if(!activeFolderId) return true;
             return true;
+        }
+        function folderDisplayName(folderId){
+            const id = StudioHistoryMeta.normalizeFolderId(folderId);
+            if(!id) return tr('gallery.folderAll');
+            if(id === UNCATEGORIZED_ID) return tr('gallery.folderUncategorized');
+            return folders.find(f => f.id === id)?.name || tr('gallery.projectFolder');
+        }
+        function writeTargetFolderId(){
+            const id = StudioHistoryMeta.normalizeFolderId(activeFolderId);
+            if(!id || id === UNCATEGORIZED_ID) return '';
+            return id;
+        }
+        function assignItemToActiveFolder(key, { force = false } = {}){
+            const k = StudioHistoryMeta.normalizeTimestampKey(key);
+            if(!k) return false;
+            const target = writeTargetFolderId();
+            if(!target){
+                if(force && itemFolders[k]){
+                    delete itemFolders[k];
+                    return true;
+                }
+                return false;
+            }
+            if(!force && itemFolders[k]) return false;
+            itemFolders[k] = target;
+            return true;
+        }
+        function setActiveFolder(next, { persist = true } = {}){
+            let id = StudioHistoryMeta.normalizeFolderId(next);
+            if(id && id !== UNCATEGORIZED_ID && !folders.some(f => f.id === id)) id = '';
+            activeFolderId = id;
+            StudioHistoryMeta.writeLocalActiveFolder(activeFolderId);
+            if(persist) saveMeta();
+            closeFolderMenu();
+            renderFolderSelect();
+            renderOutputGrid();
+        }
+        function toggleFolderMenu(event){
+            event?.stopPropagation();
+            folderMenuOpen = !folderMenuOpen;
+            document.getElementById('folderSelectMenu')?.classList.toggle('open', folderMenuOpen);
+            if(folderMenuOpen) lucide.createIcons();
+        }
+        function closeFolderMenu(){
+            folderMenuOpen = false;
+            document.getElementById('folderSelectMenu')?.classList.remove('open');
+        }
+        function renderFolderSelect(){
+            const label = document.getElementById('folderSelectLabel');
+            const menu = document.getElementById('folderSelectMenu');
+            if(label) label.textContent = folderDisplayName(activeFolderId);
+            if(!menu) return;
+            const rows = [];
+            const pushItem = (id, name, extra = '') => {
+                const active = StudioHistoryMeta.normalizeFolderId(activeFolderId) === StudioHistoryMeta.normalizeFolderId(id);
+                rows.push(`<button type="button" class="folder-menu-item${active?' active':''}" data-folder="${escapeHtml(id)}" onclick="setActiveFolder('${escapeHtml(id)}')">
+                    <span class="folder-item-name">${escapeHtml(name)}</span>${extra}
+                </button>`);
+            };
+            pushItem('', tr('gallery.folderAll'));
+            pushItem(UNCATEGORIZED_ID, tr('gallery.folderUncategorized'));
+            if(folders.length) rows.push('<div class="folder-menu-sep"></div>');
+            folders.forEach(f => {
+                const actions = `<span class="folder-menu-actions">
+                    <button type="button" title="${escapeHtml(tr('gallery.renameFolder'))}" onclick="event.stopPropagation(); renameFolder('${escapeHtml(f.id)}')"><i data-lucide="pencil"></i></button>
+                    <button type="button" title="${escapeHtml(tr('gallery.deleteFolder'))}" onclick="event.stopPropagation(); deleteFolder('${escapeHtml(f.id)}')"><i data-lucide="trash-2"></i></button>
+                </span>`;
+                pushItem(f.id, f.name, actions);
+            });
+            rows.push('<div class="folder-menu-sep"></div>');
+            rows.push(`<button type="button" class="folder-menu-item" onclick="createFolder()"><i data-lucide="folder-plus"></i><span class="folder-item-name">${escapeHtml(tr('gallery.createFolder'))}</span></button>`);
+            menu.innerHTML = rows.join('');
+            lucide.createIcons();
+        }
+        function createFolder(){
+            closeFolderMenu();
+            const name = prompt(tr('gallery.createFolderPrompt'), '');
+            if(name == null) return;
+            const trimmed = String(name).trim().slice(0, 80);
+            if(!trimmed) return;
+            const id = StudioHistoryMeta.createFolderId();
+            folders = StudioHistoryMeta.normalizeFolders([...folders, { id, name: trimmed, created_at: Date.now() / 1000 }]);
+            setActiveFolder(id, { persist: true });
+        }
+        function renameFolder(folderId){
+            closeFolderMenu();
+            const folder = folders.find(f => f.id === folderId);
+            if(!folder) return;
+            const name = prompt(tr('gallery.renameFolderPrompt'), folder.name);
+            if(name == null) return;
+            const trimmed = String(name).trim().slice(0, 80);
+            if(!trimmed) return;
+            folders = folders.map(f => f.id === folderId ? { ...f, name: trimmed } : f);
+            saveMeta();
+            renderFolderSelect();
+        }
+        function deleteFolder(folderId){
+            closeFolderMenu();
+            const folder = folders.find(f => f.id === folderId);
+            if(!folder) return;
+            if(!confirm(tr('gallery.deleteFolderConfirm').replace('{name}', folder.name))) return;
+            folders = folders.filter(f => f.id !== folderId);
+            Object.keys(itemFolders).forEach(key => {
+                if(itemFolders[key] === folderId) delete itemFolders[key];
+            });
+            if(activeFolderId === folderId) activeFolderId = '';
+            StudioHistoryMeta.writeLocalActiveFolder(activeFolderId);
+            saveMeta();
+            renderFolderSelect();
+            renderOutputGrid();
+        }
+        function openFolderPicker(mode, keys){
+            folderPickerMode = mode === 'copy' ? 'copy' : 'move';
+            folderPickerKeys = (keys && keys.length) ? keys.slice() : [...selectedKeys];
+            if(!folderPickerKeys.length) return;
+            const backdrop = document.getElementById('folderPickerBackdrop');
+            const title = document.getElementById('folderPickerTitle');
+            const list = document.getElementById('folderPickerList');
+            if(title) title.textContent = folderPickerMode === 'copy' ? tr('gallery.copyToFolder') : tr('gallery.moveToFolder');
+            const options = [
+                { id: UNCATEGORIZED_ID, name: tr('gallery.folderUncategorized') },
+                ...folders,
+            ];
+            list.innerHTML = options.map(opt => `<button type="button" class="folder-menu-item" onclick="applyFolderPicker('${escapeHtml(opt.id)}')"><span class="folder-item-name">${escapeHtml(opt.name)}</span></button>`).join('');
+            backdrop?.classList.add('open');
+            lucide.createIcons();
+        }
+        function closeFolderPicker(event){
+            if(event && event.target && event.currentTarget && event.target !== event.currentTarget) return;
+            document.getElementById('folderPickerBackdrop')?.classList.remove('open');
+            folderPickerMode = '';
+            folderPickerKeys = [];
+        }
+        async function applyFolderPicker(folderId){
+            const keys = folderPickerKeys.slice();
+            const mode = folderPickerMode;
+            document.getElementById('folderPickerBackdrop')?.classList.remove('open');
+            folderPickerMode = '';
+            folderPickerKeys = [];
+            if(!keys.length) return;
+            if(mode === 'copy') await copyItemsToFolder(keys, folderId);
+            else moveItemsToFolder(keys, folderId);
+        }
+        function moveItemsToFolder(keys, folderId){
+            const target = StudioHistoryMeta.normalizeFolderId(folderId);
+            keys.forEach(key => {
+                const k = StudioHistoryMeta.normalizeTimestampKey(key);
+                if(!k) return;
+                if(!target || target === UNCATEGORIZED_ID) delete itemFolders[k];
+                else itemFolders[k] = target;
+            });
+            saveMeta();
+            selectedKeys.clear();
+            setBulkSelectMode(false);
+            renderOutputGrid();
+        }
+        async function copyItemsToFolder(keys, folderId){
+            const target = StudioHistoryMeta.normalizeFolderId(folderId);
+            const created = [];
+            for(const key of keys){
+                const item = findHistoryItemByKey(key);
+                if(!item) continue;
+                try {
+                    const res = await fetch('/api/history/copy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ timestamp: item.timestamp }),
+                    }).then(r => r.json());
+                    if(!res?.success || !res.item) continue;
+                    const newKey = historyKey(res.item);
+                    if(newKey){
+                        if(target && target !== UNCATEGORIZED_ID) itemFolders[newKey] = target;
+                        else delete itemFolders[newKey];
+                        created.push(res.item);
+                    }
+                } catch(e){ console.error(e); }
+            }
+            created.forEach(item => {
+                const key = historyKey(item);
+                if(!key) return;
+                const idx = allHistory.findIndex(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
+                if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
+                displayOrder = displayOrder.filter(id => !StudioHistoryMeta.keysEqual(id, key));
+                displayOrder.unshift(key);
+            });
+            rebuildDisplayOrderFromPins();
+            saveMeta();
+            selectedKeys.clear();
+            setBulkSelectMode(false);
+            renderOutputGrid();
         }
 
         function setMediaFilter(next, btn){
@@ -545,20 +870,46 @@
         function saveMeta(){
             pinnedIds = normalizeIdList(pinnedIds);
             favoriteIds = normalizeIdList(favoriteIds);
+            hiddenIds = normalizeIdList(hiddenIds);
             displayOrder = normalizeIdList(displayOrder);
+            folders = StudioHistoryMeta.normalizeFolders(folders);
+            itemFolders = StudioHistoryMeta.normalizeItemFolders(itemFolders, folders);
+            activeFolderId = StudioHistoryMeta.normalizeFolderId(activeFolderId);
+            if(activeFolderId && activeFolderId !== UNCATEGORIZED_ID && !folders.some(f => f.id === activeFolderId)){
+                activeFolderId = '';
+            }
             localStorage.setItem(META_PIN, JSON.stringify(pinnedIds));
             localStorage.setItem(META_FAV, JSON.stringify(favoriteIds));
+            localStorage.setItem(META_HIDDEN, JSON.stringify(hiddenIds));
             localStorage.setItem(META_ORDER, JSON.stringify(displayOrder));
-            StudioHistoryMeta.saveUserMeta(META_SCOPE, { pinnedIds, favoriteIds, displayOrder });
+            localStorage.setItem(META_FOLDERS, JSON.stringify(folders));
+            localStorage.setItem(META_ITEM_FOLDERS, JSON.stringify(itemFolders));
+            StudioHistoryMeta.writeLocalActiveFolder(activeFolderId);
+            StudioHistoryMeta.saveUserMeta(META_SCOPE, {
+                pinnedIds, favoriteIds, hiddenIds, displayOrder, folders, itemFolders, activeFolderId,
+            });
         }
         async function loadMetaFromServer(){
-            const local = { pinnedIds, favoriteIds, displayOrder };
+            const localActive = StudioHistoryMeta.readLocalActiveFolder();
+            const local = { pinnedIds, favoriteIds, hiddenIds, displayOrder, folders, itemFolders, activeFolderId: localActive };
             const remote = await StudioHistoryMeta.loadUserMeta(META_SCOPE);
             const merged = StudioHistoryMeta.mergeMetaSources(local, remote);
             pinnedIds = merged.pinnedIds;
             favoriteIds = merged.favoriteIds;
+            hiddenIds = merged.hiddenIds;
             displayOrder = merged.displayOrder;
+            folders = merged.folders;
+            itemFolders = merged.itemFolders;
+            // Prefer last-opened local project when still valid.
+            let nextActive = StudioHistoryMeta.normalizeFolderId(localActive);
+            if(nextActive && nextActive !== UNCATEGORIZED_ID && !folders.some(f => f.id === nextActive)) nextActive = '';
+            if(!nextActive && nextActive !== UNCATEGORIZED_ID){
+                nextActive = StudioHistoryMeta.normalizeFolderId(merged.activeFolderId);
+                if(nextActive && nextActive !== UNCATEGORIZED_ID && !folders.some(f => f.id === nextActive)) nextActive = '';
+            }
+            activeFolderId = nextActive;
             saveMeta();
+            renderFolderSelect();
         }
         function mergeMetaKeys(target, sources){
             const seen = new Set(Array.isArray(target) ? target.map(String) : []);
@@ -589,12 +940,14 @@
         }
         function isPinned(item){ return StudioHistoryMeta.includesKey(pinnedIds, historyKey(item)); }
         function isFavorite(item){ return StudioHistoryMeta.includesKey(favoriteIds, historyKey(item)); }
+        function isHidden(item){ return StudioHistoryMeta.includesKey(hiddenIds, historyKey(item)); }
 
         function syncDisplayOrder(opts){
             const persist = !!(opts && opts.persist);
-            const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, displayOrder }, allHistory);
+            const synced = StudioHistoryMeta.syncMetaState({ pinnedIds, favoriteIds, hiddenIds, displayOrder }, allHistory);
             pinnedIds = synced.pinnedIds;
             favoriteIds = synced.favoriteIds;
+            hiddenIds = synced.hiddenIds || [];
             displayOrder = synced.displayOrder;
             if(persist) saveMeta();
         }
@@ -684,30 +1037,38 @@
             const url = mediaUrl(data);
             const video = isVideoItem(data);
             const audio = isAudioItem(data);
-            const pinned = isPinned(data), fav = isFavorite(data);
+            const pinned = isPinned(data), fav = isFavorite(data), hidden = isHidden(data);
+            const hideTip = hidden ? 'gallery.unhide' : 'gallery.hide';
+            const hideIcon = hidden ? 'eye' : 'eye-off';
             let media;
             if(video){
                 media = `<video src="${escapeHtml(url)}" muted playsinline preload="auto" class="draggable-output" draggable="true"></video>
                          <div class="video-progress-bar"><div class="video-progress-fill" id="progress-fill-${escapeHtml(key)}"></div></div>
                          <span class="video-badge"><i data-lucide="clapperboard" class="w-2.5 h-2.5"></i>VIDEO</span>`;
             } else if(audio){
+                const titleInfo = audioTitleInfo(data);
                 media = `<div class="audio-cover draggable-output" draggable="true"><i data-lucide="music"></i></div>
                          <button type="button" class="audio-play-btn" data-audio-play aria-label="Play" aria-pressed="false"><i data-lucide="play"></i></button>
+                         <div class="audio-title${titleInfo.placeholder ? ' is-placeholder' : ''}" title="${escapeHtml(titleInfo.text)}">${escapeHtml(titleInfo.text)}</div>
                          <span class="audio-badge"><i data-lucide="music-2" class="w-3 h-3"></i>AUDIO</span>`;
             } else {
                 media = `<img src="${escapeHtml(url)}" alt="" loading="lazy" class="draggable-output" draggable="true">`;
             }
-            return `<div class="output-grid-cell${video?' is-video':''}${audio?' is-audio':''}${pinned?' is-pinned':''}${fav?' is-favorite':''}${selectedKeys.has(key)?' bulk-selected':''}" data-ts="${escapeHtml(key)}">
+            return `<div class="output-grid-cell${video?' is-video':''}${audio?' is-audio':''}${pinned?' is-pinned':''}${fav?' is-favorite':''}${hidden?' is-hidden':''}${selectedKeys.has(key)?' bulk-selected':''}" data-ts="${escapeHtml(key)}">
                 ${media}
                 <div class="bulk-check-mark"><i data-lucide="check"></i></div>
                 <div class="board-pick-overlay" aria-hidden="true"><span class="board-pick-dim"></span><span class="board-pick-plus"><i data-lucide="plus"></i></span></div>
                 <div class="cell-actions-top">
                     <button type="button" class="cell-action-btn${pinned?' active':''}" data-action="pin"><i data-lucide="arrow-up-to-line"></i></button>
+                    ${audio ? `<button type="button" class="cell-action-btn" data-action="rename" data-i18n-tip="gallery.renameAudio"><i data-lucide="pencil"></i></button>` : ''}
                     <a href="${escapeHtml(url)}" download class="cell-action-btn" onclick="event.stopPropagation()"><i data-lucide="download"></i></a>
                     <button type="button" class="cell-action-btn" data-action="delete"><i data-lucide="trash-2"></i></button>
                 </div>
                 <div class="cell-actions-bottom">
                     <button type="button" class="cell-action-btn${fav?' fav-active active':''}" data-action="favorite"><i data-lucide="heart"></i></button>
+                    <button type="button" class="cell-action-btn${hidden?' hide-active active':''}" data-action="hide" data-i18n-tip="${hideTip}"><i data-lucide="${hideIcon}"></i></button>
+                    <button type="button" class="cell-action-btn" data-action="move" data-i18n-tip="gallery.moveToFolder"><i data-lucide="folder-input"></i></button>
+                    <button type="button" class="cell-action-btn" data-action="copy" data-i18n-tip="gallery.copyToFolder"><i data-lucide="copy"></i></button>
                     <button type="button" class="cell-action-btn" data-action="apply"><i data-lucide="clipboard-copy"></i></button>
                 </div>
             </div>`;
@@ -854,7 +1215,17 @@
                 };
 
                 cell.querySelector('[data-action="pin"]')?.addEventListener('click', e => { e.stopPropagation(); togglePin(data); });
+                cell.querySelector('[data-action="rename"]')?.addEventListener('click', e => { e.stopPropagation(); renameAudioItem(data); });
                 cell.querySelector('[data-action="favorite"]')?.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(data); });
+                cell.querySelector('[data-action="hide"]')?.addEventListener('click', e => { e.stopPropagation(); toggleHidden(data); });
+                cell.querySelector('[data-action="move"]')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openFolderPicker('move', [historyKey(data)]);
+                });
+                cell.querySelector('[data-action="copy"]')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openFolderPicker('copy', [historyKey(data)]);
+                });
                 cell.querySelector('[data-action="apply"]')?.addEventListener('click', e => {
                     e.stopPropagation();
                     if(window.parent && window.parent !== window){
@@ -905,12 +1276,27 @@
             const normal = document.getElementById('bulkToolbarNormal');
             const active = document.getElementById('bulkToolbarActive');
             const allBtn = document.getElementById('bulkSelectAllBtn');
+            const moveBtn = document.getElementById('bulkMoveBtn');
+            const copyBtn = document.getElementById('bulkCopyBtn');
+            const hideBtn = document.getElementById('bulkHideBtn');
             const dlBtn = document.getElementById('bulkDownloadBtn');
             const delBtn = document.getElementById('bulkDeleteBtn');
             if(normal) normal.hidden = bulkSelectMode;
             if(active) active.hidden = !bulkSelectMode;
             const filteredCount = sortedHistory().filter(matchesMediaFilter).length;
             if(allBtn) allBtn.disabled = !filteredCount;
+            if(moveBtn) moveBtn.disabled = !selectedKeys.size;
+            if(copyBtn) copyBtn.disabled = !selectedKeys.size;
+            if(hideBtn){
+                hideBtn.disabled = !selectedKeys.size;
+                const hideKey = mediaFilter === 'hidden' ? 'gallery.unhideSelected' : 'gallery.hideSelected';
+                const hideBase = tr(hideKey);
+                hideBtn.setAttribute('data-i18n-tip', hideKey);
+                hideBtn.setAttribute('data-tip', selectedKeys.size ? `${hideBase} (${selectedKeys.size})` : hideBase);
+                hideBtn.setAttribute('aria-label', hideBase);
+                const icon = hideBtn.querySelector('[data-lucide]');
+                if(icon) icon.setAttribute('data-lucide', mediaFilter === 'hidden' ? 'eye' : 'eye-off');
+            }
             if(dlBtn){
                 dlBtn.disabled = !selectedKeys.size;
                 const base = tr('gallery.downloadSelected');
@@ -994,6 +1380,22 @@
             } finally {
                 if(btn) btn.disabled = false;
             }
+        }
+
+        function hideSelectedBulk(){
+            if(!selectedKeys.size){ alert(tr('gallery.bulkNothingSelectedHide')); return; }
+            const keys = [...selectedKeys];
+            const unhide = mediaFilter === 'hidden';
+            keys.forEach(key => {
+                if(!key) return;
+                if(unhide) hiddenIds = hiddenIds.filter(id => !StudioHistoryMeta.keysEqual(id, key));
+                else if(!StudioHistoryMeta.includesKey(hiddenIds, key)){
+                    hiddenIds = [...hiddenIds.filter(id => !StudioHistoryMeta.keysEqual(id, key)), key];
+                }
+            });
+            saveMeta();
+            setBulkSelectMode(false);
+            renderOutputGrid();
         }
 
         async function deleteSelectedBulk(){
@@ -1136,8 +1538,19 @@
                 const fp = historyDataFingerprint(data);
                 if(fp === lastHistoryFingerprint) return;
                 lastHistoryFingerprint = fp;
+                const hadHistory = allHistory.length > 0;
+                const prevKeys = new Set(allHistory.map(historyKey).filter(Boolean));
                 allHistory = data;
+                let assigned = false;
+                if(hadHistory){
+                    allHistory.forEach(item => {
+                        const key = historyKey(item);
+                        if(!key || prevKeys.has(key)) return;
+                        if(assignItemToActiveFolder(key)) assigned = true;
+                    });
+                }
                 syncDisplayOrder({ persist: true });
+                if(assigned) saveMeta();
                 renderOutputGrid();
             } catch(e){ console.error(e); }
         }
@@ -1230,6 +1643,7 @@
             const key = historyKey(item);
             if(!key) return;
             const idx = allHistory.findIndex(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
+            const isNew = idx < 0;
             if(idx >= 0) allHistory[idx] = item; else allHistory.unshift(item);
             displayOrder = displayOrder.filter(id => !StudioHistoryMeta.keysEqual(id, key));
             if(StudioHistoryMeta.includesKey(pinnedIds, key)){
@@ -1237,6 +1651,7 @@
             } else {
                 displayOrder.unshift(key);
             }
+            if(isNew) assignItemToActiveFolder(key);
             rebuildDisplayOrderFromPins();
             syncGalleryFingerprints();
             saveMeta();
@@ -1259,6 +1674,14 @@
             else favoriteIds = [...favoriteIds.filter(id => !StudioHistoryMeta.keysEqual(id, key)), key];
             saveMeta(); renderOutputGrid();
         }
+        function toggleHidden(item){
+            const key = historyKey(item);
+            if(!key) return;
+            if(StudioHistoryMeta.includesKey(hiddenIds, key)) hiddenIds = hiddenIds.filter(id => !StudioHistoryMeta.keysEqual(id, key));
+            else hiddenIds = [...hiddenIds.filter(id => !StudioHistoryMeta.keysEqual(id, key)), key];
+            saveMeta();
+            renderOutputGrid();
+        }
         function findHistoryItemByKey(key){
             if(key == null || key === '') return null;
             return allHistory.find(h => StudioHistoryMeta.keysEqual(historyKey(h), key));
@@ -1270,7 +1693,11 @@
             allHistory = allHistory.filter(h => !isRemovedKey(historyKey(h)));
             pinnedIds = pinnedIds.filter(id => !isRemovedKey(id));
             favoriteIds = favoriteIds.filter(id => !isRemovedKey(id));
+            hiddenIds = hiddenIds.filter(id => !isRemovedKey(id));
             displayOrder = displayOrder.filter(id => !isRemovedKey(id));
+            Object.keys(itemFolders).forEach(id => {
+                if(isRemovedKey(id)) delete itemFolders[id];
+            });
             matchers.forEach(k => {
                 [...selectedKeys].forEach(sk => {
                     if(StudioHistoryMeta.keysEqual(sk, k)) selectedKeys.delete(sk);
@@ -1385,6 +1812,7 @@
             if(data.type === 'studio-lang' && window.StudioI18n){
                 StudioI18n.set(e.data.lang);
                 applyTooltips();
+                renderFolderSelect();
                 syncBulkToolbarUI();
             }
             if(data.type === 'studio-layout-resize'){
@@ -1451,8 +1879,12 @@
         setOutputCols(outputCols);
         applyTooltips();
         initMediaFilterTabs();
+        renderFolderSelect();
         initBulkBoxSelect();
         initFileDropZone();
+        document.addEventListener('click', (e) => {
+            if(!e.target.closest?.('#folderSelectWrap')) closeFolderMenu();
+        });
         (async () => {
             await loadMetaFromServer();
             await loadAllHistory();

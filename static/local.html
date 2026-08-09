@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -79,8 +79,8 @@
     <link rel="stylesheet" href="/static/studio-range-slider.css?v=20260530-range-white">
     <link rel="stylesheet" href="/static/studio-pullup-select.css?v=20260530-pullup-select">
     <script src="/static/studio-pullup-select.js?v=20260530-pullup-select"></script>
-    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260530-prompt-height-4x">
-    <script src="/static/studio-prompt-enhance.js?v=20260530-prompt-height-4x"></script>
+    <link rel="stylesheet" href="/static/studio-prompt-enhance.css?v=20260809-enhance-confirm-out">
+    <script src="/static/studio-prompt-enhance.js?v=20260809-enhance-confirm-out"></script>
     <script src="/static/studio-range-slider.js?v=20260530-range-white" defer></script>
     <style>
         html:not(.studio-theme-dark):not(.theme-dark) body.mg-studio .options-panel .control-label {
@@ -94,7 +94,7 @@
             <div class="lg:col-span-3 options-panel h-full min-h-0 studio-panel-col">
                 <section class="tool-panel">
                     <label class="block">
-                        <div class="control-label mb-1"><span data-i18n="local.workflow">工作流</span></div>
+                        <div class="control-label mb-1"><span data-i18n="local.workflow">工作�?/span></div>
                         <select id="workflowSelect" class="size-select" onchange="selectWorkflow(this.value)"></select>
                     </label>
                 </section>
@@ -165,7 +165,7 @@
             if(typeof value === 'boolean') return 'boolean';
             if(typeof value === 'number') return /strength|cfg|denoise/.test(lc) ? 'slider' : 'number';
             if(typeof value === 'string'){
-                if(/prompt|text|description|提示词/.test(lc) || value.length > 60) return 'textarea';
+                if(/prompt|text|description|提示�?.test(lc) || value.length > 60) return 'textarea';
                 if(/image|filename/.test(lc)) return 'image';
                 return 'text';
             }
@@ -273,7 +273,7 @@
                 });
                 if(images.length){
                     html += `<div>
-                        <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图片</span></div>
+                        <div class="control-label mb-1"><span data-i18n="online.referenceImages">参考图�?/span></div>
                         <div id="localRefGrid" class="ref-grid"></div>
                     </div>`;
                 }
@@ -621,8 +621,7 @@
             await Promise.allSettled(jobs);
         }
 
-        // —— output grid (same pattern as online.html) ——
-        function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
+        // —�?output grid (same pattern as online.html) —�?        function historyKey(item){ return StudioHistoryMeta.historyKey(item); }
         function loadMeta(){
             try {
                 pinnedIds = StudioHistoryMeta.normalizeIdList(JSON.parse(localStorage.getItem(META_PIN)||'[]'));

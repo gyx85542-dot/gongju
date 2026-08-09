@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import shutil
 import sqlite3
 import time
@@ -306,6 +307,33 @@ def delete_history_by_timestamp(timestamp: Any) -> Optional[Dict[str, Any]]:
         return target
 
 
+def update_history_by_timestamp(timestamp: Any, patch: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Merge patch into a history record JSON and persist. Returns updated record."""
+    if not isinstance(patch, dict) or not patch:
+        return None
+    with DB_LOCK:
+        conn = _connect()
+        rows = conn.execute("SELECT id, record_json FROM history_records").fetchall()
+        for row in rows:
+            try:
+                item = json.loads(row["record_json"])
+            except Exception:
+                continue
+            if not _timestamp_matches(item.get("timestamp", 0), timestamp):
+                continue
+            for key, value in patch.items():
+                if key == "timestamp":
+                    continue
+                item[key] = value
+            conn.execute(
+                "UPDATE history_records SET record_json = ? WHERE id = ?",
+                (json.dumps(item, ensure_ascii=False), row["id"]),
+            )
+            conn.commit()
+            return item
+    return None
+
+
 def delete_history_batch(timestamps: List[Any]) -> List[Dict[str, Any]]:
     req_ts = [float(t) for t in timestamps]
     deleted: List[Dict[str, Any]] = []
@@ -333,7 +361,63 @@ def delete_history_batch(timestamps: List[Any]) -> List[Dict[str, Any]]:
 # --- History user meta (pin / favorite / order) ---
 
 def _default_history_user_meta() -> Dict[str, Any]:
-    return {"pinned": [], "favorites": [], "order": []}
+    return {
+        "pinned": [],
+        "favorites": [],
+        "hidden": [],
+        "order": [],
+        "folders": [],
+        "itemFolders": {},
+        "activeFolderId": "",
+    }
+
+
+def _sanitize_folder_id(raw: Any) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    if text == "__none__":
+        return text
+    if re.fullmatch(r"fld_[a-zA-Z0-9]{6,32}", text):
+        return text
+    return ""
+
+
+def _sanitize_folders(raw: Any) -> List[Dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    seen = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        fid = _sanitize_folder_id(item.get("id"))
+        name = str(item.get("name") or "").strip()[:80]
+        if not fid or not name or fid in seen or fid == "__none__":
+            continue
+        seen.add(fid)
+        created = item.get("created_at")
+        try:
+            created_at = float(created)
+        except (TypeError, ValueError):
+            created_at = time.time()
+        out.append({"id": fid, "name": name, "created_at": created_at})
+    return out
+
+
+def _sanitize_item_folders(raw: Any, valid_folder_ids: set) -> Dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key, value in raw.items():
+        item_key = _sanitize_history_meta_id(key)
+        folder_id = _sanitize_folder_id(value)
+        if not item_key or not folder_id or folder_id == "__none__":
+            continue
+        if folder_id not in valid_folder_ids:
+            continue
+        out[item_key] = folder_id
+    return out
 
 
 def _sanitize_history_meta_id(raw: Any) -> str:
@@ -379,17 +463,26 @@ def _sanitize_history_user_meta(data: Dict[str, Any]) -> Dict[str, Any]:
     base = _default_history_user_meta()
     if not isinstance(data, dict):
         return base
+    folders = _sanitize_folders(data.get("folders"))
+    valid_ids = {f["id"] for f in folders}
+    active = _sanitize_folder_id(data.get("activeFolderId"))
+    if active and active != "__none__" and active not in valid_ids:
+        active = ""
     return {
         "pinned": _sanitize_history_meta_list(data.get("pinned")),
         "favorites": _sanitize_history_meta_list(data.get("favorites")),
+        "hidden": _sanitize_history_meta_list(data.get("hidden")),
         "order": _sanitize_history_meta_list(data.get("order")),
+        "folders": folders,
+        "itemFolders": _sanitize_item_folders(data.get("itemFolders"), valid_ids),
+        "activeFolderId": active,
     }
 
 
 def _history_meta_needs_heal(data: Dict[str, Any]) -> bool:
     if not isinstance(data, dict):
         return True
-    for key in ("pinned", "favorites", "order"):
+    for key in ("pinned", "favorites", "hidden", "order"):
         raw = data.get(key)
         if not isinstance(raw, list):
             return True
@@ -397,6 +490,17 @@ def _history_meta_needs_heal(data: Dict[str, Any]) -> bool:
             sid = _sanitize_history_meta_id(item)
             if not sid or sid != str(item).strip():
                 return True
+    clean = _sanitize_history_user_meta(data)
+    if clean["folders"] != _sanitize_folders(data.get("folders")):
+        return True
+    if clean["itemFolders"] != _sanitize_item_folders(
+        data.get("itemFolders"),
+        {f["id"] for f in clean["folders"]},
+    ):
+        return True
+    active_raw = str(data.get("activeFolderId") or "").strip()
+    if active_raw and active_raw != clean["activeFolderId"]:
+        return True
     return False
 
 
@@ -432,24 +536,29 @@ def load_history_user_meta(scope: str) -> Dict[str, Any]:
         _persist_history_user_meta(scope, clean)
     return {
         "scope": scope,
-        "pinned": clean["pinned"],
-        "favorites": clean["favorites"],
-        "order": clean["order"],
+        **clean,
     }
 
 
 def save_history_user_meta(scope: str, meta: Dict[str, Any]) -> Dict[str, Any]:
     scope = str(scope or "studio").strip() or "studio"
-    clean = _sanitize_history_user_meta(meta if isinstance(meta, dict) else {})
-    payload = {
-        "pinned": clean["pinned"],
-        "favorites": clean["favorites"],
-        "order": clean["order"],
+    incoming = meta if isinstance(meta, dict) else {}
+    # Merge with existing so partial clients don't wipe folders.
+    existing = load_history_user_meta(scope)
+    merged = {
+        "pinned": incoming["pinned"] if "pinned" in incoming else existing.get("pinned"),
+        "favorites": incoming["favorites"] if "favorites" in incoming else existing.get("favorites"),
+        "hidden": incoming["hidden"] if "hidden" in incoming else existing.get("hidden"),
+        "order": incoming["order"] if "order" in incoming else existing.get("order"),
+        "folders": incoming["folders"] if "folders" in incoming else existing.get("folders"),
+        "itemFolders": incoming["itemFolders"] if "itemFolders" in incoming else existing.get("itemFolders"),
+        "activeFolderId": incoming["activeFolderId"] if "activeFolderId" in incoming else existing.get("activeFolderId"),
     }
-    _persist_history_user_meta(scope, payload)
+    clean = _sanitize_history_user_meta(merged)
+    _persist_history_user_meta(scope, clean)
     return {
         "scope": scope,
-        **payload,
+        **clean,
     }
 
 

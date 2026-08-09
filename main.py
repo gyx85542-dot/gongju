@@ -391,6 +391,7 @@ def mask_secret(value):
 BUILTIN_APIMART_ID = "apimart"
 BUILTIN_APIMART_LOCKED_IMAGE_MODELS = [
     "gpt-image-2",
+    "gpt-image-2-official",
     "gemini-3-pro-image-preview",
     "gemini-3.1-flash-image-preview",
 ]
@@ -814,9 +815,21 @@ class DeleteHistoryBatchRequest(BaseModel):
 
 class HistoryUserMetaPayload(BaseModel):
     scope: str = "studio"
-    pinned: List[str] = Field(default_factory=list)
-    favorites: List[str] = Field(default_factory=list)
-    order: List[str] = Field(default_factory=list)
+    pinned: Optional[List[str]] = None
+    favorites: Optional[List[str]] = None
+    hidden: Optional[List[str]] = None
+    order: Optional[List[str]] = None
+    folders: Optional[List[Dict[str, Any]]] = None
+    itemFolders: Optional[Dict[str, str]] = None
+    activeFolderId: Optional[str] = None
+
+class HistoryCopyRequest(BaseModel):
+    timestamp: float
+    folder_id: Optional[str] = None
+
+class HistoryRenameRequest(BaseModel):
+    timestamp: float
+    title: str = Field(default="", max_length=120)
 
 class OnlinePendingJob(BaseModel):
     id: str
@@ -1018,43 +1031,52 @@ def load_enhance_system_prompts() -> list:
     return pe.merge_enhance_prompts(_load_saved_enhance_prompts_raw())
 
 def save_enhance_system_prompts(prompts: list) -> list:
-    defaults = {item["id"] for item in pe.default_enhance_prompts()}
+    """Persist prompts in the caller-provided order (builtins + custom interleaved)."""
+    defaults = {item["id"]: item for item in pe.default_enhance_prompts()}
     normalized = []
     seen = set()
-    incoming = {str((raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else raw).get("id") or "").strip(): raw for raw in (prompts or []) if isinstance(raw, (dict, EnhanceSystemPromptItem))}
-    for default in pe.default_enhance_prompts():
-        pid = default["id"]
-        raw = incoming.get(pid)
-        item = raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else dict(raw or default)
-        name = str(item.get("name") or default["name"]).strip()
-        system_prompt = str(item.get("system_prompt") or default["system_prompt"]).strip()
-        normalized.append({
-            "id": pid,
-            "name": name or default["name"],
-            "system_prompt": system_prompt or default["system_prompt"],
-            "kind": default["kind"],
-            "builtin": True,
-        })
-        seen.add(pid)
     for raw in prompts or []:
-        item = raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else dict(raw)
+        item = raw.dict() if isinstance(raw, EnhanceSystemPromptItem) else dict(raw or {})
         pid = str(item.get("id") or "").strip() or uuid.uuid4().hex
-        if pid in defaults or pid in seen:
+        if pid in seen:
+            continue
+        if pid in defaults:
+            default = defaults[pid]
+            name = str(item.get("name") or default["name"]).strip()
+            system_prompt = str(item.get("system_prompt") or default["system_prompt"]).strip()
+            normalized.append({
+                "id": pid,
+                "name": name or default["name"],
+                "system_prompt": system_prompt or default["system_prompt"],
+                "kind": default["kind"],
+                "builtin": True,
+            })
+            seen.add(pid)
             continue
         name = str(item.get("name") or "").strip()
         system_prompt = str(item.get("system_prompt") or "").strip()
         if not name or not system_prompt:
             continue
-        if pid in seen:
-            pid = uuid.uuid4().hex
         seen.add(pid)
         normalized.append({
             "id": pid,
             "name": name,
             "system_prompt": system_prompt,
-            "kind": "llm",
+            "kind": pe.normalize_enhance_kind(item.get("kind")),
             "builtin": False,
         })
+    for default in pe.default_enhance_prompts():
+        pid = default["id"]
+        if pid in seen:
+            continue
+        normalized.append({
+            "id": pid,
+            "name": default["name"],
+            "system_prompt": default["system_prompt"],
+            "kind": default["kind"],
+            "builtin": True,
+        })
+        seen.add(pid)
     os.makedirs(DATA_DIR, exist_ok=True)
     with ENHANCE_SYSTEM_PROMPTS_LOCK:
         with open(ENHANCE_SYSTEM_PROMPTS_FILE, "w", encoding="utf-8") as f:
@@ -2002,7 +2024,8 @@ GPT_IMAGE2_MAX_PIXELS = 8_294_400
 GPT_IMAGE2_MIN_PIXELS = 655_360
 
 def is_gpt_image_2_model(model):
-    return str(model or "").strip().lower() == "gpt-image-2"
+    name = str(model or "").strip().lower()
+    return name == "gpt-image-2" or name.startswith("gpt-image-2-")
 
 def is_gemini_image_model(model):
     name = str(model or "").strip().lower()
@@ -2110,9 +2133,14 @@ async def generate_ai_image(prompt, size, quality, model, reference_images=None,
     is_gpt2 = is_gpt_image_2_model(model)
     is_apimart = is_apimart_provider(provider)
     quality = str(quality or "").strip().lower()
-    if quality not in {"low", "medium", "high"}:
+    if quality not in {"low", "medium", "high", "auto"}:
         quality = ""
-    if is_gpt_image_2_model(model) and not is_apimart:
+    # gpt-image-2 / gpt-image-2-official：质量默认 medium（文档可选 auto/low/medium/high）
+    if is_gpt2 and (not quality or quality == "auto"):
+        quality = "medium"
+    elif quality == "auto":
+        quality = ""
+    if is_gpt2 and not is_apimart:
         size = normalize_gpt_image_2_size(size)
     base_url = (provider.get("base_url") or AI_BASE_URL).rstrip("/")
     if not base_url:
@@ -2152,6 +2180,8 @@ async def generate_ai_image(prompt, size, quality, model, reference_images=None,
             }
             if apimart_resolution:
                 body["resolution"] = apimart_resolution
+            if quality:
+                body["quality"] = quality
             if image_refs:
                 body["image_urls"] = [reference_to_data_url(ref, max_size=1536) for ref in image_refs[:16]]
             response = await client.post(gen_url, headers=api_headers(provider=provider), json=body)
@@ -3577,10 +3607,9 @@ async def api_prompt_enhance(payload: PromptEnhanceRequest):
     audios = [str(a).strip() for a in (payload.reference_audios or []) if str(a or "").strip()]
     has_any_input = bool(user_text or refs or videos or audios)
 
-    if item.get("kind") == "local":
-        if item.get("id") == "image_upscale":
-            pass
-        elif not user_text:
+    kind = pe.normalize_enhance_kind(item.get("kind"))
+    if kind in ("local", "fixed"):
+        if pe.enhance_needs_user_text(item) and not user_text:
             raise HTTPException(status_code=400, detail="请先输入提示词")
         return {
             "prompt": pe.run_local_enhance(item, user_text),
@@ -3635,14 +3664,44 @@ async def get_history_user_meta(scope: str = Query("studio")):
 
 @app.put("/api/history/user-meta")
 async def put_history_user_meta(payload: HistoryUserMetaPayload):
-    return db.save_history_user_meta(
-        payload.scope,
-        {
-            "pinned": payload.pinned or [],
-            "favorites": payload.favorites or [],
-            "order": payload.order or [],
-        },
-    )
+    meta: Dict[str, Any] = {}
+    data = payload.dict(exclude_unset=True)
+    for key in ("pinned", "favorites", "hidden", "order", "folders", "itemFolders", "activeFolderId"):
+        if key in data:
+            meta[key] = data[key]
+    return db.save_history_user_meta(payload.scope, meta)
+
+@app.post("/api/history/copy")
+async def copy_history_record(req: HistoryCopyRequest):
+    """Reference-copy a history item (same media URLs, new timestamp)."""
+    try:
+        source = None
+        with HISTORY_LOCK:
+            for item in db.list_history_records():
+                ts = item.get("timestamp", 0)
+                if isinstance(ts, (int, float)) and abs(float(ts) - float(req.timestamp)) < 0.001:
+                    source = item
+                    break
+                if str(ts) == str(req.timestamp):
+                    source = item
+                    break
+        if not source:
+            raise HTTPException(status_code=404, detail="记录不存在")
+        clone = json.loads(json.dumps(source, ensure_ascii=False))
+        clone["timestamp"] = time.time()
+        params = clone.get("params") if isinstance(clone.get("params"), dict) else {}
+        params = dict(params)
+        params["copied_from"] = source.get("timestamp")
+        clone["params"] = params
+        save_to_history(clone)
+        if GLOBAL_LOOP:
+            asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(clone), GLOBAL_LOOP)
+        return {"success": True, "item": clone}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Copy history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.get("/api/queue_status")
 async def get_queue_status(client_id: str):
@@ -3651,6 +3710,17 @@ async def get_queue_status(client_id: str):
         positions = [i + 1 for i, t in enumerate(QUEUE) if t["client_id"] == client_id]
         position = positions[0] if positions else 0
     return {"total": total, "position": position}
+
+@app.post("/api/history/rename")
+async def rename_history_record(req: HistoryRenameRequest):
+    title = str(req.title or "").strip()[:120]
+    with HISTORY_LOCK:
+        item = db.update_history_by_timestamp(req.timestamp, {"title": title})
+    if not item:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    if GLOBAL_LOOP:
+        asyncio.run_coroutine_threadsafe(manager.broadcast_new_image(item), GLOBAL_LOOP)
+    return {"success": True, "item": item}
 
 @app.post("/api/history/delete")
 async def delete_history(req: DeleteHistoryRequest):
@@ -4280,7 +4350,7 @@ async def get_canvas_comfy_task(task_id: str):
 
 # --- RunningHub API ---
 RUNNINGHUB_BASE_URL = "https://www.runninghub.cn"
-RUNNINGHUB_TASK_TIMEOUT = 1200  # RunningHub 生图最长等待 20 分钟
+RUNNINGHUB_TASK_TIMEOUT = 2940  # RunningHub 任务最长等待 49 分钟
 RUNNINGHUB_POLL_INTERVAL = 30  # 轮询间隔（秒）
 RUNNINGHUB_API_KEY_ENV = "RUNNINGHUB_API_KEY"
 RUNNINGHUB_CONFIG_FILE = os.path.join(DATA_DIR, "runninghub.json")
@@ -5034,11 +5104,84 @@ def runninghub_field_value(api_key: str, field_type: str, value: Any, references
         return str(value if value is not None else "")
     return str(value if value is not None else "").strip()
 
+_RH_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"}
+_RH_VIDEO_EXTS = {".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v"}
+_RH_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus", ".weba", ".wma"}
+
+
+def sniff_media_extension(path: str, fallback: str = ".bin") -> str:
+    """Detect real media type from file magic bytes (RunningHub URLs often omit/wrong ext)."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(32)
+    except Exception:
+        return fallback or ".bin"
+    if head.startswith(b"\x89PNG"):
+        return ".png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if head.startswith(b"GIF8"):
+        return ".gif"
+    if head.startswith(b"RIFF") and head[8:12] == b"WAVE":
+        return ".wav"
+    if head.startswith(b"RIFF") and head[8:12] == b"AVI ":
+        return ".avi"
+    if head.startswith(b"fLaC"):
+        return ".flac"
+    if head.startswith(b"OggS"):
+        return ".ogg"
+    if head.startswith(b"ID3") or head[:2] in (b"\xff\xfb", b"\xff\xfa", b"\xff\xf3", b"\xff\xf2"):
+        return ".mp3"
+    if len(head) >= 12 and head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand in (b"M4A ", b"M4B ", b"mp42", b"isom", b"MSNV") or b"mp4" in brand.lower():
+            # Ambiguous; prefer audio only for clear M4A brands
+            if brand in (b"M4A ", b"M4B "):
+                return ".m4a"
+            return ".mp4"
+    if head.startswith(b"\x1aE\xdf\xa3"):
+        return ".webm"
+    return fallback or ".bin"
+
+
+def classify_local_media_url(url: str) -> str:
+    """Return 'image' | 'video' | 'audio' for a local/remote media URL."""
+    text = str(url or "").strip()
+    path = output_file_from_url(text)
+    ext = ""
+    if path and os.path.isfile(path):
+        ext = sniff_media_extension(path, os.path.splitext(path)[1].lower() or ".bin")
+    if not ext:
+        ext = os.path.splitext(urllib.parse.urlparse(text).path)[1].lower()
+    if ext in _RH_AUDIO_EXTS:
+        return "audio"
+    if ext in _RH_VIDEO_EXTS:
+        return "video"
+    return "image"
+
+
+def split_runninghub_outputs(outputs: List[str]):
+    images, videos, audios = [], [], []
+    for raw in outputs or []:
+        u = str(raw or "").strip()
+        if not u:
+            continue
+        kind = classify_local_media_url(u)
+        if kind == "audio":
+            audios.append(u)
+        elif kind == "video":
+            videos.append(u)
+        else:
+            images.append(u)
+    return images, videos, audios
+
+
 def runninghub_download_output(url: str):
     parsed = urllib.parse.urlparse(url)
-    ext = os.path.splitext(parsed.path)[1].lower() or ".png"
-    if ext not in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov"]:
-        ext = ".png"
+    ext = os.path.splitext(parsed.path)[1].lower() or ".bin"
+    allowed = _RH_IMAGE_EXTS | _RH_VIDEO_EXTS | _RH_AUDIO_EXTS
+    if ext not in allowed:
+        ext = ".bin"
     filename = f"rh_{uuid.uuid4().hex[:12]}{ext}"
     folder, _ = output_storage("output")
     path = os.path.join(folder, filename)
@@ -5048,8 +5191,17 @@ def runninghub_download_output(url: str):
             for chunk in resp.iter_content(chunk_size=1024 * 64):
                 if chunk:
                     f.write(chunk)
-    rel = os.path.relpath(path, OUTPUT_DIR).replace("\\", "/")
-    return f"/output/{rel}"
+    sniffed = sniff_media_extension(path, ext if ext != ".bin" else ".png")
+    if sniffed != os.path.splitext(path)[1].lower():
+        new_name = f"rh_{uuid.uuid4().hex[:12]}{sniffed}"
+        new_path = os.path.join(folder, new_name)
+        try:
+            os.replace(path, new_path)
+            path = new_path
+            filename = new_name
+        except Exception:
+            filename = os.path.basename(path)
+    return output_url_for(filename, "output")
 
 def runninghub_format_task_failure(data: Any) -> str:
     if not isinstance(data, dict):
@@ -5315,10 +5467,7 @@ def build_runninghub_result(payload: RunningHubRunRequest):
         raise HTTPException(status_code=502, detail="RunningHub 未返回 taskId")
     result = runninghub_wait_outputs(api_key, task_id)
     outputs = result.get("outputs") or []
-    images = [u for u in outputs if str(u).startswith("/output/") or str(u).startswith("/assets/") or (str(u).startswith("http") and not str(u).lower().endswith((".mp4", ".webm", ".mov")))]
-    videos = [u for u in outputs if str(u).lower().endswith((".mp4", ".webm", ".mov"))]
-    if not images and outputs:
-        images = [u for u in outputs if not str(u).lower().endswith((".mp4", ".webm", ".mov"))]
+    images, videos, audios = split_runninghub_outputs(outputs)
     prompt_text = global_prompt
     if not prompt_text:
         incoming = {str(k): v for k, v in (payload.fields or {}).items()}
@@ -5336,6 +5485,7 @@ def build_runninghub_result(payload: RunningHubRunRequest):
         "prompt": prompt_text,
         "images": images,
         "videos": videos,
+        "audios": audios,
         "outputs": outputs,
         "timestamp": current_timestamp,
         "type": "runninghub",
@@ -5365,6 +5515,7 @@ def build_runninghub_result(payload: RunningHubRunRequest):
         "task_id": task_id,
         "images": images,
         "videos": videos,
+        "audios": audios,
         "outputs": outputs,
         "remote_outputs": result.get("remote_outputs") or [],
         "timestamp": current_timestamp,

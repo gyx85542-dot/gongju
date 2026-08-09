@@ -249,6 +249,12 @@ SYSTEM_BY_MODE = {
 
 
 LOCAL_INPUT_PLACEHOLDER = "{input}"
+ENHANCE_KINDS = frozenset({"fixed", "local", "llm"})
+
+
+def normalize_enhance_kind(kind: str | None) -> str:
+    k = str(kind or "llm").strip().lower()
+    return k if k in ENHANCE_KINDS else "llm"
 
 
 def default_enhance_prompts() -> list:
@@ -277,7 +283,7 @@ def default_enhance_prompts() -> list:
         {
             "id": "image_upscale",
             "name": "图片高清放大",
-            "kind": "local",
+            "kind": "fixed",
             "builtin": True,
             "system_prompt": IMAGE_UPSCALE_PROMPT,
         },
@@ -299,39 +305,67 @@ def default_enhance_prompts() -> list:
 
 
 def merge_enhance_prompts(saved: list | None) -> list:
+    """Merge saved prompts with builtins while preserving saved list order."""
     defaults = {item["id"]: item for item in default_enhance_prompts()}
-    saved_map = {}
-    for raw in saved or []:
-        if not isinstance(raw, dict):
-            continue
-        pid = str(raw.get("id") or "").strip()
-        if pid:
-            saved_map[pid] = raw
+    default_order = [item["id"] for item in default_enhance_prompts()]
+    saved_list = [
+        raw for raw in (saved or [])
+        if isinstance(raw, dict) and str(raw.get("id") or "").strip()
+    ]
+    if not saved_list:
+        return [
+            {
+                "id": item["id"],
+                "name": item["name"],
+                "system_prompt": item["system_prompt"],
+                "kind": normalize_enhance_kind(item["kind"]),
+                "builtin": True,
+            }
+            for item in default_enhance_prompts()
+        ]
+
     merged = []
-    for default in default_enhance_prompts():
-        pid = default["id"]
-        hit = saved_map.get(pid) or {}
-        merged.append({
-            "id": pid,
-            "name": str(hit.get("name") or default["name"]).strip() or default["name"],
-            "system_prompt": str(hit.get("system_prompt") or default["system_prompt"]).strip() or default["system_prompt"],
-            "kind": default["kind"],
-            "builtin": True,
-        })
-    for pid, hit in saved_map.items():
-        if pid in defaults:
+    seen = set()
+    for raw in saved_list:
+        pid = str(raw.get("id") or "").strip()
+        if not pid or pid in seen:
             continue
-        name = str(hit.get("name") or "").strip()
-        system_prompt = str(hit.get("system_prompt") or "").strip()
+        if pid in defaults:
+            default = defaults[pid]
+            merged.append({
+                "id": pid,
+                "name": str(raw.get("name") or default["name"]).strip() or default["name"],
+                "system_prompt": str(raw.get("system_prompt") or default["system_prompt"]).strip() or default["system_prompt"],
+                "kind": normalize_enhance_kind(default["kind"]),
+                "builtin": True,
+            })
+            seen.add(pid)
+            continue
+        name = str(raw.get("name") or "").strip()
+        system_prompt = str(raw.get("system_prompt") or "").strip()
         if not name or not system_prompt:
             continue
         merged.append({
             "id": pid,
             "name": name,
             "system_prompt": system_prompt,
-            "kind": "llm",
+            "kind": normalize_enhance_kind(raw.get("kind")),
             "builtin": False,
         })
+        seen.add(pid)
+
+    for pid in default_order:
+        if pid in seen:
+            continue
+        default = defaults[pid]
+        merged.append({
+            "id": pid,
+            "name": default["name"],
+            "system_prompt": default["system_prompt"],
+            "kind": normalize_enhance_kind(default["kind"]),
+            "builtin": True,
+        })
+        seen.add(pid)
     return merged
 
 
@@ -373,16 +407,44 @@ def build_image_upscale(_user_input: str = "", template: str = "") -> str:
     return text or IMAGE_UPSCALE_PROMPT
 
 
+def apply_local_template(template: str, user_text: str) -> str:
+    """String concat: replace known placeholders, else append user text."""
+    tpl = template or ""
+    text = (user_text or "").strip()
+    if STORYBOARD_GRID_PLACEHOLDER in tpl:
+        return tpl.replace(STORYBOARD_GRID_PLACEHOLDER, text)
+    if LOCAL_INPUT_PLACEHOLDER in tpl:
+        return tpl.replace(LOCAL_INPUT_PLACEHOLDER, text)
+    if text and tpl:
+        return f"{tpl}\n{text}".strip()
+    return (tpl or text).strip()
+
+
+def enhance_needs_user_text(item: dict) -> bool:
+    kind = normalize_enhance_kind(item.get("kind"))
+    if kind == "fixed":
+        return False
+    if kind == "local":
+        return True
+    return False
+
+
+def local_template_needs_user_text(item: dict) -> bool:
+    """Backward-compatible alias."""
+    return enhance_needs_user_text(item)
+
+
 def run_local_enhance(item: dict, user_text: str) -> str:
     mode = str(item.get("id") or "").strip()
     template = str(item.get("system_prompt") or "")
+    kind = normalize_enhance_kind(item.get("kind"))
+    if kind == "fixed" or mode == "image_upscale":
+        return build_image_upscale(user_text, template)
     if mode == "storyboard_grid":
         return build_storyboard_grid(user_text, template)
     if mode == "character_turnaround":
         return build_character_turnaround(user_text, template)
-    if mode == "image_upscale":
-        return build_image_upscale(user_text, template)
-    raise ValueError(f"Unknown local enhance mode: {mode}")
+    return apply_local_template(template, user_text)
 
 
 def resolve_enhance_provider_id(
