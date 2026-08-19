@@ -762,6 +762,10 @@
                     <span class="nav-icon"><i data-lucide="messages-square"></i></span>
                     <span class="nav-text" data-i18n="nav.gpt">AI 对话</span>
                 </div>
+                <div class="nav-item" onclick="switchUI(this, 'reverse')">
+                    <span class="nav-icon"><i data-lucide="scan-search"></i></span>
+                    <span class="nav-text" data-i18n="nav.reverse">提示词反推</span>
+                </div>
             </nav>
 
             <div class="side-actions">
@@ -816,10 +820,10 @@
         <main class="stage">
             <div id="studio-shell" class="studio-shell active">
                     <div class="studio-panels studio-module">
-                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260809-enhance-confirm-out" class="active" scrolling="no"></iframe>
-                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260809-enhance-confirm-out" scrolling="no"></iframe>
-                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260809-enhance-confirm-out" scrolling="no"></iframe>
-                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260809-enhance-confirm-out" scrolling="no"></iframe>
+                        <iframe id="frame-online" data-src="/static/online.html?embed=panel&v=20260815-html-utf8-fix" class="active" scrolling="no"></iframe>
+                        <iframe id="frame-local" data-src="/static/local.html?embed=panel&page=local&v=20260815-html-utf8-fix" scrolling="no"></iframe>
+                        <iframe id="frame-video" data-src="/static/video.html?embed=panel&page=video&v=20260815-html-utf8-fix" scrolling="no"></iframe>
+                        <iframe id="frame-runninghub" data-src="/static/runninghub.html?embed=panel&page=runninghub&v=20260815-html-utf8-fix" scrolling="no"></iframe>
                         <div id="studioPanelResizeHandle" class="studio-panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize parameter panel" title="拖拽调整参数面板宽度"></div>
                     </div>
                     <div class="studio-gallery-wrap studio-module">
@@ -828,6 +832,7 @@
             </div>
             <div id="full-stage" class="full-stage">
                 <iframe id="frame-gpt-chat" data-src="/static/gpt-chat.html?v=20260530-provider-sync" scrolling="yes"></iframe>
+                <iframe id="frame-reverse" data-src="/static/reverse.html?v=20260819-reverse-3" scrolling="yes"></iframe>
                 <iframe id="frame-api-settings" data-src="/static/api-settings.html?v=20260530-provider-sync" scrolling="yes"></iframe>
                 <iframe id="frame-comfyui-settings" data-src="/static/comfyui-settings.html?v=20260530-no-canvas" scrolling="yes"></iframe>
                 <iframe id="frame-runninghub-settings" data-src="/static/runninghub-settings.html?v=20260809-rh-reorder2" scrolling="yes"></iframe>
@@ -1008,7 +1013,7 @@
         localStorage.setItem("client_id", CID);
         const ACTIVE_PAGE_KEY = 'studio_active_page';
         const DEFAULT_PAGE_ID = 'online';
-        const PAGE_IDS = ['online','local','video','gpt-chat','runninghub','api-settings','comfyui-settings','runninghub-settings','system-prompt-settings'];
+        const PAGE_IDS = ['online','local','video','gpt-chat','reverse','runninghub','api-settings','comfyui-settings','runninghub-settings','system-prompt-settings'];
 
         const STUDIO_PAGE_IDS = ['online','local','video','runninghub'];
         const STUDIO_AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|flac|opus|weba)(\?|$)/i;
@@ -1146,7 +1151,7 @@
         }
 
         function preloadFullStageFrames(){
-            ['gpt-chat', 'api-settings', 'comfyui-settings', 'runninghub-settings', 'system-prompt-settings'].forEach((id, index) => {
+            ['gpt-chat', 'reverse', 'api-settings', 'comfyui-settings', 'runninghub-settings', 'system-prompt-settings'].forEach((id, index) => {
                 setTimeout(() => {
                     ensureFrameLoaded(document.getElementById('frame-' + id));
                 }, index * 300);

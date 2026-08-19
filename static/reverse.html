@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <title>提示词反推</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --accent:#ff4d94; --bg:#1a1a1a; --card:#212121; --soft:#313131;
+            --line:rgba(255,255,255,.08); --text:#f5f5f5; --muted:#a3a3a3; --faint:#737373;
+            --ok:#7ee787; --bad:#ff6b6b; --radius:12px;
+            --card-size:230px;
+            --ease:cubic-bezier(0.22,1,0.36,1);
+        }
+        * { box-sizing:border-box; }
+        html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif; -webkit-font-smoothing:antialiased; }
+        button, input, select, textarea { font:inherit; color:inherit; }
+        button { cursor:pointer; }
+        ::selection { background:rgba(255,77,148,.4); }
+
+        .topbar { position:sticky; top:0; z-index:5; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px 22px; background:rgba(26,26,26,.92); border-bottom:1px solid var(--line); backdrop-filter:blur(18px); }
+        .brand { font-size:14px; font-weight:600; letter-spacing:.02em; margin-right:6px; white-space:nowrap; }
+        .search-wrap { flex:1 1 200px; min-width:160px; position:relative; }
+        .search { width:100%; background:var(--soft); border:1px solid transparent; border-radius:var(--radius); padding:8px 30px 8px 12px; font-size:12px; outline:none; }
+        .search:focus { border-color:rgba(255,77,148,.45); }
+        .search-clear { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--faint); font-size:15px; padding:2px 6px; }
+        .search-count { font-size:10px; color:var(--faint); white-space:nowrap; }
+        .size-wrap { display:flex; align-items:center; gap:8px; font-size:10px; color:var(--muted); white-space:nowrap; }
+        .size-wrap input { accent-color:var(--accent); width:110px; }
+        .btn { background:var(--soft); border:1px solid var(--line); border-radius:var(--radius); padding:8px 14px; font-size:11px; font-weight:600; color:var(--muted); transition:all .18s var(--ease); white-space:nowrap; }
+        .btn:hover:not(:disabled) { background:#3a3a3a; color:var(--text); }
+        .btn:disabled { opacity:.5; cursor:not-allowed; }
+        .btn-accent { background:var(--accent); border-color:transparent; color:#fff; box-shadow:0 4px 14px rgba(255,77,148,.25); }
+        .btn-accent:hover:not(:disabled) { background:#e8437f; color:#fff; }
+
+        .wall { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--card-size), 1fr)); gap:14px; padding:18px 22px 60px; align-items:start; }
+        .empty { text-align:center; color:var(--faint); font-size:12px; padding:60px 0; }
+
+        .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; transition:border-color .2s, box-shadow .2s; }
+        .card.clickable { cursor:pointer; }
+        .card.clickable:hover { border-color:rgba(255,77,148,.35); }
+        .card.flash { box-shadow:0 0 0 2px var(--accent); }
+        .card .thumbs { display:flex; gap:2px; height:calc(var(--card-size) * .48); background:#161616; overflow:hidden; }
+        .card .thumbs img { flex:1; min-width:0; object-fit:cover; height:100%; }
+        .card .thumbs .ph { flex:1; background:repeating-linear-gradient(45deg,#202020,#202020 8px,#242424 8px,#242424 16px); }
+        .card .thumbs .more { flex:0 0 34%; display:flex; align-items:center; justify-content:center; background:#232323; font-size:12px; color:var(--muted); }
+        .card .body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:6px; }
+        .kicker { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); }
+        .clip { margin:0; font-size:11.5px; line-height:1.55; color:var(--text); display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+        .clip.s { color:var(--muted); font-size:10.5px; }
+        .meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:9.5px; color:var(--faint); margin-top:2px; }
+        .badge { padding:2px 8px; border-radius:20px; font-weight:700; font-size:9px; letter-spacing:.04em; }
+        .badge.ok { background:rgba(126,231,135,.12); color:var(--ok); }
+        .badge.bad { background:rgba(255,107,107,.12); color:var(--bad); }
+        .badge.run { background:rgba(255,77,148,.12); color:var(--accent); }
+        .card-actions { display:flex; gap:6px; }
+        .mini { background:none; border:1px solid var(--line); border-radius:8px; padding:3px 8px; font-size:9.5px; color:var(--muted); }
+        .mini:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
+
+        .card.draft { border-color:rgba(255,77,148,.4); }
+        .editor { padding:12px; display:flex; flex-direction:column; gap:8px; }
+        .editor.drop-on { outline:2px dashed var(--accent); outline-offset:-6px; }
+        .editor textarea, .editor input[type=text], .editor select { background:var(--soft); border:1px solid transparent; border-radius:10px; padding:8px 10px; font-size:11.5px; outline:none; width:100%; }
+        .editor textarea:focus, .editor input:focus, .editor select:focus { border-color:rgba(255,77,148,.45); }
+        .editor textarea { resize:vertical; min-height:52px; }
+        .editor textarea.sys { min-height:74px; }
+        .file-btn { text-align:center; border-style:dashed; }
+        .file-btn input { display:none; }
+        .previews { display:flex; flex-wrap:wrap; gap:6px; }
+        .previews:empty { display:none; }
+        .previews button { position:relative; width:52px; height:52px; padding:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:none; }
+        .previews img { width:100%; height:100%; object-fit:cover; display:block; }
+        .previews button::after { content:"×"; position:absolute; top:0; right:0; width:16px; height:16px; line-height:15px; font-size:12px; text-align:center; background:rgba(0,0,0,.65); color:#fff; border-bottom-left-radius:6px; opacity:0; transition:opacity .15s; }
+        .previews button:hover::after { opacity:1; }
+        .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .err { margin:0; color:var(--bad); font-size:10.5px; }
+
+        .modal-bg { position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.6); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:26px; }
+        .modal { background:var(--card); border:1px solid var(--line); border-radius:16px; width:min(860px,100%); max-height:calc(100vh - 52px); display:flex; flex-direction:column; min-height:0; box-shadow:0 30px 80px rgba(0,0,0,.5); }
+        .modal-head { padding:16px 20px 10px; border-bottom:1px solid var(--line); flex-shrink:0; }
+        .modal-head h2 { margin:0; font-size:14px; font-weight:600; }
+        .modal-head .kicker { margin-top:4px; }
+        .modal-body { padding:14px 20px; overflow:auto; display:flex; flex-direction:column; gap:12px; flex:1; min-height:0; }
+        .modal-foot { padding:12px 20px 16px; border-top:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0; }
+        .fold { border:1px solid var(--line); border-radius:10px; flex-shrink:0; overflow:visible; }
+        .fold-head { width:100%; display:flex; justify-content:space-between; align-items:center; background:var(--soft); border:none; padding:9px 12px; font-size:11px; font-weight:600; color:var(--muted); border-radius:10px 10px 0 0; }
+        .fold-head:hover { color:var(--text); }
+        .fold-body { padding:10px 12px 12px; overflow:visible; }
+        .fold.is-closed .fold-body { display:none; }
+        .fold.is-closed .fold-head { border-radius:10px; }
+        .full { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; font-size:12px; line-height:1.7; }
+        .modal-imgs { display:flex; flex-wrap:wrap; gap:10px; }
+        .modal-imgs img { max-width:180px; max-height:180px; width:auto; height:auto; object-fit:contain; background:#161616; border-radius:8px; border:1px solid var(--line); cursor:zoom-in; }
+        .zoom-bg { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; cursor:zoom-out; }
+        .zoom-bg img { max-width:94vw; max-height:94vh; object-fit:contain; }
+
+        .preset-form, .preset-item { display:flex; flex-direction:column; gap:8px; border:1px solid var(--line); border-radius:10px; padding:12px; }
+        .preset-form label, .preset-item label { display:flex; flex-direction:column; gap:5px; font-size:10px; color:var(--faint); }
+        .preset-form input, .preset-form textarea, .preset-item input, .preset-item textarea { background:var(--soft); border:1px solid transparent; border-radius:8px; padding:8px 10px; font-size:11.5px; outline:none; }
+        .preset-form textarea, .preset-item textarea { min-height:70px; resize:vertical; }
+        .preset-actions { display:flex; gap:8px; }
+        .streaming-cursor::after { content:""; display:inline-block; width:6px; height:1em; margin-left:2px; background:var(--accent); vertical-align:-.15em; animation:blink .9s steps(2,end) infinite; }
+        @keyframes blink { 0%,45%{opacity:1;} 46%,100%{opacity:0;} }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">提示词反推</div>
+        <div class="search-wrap">
+            <input id="searchInput" class="search" placeholder="搜索输入、系统提示词、产出">
+            <button id="searchClear" class="search-clear" style="display:none">×</button>
+        </div>
+        <span id="countLabel" class="search-count"></span>
+        <label class="size-wrap">卡片大小 <input id="sizeRange" type="range" min="160" max="340" value="230"></label>
+        <button class="btn" id="presetBtn" type="button">管理预设</button>
+        <button class="btn btn-accent" id="newBtn" type="button">新建反推</button>
+    </header>
+
+    <main id="wall" class="wall"></main>
+    <p id="emptyTip" class="empty" style="display:none"></p>
+
+    <div id="modalHost"></div>
+
+    <script>
+    'use strict';
+    const DEFAULT_MODEL = 'gemini-3.5-flash';
+    const UI_KEY = 'reverse_ui_v1';
+    let MODELS = [DEFAULT_MODEL];
+    let cards = [];
+    let presets = [];
+    let drafts = [];
+    let searchText = '';
+    let openCardId = null;
+    let flashId = null;
+
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const imgUrl = img => '/assets/reverse/' + img.file_path;
+    const shortModel = m => String(m || '').replace(/^gemini-/, '');
+
+    function formatTime(iso){
+        if(!iso) return '';
+        const d = new Date(iso); if(isNaN(d)) return iso;
+        const now = new Date();
+        const hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        const days = Math.round((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - new Date(d.getFullYear(),d.getMonth(),d.getDate())) / 86400000);
+        if(days === 0) return '今天 ' + hm;
+        if(days === 1) return '昨天 ' + hm;
+        if(d.getFullYear() === now.getFullYear()) return (d.getMonth()+1) + '/' + d.getDate() + ' ' + hm;
+        return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' ' + hm;
+    }
+
+    async function fetchJSON(url, options){
+        const res = await fetch(url, options);
+        if(res.status === 204) return null;
+        const data = await res.json().catch(() => ({}));
+        if(!res.ok) throw new Error(data.detail || data.error || ('请求失败 ' + res.status));
+        return data;
+    }
+
+    async function readSSE(res, onEvent){
+        if(!res.ok){
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || data.error || ('请求失败 ' + res.status));
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while(true){
+            const { done, value } = await reader.read();
+            if(done) break;
+            buffer += decoder.decode(value, { stream:true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for(const line of lines){
+                const trimmed = line.trim();
+                if(!trimmed.startsWith('data:')) continue;
+                const raw = trimmed.slice(5).trim();
+                if(!raw) continue;
+                try { onEvent(JSON.parse(raw)); } catch(e) {}
+            }
+        }
+    }
+
+    function isImageFile(f){ return /^image\/(jpeg|png|webp|gif)$/.test(f.type); }
+
+    function emptyDraft(source){
+        return {
+            localId: 'd' + Math.random().toString(36).slice(2),
+            userText: source?.user_text || '',
+            systemPrompt: source?.system_prompt || '',
+            presetId: source?.preset_id || '',
+            presetName: source?.preset_name || '',
+            model: source?.model || DEFAULT_MODEL,
+            customModel: '',
+            sourceCardId: source?.id || null,
+            files: [],
+            keepFrom: source || null,
+            error: '',
+            running: false,
+        };
+    }
+
+    async function filesFromCard(card){
+        const files = [];
+        for(const img of card.images || []){
+            const res = await fetch(imgUrl(img));
+            const blob = await res.blob();
+            files.push(new File([blob], img.original_name || 'image', { type: img.mime }));
+        }
+        return files;
+    }
+
+    // ---------- 数据加载 ----------
+    async function reload(){
+        const [c, p] = await Promise.all([
+            fetchJSON('/api/reverse/cards?q=' + encodeURIComponent(searchText)),
+            fetchJSON('/api/reverse/presets'),
+        ]);
+        cards = c; presets = p;
+        render();
+    }
+
+    async function loadConfig(){
+        try {
+            const cfg = await fetchJSON('/api/reverse/config');
+            MODELS = cfg.options || [DEFAULT_MODEL];
+        } catch(e) {}
+    }
+
+    // ---------- 渲染 ----------
+    function clampLines(){
+        const size = Number(document.getElementById('sizeRange').value);
+        if(size < 190) return 2;
+        if(size < 270) return 3;
+        return 4;
+    }
+
+    function render(){
+        const wall = document.getElementById('wall');
+        const lines = clampLines();
+        wall.innerHTML =
+            drafts.map(renderDraft).join('') +
+            cards.map(card => renderCard(card, lines)).join('');
+        const tip = document.getElementById('emptyTip');
+        if(!drafts.length && !cards.length){
+            tip.style.display = '';
+            tip.textContent = searchText ? ('没有匹配「' + searchText + '」的卡片') : '还没有反推。点右上角「新建反推」开始。';
+        } else tip.style.display = 'none';
+        document.getElementById('countLabel').textContent = searchText ? ('匹配 ' + cards.length + ' 条') : (cards.length + ' 条');
+        bindDraftEvents();
+        if(window.lucide) lucide.createIcons();
+    }
+
+    function renderCard(card, lines){
+        const imgs = card.images || [];
+        const shown = imgs.slice(0, 3);
+        const extra = imgs.length - shown.length;
+        const statusCls = card.status === 'succeeded' ? 'ok' : card.status === 'failed' ? 'bad' : 'run';
+        const statusTxt = card.status === 'succeeded' ? '成功' : card.status === 'failed' ? '失败' : '进行中';
+        const main = card.output || card.error || (card.status === 'failed' ? '失败，尚未产出' : '尚无产出');
+        return `<article class="card clickable ${card.status}${flashId === card.id ? ' flash' : ''}" data-open="${card.id}" id="card-${card.id}">
+            <div class="thumbs">${imgs.length === 0 ? '<div class="ph"></div>'
+                : shown.map(img => `<img src="${esc(imgUrl(img))}" alt="" loading="lazy">`).join('') + (extra > 0 ? `<div class="more">+${extra}</div>` : '')}</div>
+            <div class="body">
+                <div class="kicker">${esc(card.preset_name || '产出')}</div>
+                <p class="clip${card.status === 'running' ? ' streaming-cursor' : ''}" style="-webkit-line-clamp:${lines}">${esc(main)}</p>
+                ${card.user_text ? `<p class="clip s" style="-webkit-line-clamp:${Math.max(1, lines-1)}">${esc(card.user_text)}</p>` : ''}
+                <div class="meta"><span>${esc(shortModel(card.model))} · ${esc(formatTime(card.created_at))}</span><span class="badge ${statusCls}">${statusTxt}</span></div>
+                <div class="card-actions">
+                    ${card.output ? `<button class="mini" data-copy="${card.id}">复制</button>` : ''}
+                    ${card.source_card_id ? `<button class="mini" data-jump="${card.source_card_id}">来自 #${card.source_card_id}</button>` : ''}
+                </div>
+            </div>
+        </article>`;
+    }
+
+    function renderDraft(d){
+        const isCustom = d.model === 'custom' || !MODELS.includes(d.model);
+        return `<article class="card draft" id="draft-${d.localId}">
+            <div class="editor" data-draft="${d.localId}">
+                <div class="kicker">${d.sourceCardId ? ('再跑 · 来自 #' + d.sourceCardId) : '新卡片'}</div>
+                <label class="btn file-btn">添加图片 / 拖入 / Ctrl+V<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-files></label>
+                <div class="previews">${previewsHtml(d)}</div>
+                <textarea data-field="userText" placeholder="文字（可选）">${esc(d.userText)}</textarea>
+                <div class="row2">
+                    <select data-field="presetId"><option value="">选择预设</option>${presets.map(p => `<option value="${p.id}" ${String(p.id)===String(d.presetId)?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+                    <select data-field="model">${MODELS.map(m => `<option value="${esc(m)}" ${d.model===m?'selected':''}>${esc(m)}</option>`).join('')}<option value="custom" ${isCustom?'selected':''}>自定义</option></select>
+                </div>
+                ${isCustom ? `<input type="text" data-field="customModel" placeholder="自定义模型名" value="${esc(d.customModel || (!MODELS.includes(d.model) && d.model !== 'custom' ? d.model : ''))}">` : ''}
+                <textarea class="sys" data-field="systemPrompt" placeholder="系统提示词">${esc(d.systemPrompt)}</textarea>
+                ${d.error ? `<p class="err">${esc(d.error)}</p>` : ''}
+                <div class="row2">
+                    <button class="btn btn-accent" data-submit ${d.running ? 'disabled' : ''}>${d.running ? '反推中…' : '开始反推'}</button>
+                    <button class="btn" data-cancel ${d.running ? 'disabled' : ''}>取消</button>
+                </div>
+            </div>
+        </article>`;
+    }
+
+    function previewsHtml(d){
+        const urls = d.files.length ? d.files.map(f => URL.createObjectURL(f))
+            : (d.keepFrom?.images || []).map(imgUrl);
+        return urls.map((src, i) => `<button type="button" data-rm="${i}" title="移除"><img src="${esc(src)}" alt=""></button>`).join('');
+    }
+
+    // ---------- 草稿操作 ----------
+    function getDraft(id){ return drafts.find(d => d.localId === id); }
+    function patchDraft(id, patch){ const d = getDraft(id); if(d) Object.assign(d, patch); }
+
+    function bindDraftEvents(){
+        document.querySelectorAll('.editor[data-draft]').forEach(box => {
+            const id = box.dataset.draft;
+            box.querySelectorAll('[data-field]').forEach(el => {
+                el.addEventListener('input', () => {
+                    const field = el.dataset.field;
+                    if(field === 'presetId'){
+                        const preset = presets.find(p => String(p.id) === el.value);
+                        patchDraft(id, { presetId: el.value, presetName: preset?.name || '' });
+                        if(preset){
+                            patchDraft(id, { systemPrompt: preset.body });
+                            box.querySelector('[data-field=systemPrompt]').value = preset.body;
+                        }
+                    } else if(field === 'model'){
+                        patchDraft(id, { model: el.value });
+                        render();
+                    } else {
+                        patchDraft(id, { [field]: el.value });
+                    }
+                });
+            });
+            box.querySelector('[data-files]')?.addEventListener('change', e => {
+                addFilesToDraft(id, e.target.files);
+            });
+            box.querySelectorAll('[data-rm]').forEach(btn => btn.addEventListener('click', () => {
+                const d = getDraft(id); if(!d) return;
+                const idx = Number(btn.dataset.rm);
+                if(d.files.length){ d.files.splice(idx, 1); }
+                else if(d.keepFrom){ d.keepFrom = { ...d.keepFrom, images: (d.keepFrom.images || []).filter((_, i) => i !== idx) }; }
+                render();
+            }));
+            box.querySelector('[data-submit]')?.addEventListener('click', () => submitDraft(id));
+            box.querySelector('[data-cancel]')?.addEventListener('click', () => {
+                drafts = drafts.filter(d => d.localId !== id);
+                render();
+            });
+            box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drop-on'); });
+            box.addEventListener('dragleave', e => { if(!box.contains(e.relatedTarget)) box.classList.remove('drop-on'); });
+            box.addEventListener('drop', e => {
+                e.preventDefault(); box.classList.remove('drop-on');
+                addFilesToDraft(id, e.dataTransfer.files);
+            });
+            box.addEventListener('keydown', e => {
+                if(e.isComposing) return;
+                if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); submitDraft(id); }
+            });
+        });
+        document.querySelectorAll('[data-open]').forEach(el => el.addEventListener('click', e => {
+            if(e.target.closest('[data-copy],[data-jump]')) return;
+            openModal(Number(el.dataset.open));
+        }));
+        document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+            const card = cards.find(c => c.id === Number(btn.dataset.copy));
+            if(!card?.output) return;
+            await copyText(card.output);
+            btn.textContent = '已复制';
+            setTimeout(() => { btn.textContent = '复制'; }, 1200);
+        }));
+        document.querySelectorAll('[data-jump]').forEach(btn => btn.addEventListener('click', () => locateCard(Number(btn.dataset.jump))));
+    }
+
+    function addFilesToDraft(id, list){
+        const incoming = Array.from(list || []).filter(isImageFile);
+        if(!incoming.length) return;
+        const d = getDraft(id); if(!d || d.running) return;
+        d.files = [...d.files, ...incoming];
+        d.keepFrom = null;
+        render();
+    }
+
+    async function copyText(text){
+        try { await navigator.clipboard.writeText(text); }
+        catch(e){
+            const area = document.createElement('textarea');
+            area.value = text; document.body.appendChild(area);
+            area.select(); document.execCommand('copy'); area.remove();
+        }
+    }
+
+    function locateCard(id){
+        flashId = id; render();
+        setTimeout(() => document.getElementById('card-' + id)?.scrollIntoView({ behavior:'smooth', block:'center' }), 30);
+        setTimeout(() => { if(flashId === id){ flashId = null; render(); } }, 1400);
+    }
+
+    async function submitDraft(localId, retryId){
+        const d = getDraft(localId);
+        if(!d || d.running) return;
+        const model = (d.model === 'custom' || !MODELS.includes(d.model)) ? (d.customModel || d.model).trim() : d.model;
+        if((d.model === 'custom') && !d.customModel.trim()){ patchDraft(localId, { error:'请填写自定义模型名' }); render(); return; }
+        let files = d.files;
+        if(!files.length && d.keepFrom) files = await filesFromCard(d.keepFrom);
+        if(!d.userText.trim() && !files.length){ patchDraft(localId, { error:'请至少上传一张图或输入一段文字' }); render(); return; }
+
+        const body = new FormData();
+        body.set('user_text', d.userText);
+        body.set('system_prompt', d.systemPrompt);
+        if(d.presetId) body.set('preset_id', String(d.presetId));
+        if(d.presetName) body.set('preset_name', d.presetName);
+        body.set('model', model === 'custom' ? DEFAULT_MODEL : (model || DEFAULT_MODEL));
+        if(d.sourceCardId && !retryId) body.set('source_card_id', String(d.sourceCardId));
+        for(const file of files) body.append('images', file);
+
+        patchDraft(localId, { running:true, error:'' }); render();
+        const url = retryId ? ('/api/reverse/cards/' + retryId + '/retry') : '/api/reverse/cards';
+        let liveId = retryId || null;
+        try {
+            const res = await fetch(url, { method:'POST', body });
+            await readSSE(res, evt => {
+                if(evt.type === 'card' || evt.type === 'done'){
+                    liveId = evt.card.id;
+                    cards = [evt.card, ...cards.filter(c => c.id !== evt.card.id)];
+                    if(evt.type === 'card'){ drafts = drafts.filter(x => x.localId !== localId); }
+                    render();
+                    if(evt.type === 'done' && openCardId === null){ openModal(evt.card.id); locateCard(evt.card.id); }
+                    else if(evt.type === 'done' && openCardId === evt.card.id){ openModal(evt.card.id); }
+                }
+                if(evt.type === 'delta' && liveId){
+                    const card = cards.find(c => c.id === liveId);
+                    if(card){ card.output = evt.text; card.status = 'running'; renderCardInPlace(card); }
+                }
+            });
+            await reload();
+        } catch(err){
+            patchDraft(localId, { running:false, error: err.message }); render();
+        }
+    }
+
+    function renderCardInPlace(card){
+        const el = document.getElementById('card-' + card.id);
+        if(!el) return;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = renderCard(card, clampLines());
+        el.replaceWith(tmp.firstElementChild);
+        bindDraftEvents();
+    }
+
+    // ---------- 查看弹窗 ----------
+    function openModal(id){
+        openCardId = id;
+        const card = cards.find(c => c.id === id);
+        if(!card){ closeModal(); return; }
+        const failed = card.status === 'failed';
+        const host = document.getElementById('modalHost');
+        host.innerHTML = `<div class="modal-bg" data-close>
+            <div class="modal" data-stop>
+                <div class="modal-head">
+                    <h2>${esc(card.preset_name || (failed ? '失败卡片' : '反推结果'))} <span class="kicker">#${card.id}</span></h2>
+                    <p class="kicker">${esc(card.model)} · ${esc(formatTime(card.created_at))}</p>
+                </div>
+                <div class="modal-body">
+                    ${(card.images || []).length ? `<div class="fold"><button class="fold-head" type="button" data-fold>参考图（${card.images.length}）</button><div class="fold-body"><div class="modal-imgs">${card.images.map(img => `<img src="${esc(imgUrl(img))}" data-zoom="${esc(imgUrl(img))}" alt="">`).join('')}</div></div></div>` : ''}
+                    <div class="fold is-closed"><button class="fold-head" type="button" data-fold>系统提示词</button><div class="fold-body"><p class="full">${esc(card.system_prompt || '（未填写）')}</p></div></div>
+                    ${card.user_text ? `<div class="fold is-closed"><button class="fold-head" type="button" data-fold>用户文字</button><div class="fold-body"><p class="full">${esc(card.user_text)}</p></div></div>` : ''}
+                    <div class="fold"><button class="fold-head" type="button" data-fold>产出</button><div class="fold-body"><p class="full">${esc(card.output || '')}</p></div></div>
+                    ${card.error ? `<p class="err">${esc(card.error)}</p>` : ''}
+                </div>
+                <div class="modal-foot">
+                    <button class="btn btn-accent" data-mcopy ${card.output ? '' : 'disabled'}>复制产出</button>
+                    ${failed ? `<button class="btn" data-mretry>重试该卡</button>` : ''}
+                    <button class="btn" data-mrerun>用新系统提示词再跑</button>
+                    <button class="btn" data-mclose>关闭</button>
+                </div>
+            </div>
+        </div>`;
+        host.querySelector('[data-close]').addEventListener('click', e => { if(!e.target.closest('[data-stop]')) closeModal(); });
+        host.querySelectorAll('[data-fold]').forEach(btn => btn.addEventListener('click', () => {
+            btn.closest('.fold')?.classList.toggle('is-closed');
+        }));
+        host.querySelectorAll('[data-zoom]').forEach(img => img.addEventListener('click', () => {
+            const z = document.createElement('div');
+            z.className = 'zoom-bg';
+            z.innerHTML = `<img src="${esc(img.dataset.zoom)}" alt="">`;
+            z.addEventListener('click', () => z.remove());
+            document.body.appendChild(z);
+        }));
+        host.querySelector('[data-mcopy]')?.addEventListener('click', async e => {
+            if(!card.output) return;
+            await copyText(card.output);
+            e.target.textContent = '已复制';
+            setTimeout(() => { e.target.textContent = '复制产出'; }, 1500);
+        });
+        host.querySelector('[data-mclose]')?.addEventListener('click', closeModal);
+        host.querySelector('[data-mrerun]')?.addEventListener('click', async () => {
+            const next = emptyDraft(card);
+            closeModal();
+            drafts = [next, ...drafts];
+            render();
+            document.getElementById('draft-' + next.localId)?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        });
+        host.querySelector('[data-mretry]')?.addEventListener('click', () => {
+            const next = emptyDraft(card);
+            next.sourceCardId = null;
+            next.retryTarget = card.id;
+            closeModal();
+            drafts = [next, ...drafts];
+            render();
+            const box = document.getElementById('draft-' + next.localId);
+            box?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        });
+    }
+
+    function closeModal(){
+        openCardId = null;
+        document.getElementById('modalHost').innerHTML = '';
+    }
+
+    // ---------- 预设弹窗 ----------
+    function openPresets(){
+        const host = document.getElementById('modalHost');
+        const listHtml = () => presets.map(p => `<div class="preset-item" data-pid="${p.id}">
+            <label>名称<input data-pname value="${esc(p.name)}"></label>
+            <label>全文<textarea data-pbody>${esc(p.body)}</textarea></label>
+            <div class="preset-actions">
+                <button class="btn" data-psave>保存</button>
+                <button class="btn" data-pdel>删除</button>
+            </div>
+        </div>`).join('');
+        host.innerHTML = `<div class="modal-bg" data-close>
+            <div class="modal" data-stop>
+                <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center">
+                    <h2>系统提示词预设</h2>
+                    <button class="btn" data-mclose>关闭</button>
+                </div>
+                <div class="modal-body">
+                    <div class="preset-form">
+                        <label>名称<input data-newname placeholder="例如：镜头反推"></label>
+                        <label>全文<textarea data-newbody placeholder="系统提示词全文"></textarea></label>
+                        <p class="err" data-newerr style="display:none"></p>
+                        <div class="preset-actions"><button class="btn btn-accent" data-pcreate>新建预设</button></div>
+                    </div>
+                    <div data-plist>${listHtml()}</div>
+                </div>
+            </div>
+        </div>`;
+        host.querySelector('[data-close]').addEventListener('click', e => { if(!e.target.closest('[data-stop]')) closeModal(); });
+        host.querySelector('[data-mclose]').addEventListener('click', closeModal);
+        host.querySelector('[data-pcreate]').addEventListener('click', async () => {
+            const name = host.querySelector('[data-newname]').value;
+            const body = host.querySelector('[data-newbody]').value;
+            const err = host.querySelector('[data-newerr]');
+            try {
+                await fetchJSON('/api/reverse/presets', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, body }) });
+                presets = await fetchJSON('/api/reverse/presets');
+                closeModal(); openPresets();
+            } catch(e){ err.textContent = e.message; err.style.display = ''; }
+        });
+        host.querySelectorAll('.preset-item').forEach(item => {
+            const pid = item.dataset.pid;
+            item.querySelector('[data-psave]').addEventListener('click', async e => {
+                try {
+                    await fetchJSON('/api/reverse/presets/' + pid, { method:'PUT', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ name: item.querySelector('[data-pname]').value, body: item.querySelector('[data-pbody]').value }) });
+                    presets = await fetchJSON('/api/reverse/presets');
+                    e.target.textContent = '已保存';
+                    setTimeout(() => { e.target.textContent = '保存'; }, 1500);
+                } catch(err){ alert(err.message); }
+            });
+            item.querySelector('[data-pdel]').addEventListener('click', async () => {
+                if(!confirm('删除该预设？已有卡片里的提示词不会变。')) return;
+                await fetchJSON('/api/reverse/presets/' + pid, { method:'DELETE' });
+                presets = await fetchJSON('/api/reverse/presets');
+                closeModal(); openPresets();
+            });
+        });
+    }
+
+    // ---------- 顶栏与全局事件 ----------
+    document.getElementById('newBtn').addEventListener('click', () => {
+        closeModal();
+        const next = emptyDraft();
+        drafts = [next, ...drafts];
+        render();
+        document.getElementById('draft-' + next.localId)?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    });
+    document.getElementById('presetBtn').addEventListener('click', openPresets);
+
+    let searchTimer = null;
+    document.getElementById('searchInput').addEventListener('input', e => {
+        document.getElementById('searchClear').style.display = e.target.value ? '' : 'none';
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { searchText = e.target.value.trim(); reload(); }, 280);
+    });
+    document.getElementById('searchClear').addEventListener('click', () => {
+        const input = document.getElementById('searchInput');
+        input.value = ''; searchText = '';
+        document.getElementById('searchClear').style.display = 'none';
+        reload(); input.focus();
+    });
+
+    const sizeRange = document.getElementById('sizeRange');
+    sizeRange.addEventListener('input', () => {
+        document.documentElement.style.setProperty('--card-size', sizeRange.value + 'px');
+        try { localStorage.setItem(UI_KEY, JSON.stringify({ cardSize: Number(sizeRange.value) })); } catch(e) {}
+        render();
+    });
+
+    window.addEventListener('paste', e => {
+        if(openCardId !== null || document.querySelector('.modal-bg')) return;
+        const files = [...(e.clipboardData?.files || [])].filter(isImageFile);
+        if(!files.length) return;
+        const target = drafts.find(d => !d.running);
+        if(target){ target.files = [...target.files, ...files]; target.keepFrom = null; }
+        else {
+            const next = emptyDraft();
+            next.files = files;
+            drafts = [next, ...drafts];
+        }
+        render();
+    });
+
+    window.addEventListener('keydown', e => {
+        if(e.key === 'Escape'){
+            if(document.querySelector('.zoom-bg')){ document.querySelector('.zoom-bg').remove(); return; }
+            if(document.querySelector('.modal-bg')){ closeModal(); return; }
+        }
+    });
+
+    // 提交重试卡（草稿上带 retryTarget 的走 retry 接口）
+    const origSubmit = submitDraft;
+    submitDraft = function(localId){
+        const d = getDraft(localId);
+        return origSubmit(localId, d?.retryTarget || undefined);
+    };
+
+    // ---------- 启动 ----------
+    (function init(){
+        try {
+            const ui = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
+            if(ui.cardSize){ sizeRange.value = ui.cardSize; document.documentElement.style.setProperty('--card-size', ui.cardSize + 'px'); }
+        } catch(e) {}
+        loadConfig().then(reload).catch(err => {
+            document.getElementById('emptyTip').style.display = '';
+            document.getElementById('emptyTip').textContent = '加载失败：' + err.message;
+        });
+    })();
+    </script>
+</body>
+</html>

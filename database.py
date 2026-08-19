@@ -62,6 +62,37 @@ CREATE TABLE IF NOT EXISTS history_user_meta (
     meta_json TEXT NOT NULL,
     updated_at REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reverse_presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    body TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reverse_cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    user_text TEXT,
+    system_prompt TEXT,
+    preset_id INTEGER,
+    preset_name TEXT,
+    model TEXT NOT NULL,
+    output TEXT,
+    error TEXT,
+    source_card_id INTEGER,
+    status TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reverse_card_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    sort_order INTEGER NOT NULL,
+    FOREIGN KEY (card_id) REFERENCES reverse_cards(id)
+);
 """
 
 
@@ -649,3 +680,181 @@ def list_conversation_summaries(user_id: str) -> List[Dict[str, Any]]:
             "last_message": (last_message or {}).get("content", ""),
         })
     return sorted(records, key=lambda item: item["updated_at"], reverse=True)
+
+
+# --- Reverse prompt workbench (presets / cards / card images) ---
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) + f".{int(time.time() * 1000) % 1000:03d}"
+
+
+def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    return {key: row[key] for key in row.keys()}
+
+
+def _reverse_images_of(conn: sqlite3.Connection, card_id: int) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT id, card_id, file_path, original_name, mime, sort_order"
+        " FROM reverse_card_images WHERE card_id = ? ORDER BY sort_order ASC, id ASC",
+        (card_id,),
+    ).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+def _reverse_card_with_images(conn: sqlite3.Connection, row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
+    if row is None:
+        return None
+    card = _row_to_dict(row)
+    card["images"] = _reverse_images_of(conn, card["id"])
+    return card
+
+
+def list_reverse_presets() -> List[Dict[str, Any]]:
+    with DB_LOCK:
+        conn = _connect()
+        rows = conn.execute(
+            "SELECT id, name, body, updated_at FROM reverse_presets ORDER BY updated_at DESC, id DESC"
+        ).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+def create_reverse_preset(name: str, body: str) -> Dict[str, Any]:
+    trimmed = str(name or "").strip()
+    if not trimmed:
+        raise ValueError("预设名称不能为空")
+    with DB_LOCK:
+        conn = _connect()
+        try:
+            cursor = conn.execute(
+                "INSERT INTO reverse_presets(name, body, updated_at) VALUES (?, ?, ?)",
+                (trimmed, str(body or ""), _now_iso()),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("预设名称已存在") from exc
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, body, updated_at FROM reverse_presets WHERE id = ?",
+            (cursor.lastrowid,),
+        ).fetchone()
+    return _row_to_dict(row)
+
+
+def update_reverse_preset(preset_id: int, name: str, body: str) -> Optional[Dict[str, Any]]:
+    trimmed = str(name or "").strip()
+    if not trimmed:
+        raise ValueError("预设名称不能为空")
+    with DB_LOCK:
+        conn = _connect()
+        exists = conn.execute("SELECT id FROM reverse_presets WHERE id = ?", (preset_id,)).fetchone()
+        if not exists:
+            return None
+        try:
+            conn.execute(
+                "UPDATE reverse_presets SET name = ?, body = ?, updated_at = ? WHERE id = ?",
+                (trimmed, str(body or ""), _now_iso(), preset_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("预设名称已存在") from exc
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, name, body, updated_at FROM reverse_presets WHERE id = ?",
+            (preset_id,),
+        ).fetchone()
+    return _row_to_dict(row)
+
+
+def delete_reverse_preset(preset_id: int) -> None:
+    with DB_LOCK:
+        conn = _connect()
+        conn.execute("DELETE FROM reverse_presets WHERE id = ?", (preset_id,))
+        conn.commit()
+
+
+def create_reverse_card(data: Dict[str, Any]) -> Dict[str, Any]:
+    with DB_LOCK:
+        conn = _connect()
+        cursor = conn.execute(
+            """
+            INSERT INTO reverse_cards
+                (created_at, user_text, system_prompt, preset_id, preset_name, model, output, error, source_card_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                _now_iso(),
+                data.get("user_text") or "",
+                data.get("system_prompt") or "",
+                data.get("preset_id"),
+                data.get("preset_name"),
+                data["model"],
+                "",
+                "",
+                data.get("source_card_id"),
+                "running",
+            ),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM reverse_cards WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        return _reverse_card_with_images(conn, row)
+
+
+def update_reverse_card(card_id: int, patch: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    allowed = (
+        "user_text", "system_prompt", "preset_id", "preset_name",
+        "model", "output", "error", "source_card_id", "status",
+    )
+    with DB_LOCK:
+        conn = _connect()
+        row = conn.execute("SELECT * FROM reverse_cards WHERE id = ?", (card_id,)).fetchone()
+        if row is None:
+            return None
+        current = _row_to_dict(row)
+        for key in allowed:
+            if key in patch:
+                current[key] = patch[key]
+        conn.execute(
+            """
+            UPDATE reverse_cards SET user_text = ?, system_prompt = ?, preset_id = ?, preset_name = ?,
+                model = ?, output = ?, error = ?, source_card_id = ?, status = ?
+            WHERE id = ?
+            """,
+            (
+                current["user_text"], current["system_prompt"], current["preset_id"], current["preset_name"],
+                current["model"], current["output"], current["error"], current["source_card_id"], current["status"],
+                card_id,
+            ),
+        )
+        conn.commit()
+        fresh = conn.execute("SELECT * FROM reverse_cards WHERE id = ?", (card_id,)).fetchone()
+        return _reverse_card_with_images(conn, fresh)
+
+
+def get_reverse_card(card_id: int) -> Optional[Dict[str, Any]]:
+    with DB_LOCK:
+        conn = _connect()
+        row = conn.execute("SELECT * FROM reverse_cards WHERE id = ?", (card_id,)).fetchone()
+        return _reverse_card_with_images(conn, row)
+
+
+def list_reverse_cards() -> List[Dict[str, Any]]:
+    with DB_LOCK:
+        conn = _connect()
+        rows = conn.execute("SELECT * FROM reverse_cards ORDER BY created_at DESC, id DESC").fetchall()
+        return [_reverse_card_with_images(conn, row) for row in rows]
+
+
+def clear_reverse_card_images(card_id: int) -> None:
+    with DB_LOCK:
+        conn = _connect()
+        conn.execute("DELETE FROM reverse_card_images WHERE card_id = ?", (card_id,))
+        conn.commit()
+
+
+def add_reverse_card_image(card_id: int, image: Dict[str, Any]) -> None:
+    with DB_LOCK:
+        conn = _connect()
+        conn.execute(
+            "INSERT INTO reverse_card_images(card_id, file_path, original_name, mime, sort_order)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (card_id, image["file_path"], image["original_name"], image["mime"], image["sort_order"]),
+        )
+        conn.commit()

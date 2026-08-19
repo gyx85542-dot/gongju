@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -205,9 +205,9 @@
                 <section class="tool-panel">
                     <div>
                         <div class="control-label mb-1">
-                            <span data-i18n="online.promptLabel">提示�?/span>
+                            <span data-i18n="online.promptLabel">提示词</span>
                         </div>
-                        <textarea id="promptInput" rows="12" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画�?.." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
+                        <textarea id="promptInput" rows="12" class="nano-input w-full outline-none resize-none placeholder-gray-300" placeholder="输入想生成或编辑的画面..." data-i18n-placeholder="online.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                     </div>
                     <div>
                         <div class="control-label mb-1">
@@ -260,8 +260,8 @@
                                 <div id="ratioSelectMenu" class="ratio-select-menu pullup-select-menu hidden"></div>
                             </div>
                             <span class="size-pair">
-                                <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="�? data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
-                                <input id="ratioCustomHeight" class="size-custom" type="number" min="1" step="1" placeholder="�? data-i18n-placeholder="online.ratioHeight" oninput="setCustomRatio()">
+                                <input id="ratioCustomWidth" class="size-custom" type="number" min="1" step="1" placeholder="宽" data-i18n-placeholder="online.ratioWidth" oninput="setCustomRatio()">
+                                <input id="ratioCustomHeight" class="size-custom" type="number" min="1" step="1" placeholder="高" data-i18n-placeholder="online.ratioHeight" oninput="setCustomRatio()">
                             </span>
                         </label>
                     </div>
@@ -1394,7 +1394,7 @@
 
         function lightboxItems(){ return sortedHistory(); }
         function formatViewerTime(ts){
-            if(!ts) return '�?;
+            if(!ts) return '—';
             try { return new Date(Number(ts) * 1000).toLocaleString(); } catch(e) { return String(ts); }
         }
         function isViewerEditedImage(data){
@@ -1412,20 +1412,20 @@
                 return data.provider_name
                     || providerById(data.params?.provider_id || data.provider_id)?.name
                     || data.provider_id
-                    || '�?;
+                    || '—';
             }
             if(model) return model;
             return data.provider_name
                 || providerById(data.params?.provider_id || data.provider_id)?.name
                 || data.provider_id
-                || '�?;
+                    || '—';
         }
         function viewerMetaRows(data){
             const rows = [];
             const edited = isViewerEditedImage(data);
             const providerName = viewerProviderSource(data);
-            const modelName = data.params?.model || data.model || '�?;
-            const size = data.params?.size || '�?;
+            const modelName = data.params?.model || data.model || '—';
+            const size = data.params?.size || '—';
             if(data._displaySize) rows.unshift({ label: tr('online.viewerResolution') || 'Resolution', value: data._displaySize });
             if(!edited){
                 rows.push({ label: tr('api.provider') || 'Platform', value: providerName });
@@ -1435,7 +1435,7 @@
             }
             if(data.seed != null) rows.push({ label: 'Seed', value: String(data.seed) });
             rows.push({ label: tr('online.viewerCreated') || 'Created', value: formatViewerTime(data.timestamp) });
-            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '�? });
+            if(data.params?.imported && !edited) rows.push({ label: tr('online.import') || 'Import', value: '✓' });
             return rows;
         }
         function renderViewerRefThumbs(data){

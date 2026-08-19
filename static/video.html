@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -49,8 +49,8 @@
             </section>
             <section class="tool-panel">
                 <div>
-                    <div class="control-label mb-1"><span data-i18n="video.prompt">提示�?/span></div>
-                    <textarea id="promptInput" rows="12" class="nano-input" placeholder="描述你想生成的视�?.." data-i18n-placeholder="video.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
+                    <div class="control-label mb-1"><span data-i18n="video.prompt">提示词</span></div>
+                    <textarea id="promptInput" rows="12" class="nano-input" placeholder="描述你想生成的视频..." data-i18n-placeholder="video.promptPlaceholder" oninput="syncGenBtnState()"></textarea>
                 </div>
                 <div>
                     <div class="control-label mb-1"><span data-i18n="video.referenceImages">参考图</span></div>
@@ -58,13 +58,13 @@
                 </div>
                 <div id="seedanceRefWrap" class="seedance-ref-wrap" aria-hidden="true">
                     <div class="seedance-ref-block">
-                        <div class="control-label mb-1"><span data-i18n="video.referenceVideos">参考视�?/span></div>
+                        <div class="control-label mb-1"><span data-i18n="video.referenceVideos">参考视频</span></div>
                         <div id="refVideoDropZone" class="media-ref-drop-zone" data-accept="video">
                             <div id="refVideoGrid" class="ref-grid"></div>
                         </div>
                     </div>
                     <div class="seedance-ref-block">
-                        <div class="control-label mb-1"><span data-i18n="video.referenceAudio">参考音�?/span></div>
+                        <div class="control-label mb-1"><span data-i18n="video.referenceAudio">参考音频</span></div>
                         <div id="refAudioDropZone" class="media-ref-drop-zone" data-accept="audio">
                             <div id="refAudioGrid" class="ref-grid"></div>
                         </div>
@@ -81,7 +81,7 @@
                     <select id="aspectSelect" class="size-select"></select>
                 </label>
                 <label class="block">
-                    <div class="control-label mb-1" data-i18n="canvas.videoResolution">分辨�?/div>
+                    <div class="control-label mb-1" data-i18n="canvas.videoResolution">分辨率</div>
                     <select id="resolutionSelect" class="size-select">
                         <option value="480p">480p</option>
                         <option value="720p" selected>720p</option>

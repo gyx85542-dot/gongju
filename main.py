@@ -26,7 +26,8 @@ from PIL import Image
 from io import BytesIO
 import database as db
 import prompt_enhance as pe
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Header, Request, Query
+import reverse_prompt as rp
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Header, Request, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, StreamingResponse, JSONResponse
@@ -3634,6 +3635,216 @@ async def api_prompt_enhance(payload: PromptEnhanceRequest):
         "provider": provider_id,
     }
 
+# --- 反推工作台 ---
+
+REVERSE_UPLOAD_DIR = os.path.join(ASSETS_DIR, "reverse")
+
+def reverse_save_images(card_id: int, files: list) -> list:
+    """files: list of (filename, content_type, bytes). Returns image dicts for DB."""
+    card_dir = os.path.join(REVERSE_UPLOAD_DIR, str(card_id))
+    os.makedirs(card_dir, exist_ok=True)
+    saved = []
+    for index, (original_name, mime, content) in enumerate(files):
+        filename = f"{index:02d}{rp.ext_of(mime, original_name)}"
+        with open(os.path.join(card_dir, filename), "wb") as f:
+            f.write(content)
+        saved.append({
+            "file_path": f"{card_id}/{filename}",
+            "original_name": original_name or filename,
+            "mime": mime,
+            "sort_order": index,
+        })
+    return saved
+
+def reverse_read_images_for_model(images: list) -> list:
+    out = []
+    for img in images or []:
+        path = os.path.join(REVERSE_UPLOAD_DIR, img["file_path"])
+        with open(path, "rb") as f:
+            out.append({"mime": img["mime"], "base64": base64.b64encode(f.read()).decode("ascii")})
+    return out
+
+async def reverse_validate_uploads(files: List[UploadFile]) -> list:
+    if len(files) > rp.MAX_IMAGES:
+        raise HTTPException(status_code=400, detail=f"最多上传 {rp.MAX_IMAGES} 张图片")
+    result = []
+    for file in files:
+        content = await file.read()
+        mime = (file.content_type or "").lower()
+        check = rp.validate_image(mime=mime, size=len(content))
+        if not check["ok"]:
+            raise HTTPException(status_code=400, detail=check["error"])
+        result.append((file.filename or "image", mime, content))
+    return result
+
+async def reverse_run_card_stream(card: dict):
+    yield sse_event({"type": "card", "card": card})
+    card_id = card["id"]
+    try:
+        chat_base, chat_hdrs, model = resolve_chat_provider("", card["model"])
+    except HTTPException as exc:
+        failed = db.update_reverse_card(card_id, {"status": "failed", "error": str(exc.detail)})
+        yield sse_event({"type": "done", "card": failed})
+        return
+
+    messages = rp.build_messages(
+        system_prompt=card.get("system_prompt") or "",
+        user_text=card.get("user_text") or "",
+        images=reverse_read_images_for_model(card.get("images") or []),
+    )
+    parts = []
+    try:
+        async with httpx.AsyncClient(timeout=AI_REQUEST_TIMEOUT) as client:
+            async with client.stream(
+                "POST",
+                f"{chat_base}/chat/completions",
+                headers=chat_hdrs,
+                json={"model": model, "messages": messages, "stream": True},
+            ) as response:
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="ignore")
+                    failed = db.update_reverse_card(card_id, {"status": "failed", "error": f"上游接口错误：{detail[:500]}"})
+                    yield sse_event({"type": "done", "card": failed})
+                    return
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        line = line[5:].strip()
+                    if line == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    delta = text_delta_from_chat_chunk(chunk)
+                    if delta:
+                        parts.append(delta)
+                        yield sse_event({"type": "delta", "text": "".join(parts)})
+    except httpx.HTTPError as exc:
+        failed = db.update_reverse_card(card_id, {"status": "failed", "error": f"请求上游接口失败：{exc}", "output": "".join(parts)})
+        yield sse_event({"type": "done", "card": failed})
+        return
+    except asyncio.CancelledError:
+        db.update_reverse_card(card_id, {"status": "failed", "error": "任务被中断", "output": "".join(parts)})
+        raise
+
+    output = "".join(parts).strip()
+    if output:
+        done = db.update_reverse_card(card_id, {"status": "succeeded", "output": output, "error": ""})
+    else:
+        done = db.update_reverse_card(card_id, {"status": "failed", "error": "模型返回了空内容"})
+    yield sse_event({"type": "done", "card": done})
+
+@app.get("/api/reverse/config")
+async def reverse_config():
+    return {"defaultModel": rp.DEFAULT_MODEL, "options": rp.MODEL_OPTIONS}
+
+@app.get("/api/reverse/presets")
+async def reverse_list_presets():
+    return db.list_reverse_presets()
+
+@app.post("/api/reverse/presets")
+async def reverse_create_preset(payload: dict):
+    try:
+        return db.create_reverse_preset(str(payload.get("name") or ""), str(payload.get("body") or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.put("/api/reverse/presets/{preset_id}")
+async def reverse_update_preset(preset_id: int, payload: dict):
+    try:
+        row = db.update_reverse_preset(preset_id, str(payload.get("name") or ""), str(payload.get("body") or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="预设不存在")
+    return row
+
+@app.delete("/api/reverse/presets/{preset_id}")
+async def reverse_delete_preset(preset_id: int):
+    db.delete_reverse_preset(preset_id)
+    return Response(status_code=204)
+
+@app.get("/api/reverse/cards")
+async def reverse_list_cards(q: str = ""):
+    cards = db.list_reverse_cards()
+    return [card for card in cards if rp.card_matches_query(card, q)]
+
+@app.get("/api/reverse/cards/{card_id}")
+async def reverse_get_card(card_id: int):
+    card = db.get_reverse_card(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    return card
+
+@app.post("/api/reverse/cards")
+async def reverse_create_card(
+    images: List[UploadFile] = File(default=[]),
+    user_text: str = Form(default=""),
+    system_prompt: str = Form(default=""),
+    preset_id: str = Form(default=""),
+    preset_name: str = Form(default=""),
+    model: str = Form(default=""),
+    source_card_id: str = Form(default=""),
+):
+    files = await reverse_validate_uploads(images or [])
+    if not rp.can_start_run(user_text=user_text, image_count=len(files)):
+        raise HTTPException(status_code=400, detail="请至少上传一张图或输入一段文字")
+    card = db.create_reverse_card({
+        "user_text": user_text,
+        "system_prompt": system_prompt,
+        "preset_id": int(preset_id) if preset_id.strip().isdigit() else None,
+        "preset_name": preset_name or None,
+        "model": (model or rp.DEFAULT_MODEL).strip() or rp.DEFAULT_MODEL,
+        "source_card_id": int(source_card_id) if source_card_id.strip().isdigit() else None,
+    })
+    for img in reverse_save_images(card["id"], files):
+        db.add_reverse_card_image(card["id"], img)
+    fresh = db.get_reverse_card(card["id"])
+    return StreamingResponse(reverse_run_card_stream(fresh), media_type="text/event-stream")
+
+@app.post("/api/reverse/cards/{card_id}/retry")
+async def reverse_retry_card(
+    card_id: int,
+    images: List[UploadFile] = File(default=[]),
+    user_text: Optional[str] = Form(default=None),
+    system_prompt: Optional[str] = Form(default=None),
+    preset_id: str = Form(default=""),
+    preset_name: Optional[str] = Form(default=None),
+    model: str = Form(default=""),
+):
+    card = db.get_reverse_card(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    files = await reverse_validate_uploads(images or [])
+    next_text = user_text if user_text is not None else (card.get("user_text") or "")
+    image_count = len(files) or len(card.get("images") or [])
+    if not rp.can_start_run(user_text=next_text, image_count=image_count):
+        raise HTTPException(status_code=400, detail="请至少上传一张图或输入一段文字")
+    if files:
+        db.clear_reverse_card_images(card_id)
+        card_dir = os.path.join(REVERSE_UPLOAD_DIR, str(card_id))
+        shutil.rmtree(card_dir, ignore_errors=True)
+        for img in reverse_save_images(card_id, files):
+            db.add_reverse_card_image(card_id, img)
+    patch = {
+        "user_text": next_text,
+        "output": "",
+        "error": "",
+        "status": "running",
+    }
+    if system_prompt is not None:
+        patch["system_prompt"] = system_prompt
+    if preset_id.strip().isdigit():
+        patch["preset_id"] = int(preset_id)
+    if preset_name is not None:
+        patch["preset_name"] = preset_name
+    if (model or "").strip():
+        patch["model"] = model.strip()
+    fresh = db.update_reverse_card(card_id, patch)
+    return StreamingResponse(reverse_run_card_stream(fresh), media_type="text/event-stream")
+
 # --- 历史记录 ---
 
 @app.get("/api/history")
@@ -5037,11 +5248,17 @@ def build_runninghub_node_info_list(
                     item["raw"] = global_prompt
     node_info_list = []
     seen = set()
+    media_state_groups: Dict[str, List[Dict[str, Any]]] = {}
     for item in resolved:
         value = runninghub_field_value(api_key, item["ftype"], item["raw"], refs)
         if item["ftype"] in ("image", "video", "audio") and runninghub_value_is_empty(item["ftype"], value):
             continue
         if runninghub_value_is_empty(item["ftype"], value):
+            continue
+        if runninghub_is_media_state_field(item["field_name"]) and item["ftype"] == "image":
+            media_state_groups.setdefault(item["node_id"], []).append(
+                runninghub_media_state_entry(value, item["raw"])
+            )
             continue
         dedupe_key = (item["node_id"], item["field_name"])
         if dedupe_key in seen:
@@ -5068,7 +5285,52 @@ def build_runninghub_node_info_list(
             "fieldName": item["field_name"],
             "fieldValue": field_value,
         })
+    for node_id, entries in media_state_groups.items():
+        if not entries:
+            continue
+        node_info_list.append({
+            "nodeId": node_id,
+            "fieldName": "media_state",
+            "fieldValue": json.dumps(entries, ensure_ascii=False),
+        })
     return node_info_list, global_prompt
+
+def runninghub_is_media_state_field(field_name: str) -> bool:
+    return str(field_name or "").strip() == "media_state"
+
+
+def runninghub_format_media_file_ref(file_name: str) -> str:
+    name = str(file_name or "").strip()
+    if not name:
+        return ""
+    if name.endswith(" [input]"):
+        return name
+    return f"{name} [input]"
+
+
+def runninghub_media_state_entry(file_name: str, raw_value: Any = "") -> Dict[str, Any]:
+    raw = str(raw_value or "").strip()
+    local_path = output_file_from_url(raw)
+    width = height = None
+    display_name = os.path.basename(urllib.parse.urlparse(raw or str(file_name or "image")).path) or "image"
+    if local_path and os.path.isfile(local_path):
+        display_name = os.path.basename(local_path)
+        try:
+            with Image.open(local_path) as im:
+                width, height = im.size
+        except Exception:
+            pass
+    return {
+        "kind": "picture",
+        "file": runninghub_format_media_file_ref(file_name),
+        "name": display_name,
+        "duration": None,
+        "width": width,
+        "height": height,
+        "has_audio": False,
+        "audio_mode": "off",
+    }
+
 
 def runninghub_field_value(api_key: str, field_type: str, value: Any, references: List[str]):
     if value is None:
@@ -5449,6 +5711,7 @@ def build_runninghub_result(payload: RunningHubRunRequest):
         "apiKey": api_key,
         "workflowId": rh_workflow_id,
         "nodeInfoList": node_info_list,
+        "instanceType": "plus",
     }
     for item in node_info_list:
         fv = item.get("fieldValue")
