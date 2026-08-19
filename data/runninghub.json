@@ -1,0 +1,718 @@
+{
+  "workflows": [
+    {
+      "id": "rh-wf-h3u1",
+      "name": "MiniMaxH3-全能视频单图",
+      "workflow_id": "2090106771615608834",
+      "fields": [
+        {
+          "id": "h3u1-img1",
+          "name": "参考图1",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u1-prompt",
+          "name": "提示词",
+          "nodeId": "413",
+          "fieldName": "value",
+          "type": "textarea",
+          "dataType": "textarea",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u1-dur",
+          "name": "时长",
+          "nodeId": "417",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 15
+        },
+        {
+          "id": "h3u1-ratio",
+          "name": "比例",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "16:9 (Widescreen)",
+          "options": [
+            "16:9 (Widescreen)",
+            "9:16 (Portrait Widescreen)",
+            "1:1 (Square)",
+            "4:3 (Standard)",
+            "3:4 (Portrait)",
+            "21:9 (Ultra Widescreen)",
+            "2:1",
+            "1:2"
+          ],
+          "apiValue": "16:9 (Widescreen)"
+        },
+        {
+          "id": "h3u1-size",
+          "name": "大小",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio.size",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "1344×768",
+          "options": [
+            "1344×768",
+            "1152×640",
+            "768×1344",
+            "640×1152",
+            "1024×1024",
+            "768×768",
+            "1216×832",
+            "832×1216",
+            "1536×640",
+            "640×1536",
+            "1152×896",
+            "896×1152"
+          ],
+          "apiValue": "1344×768"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-h3u2",
+      "name": "MiniMaxH3-全能视频双图",
+      "workflow_id": "2090106849847762945",
+      "fields": [
+        {
+          "id": "h3u2-img1",
+          "name": "参考图1",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u2-img2",
+          "name": "参考图2",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u2-prompt",
+          "name": "提示词",
+          "nodeId": "413",
+          "fieldName": "value",
+          "type": "textarea",
+          "dataType": "textarea",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u2-dur",
+          "name": "时长",
+          "nodeId": "417",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 15
+        },
+        {
+          "id": "h3u2-ratio",
+          "name": "比例",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "16:9 (Widescreen)",
+          "options": [
+            "16:9 (Widescreen)",
+            "9:16 (Portrait Widescreen)",
+            "1:1 (Square)",
+            "4:3 (Standard)",
+            "3:4 (Portrait)",
+            "21:9 (Ultra Widescreen)",
+            "2:1",
+            "1:2"
+          ],
+          "apiValue": "16:9 (Widescreen)"
+        },
+        {
+          "id": "h3u2-size",
+          "name": "大小",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio.size",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "1344×768",
+          "options": [
+            "1344×768",
+            "1152×640",
+            "768×1344",
+            "640×1152",
+            "1024×1024",
+            "768×768",
+            "1216×832",
+            "832×1216",
+            "1536×640",
+            "640×1536",
+            "1152×896",
+            "896×1152"
+          ],
+          "apiValue": "1344×768"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-h3u3",
+      "name": "MiniMaxH3-全能视频三图",
+      "workflow_id": "2090086174114271234",
+      "fields": [
+        {
+          "id": "h3u3-img1",
+          "name": "参考图1",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u3-img2",
+          "name": "参考图2",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u3-img3",
+          "name": "参考图3",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u3-prompt",
+          "name": "提示词",
+          "nodeId": "413",
+          "fieldName": "value",
+          "type": "textarea",
+          "dataType": "textarea",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u3-dur",
+          "name": "时长",
+          "nodeId": "417",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 15
+        },
+        {
+          "id": "h3u3-ratio",
+          "name": "比例",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "16:9 (Widescreen)",
+          "options": [
+            "16:9 (Widescreen)",
+            "9:16 (Portrait Widescreen)",
+            "1:1 (Square)",
+            "4:3 (Standard)",
+            "3:4 (Portrait)",
+            "21:9 (Ultra Widescreen)",
+            "2:1",
+            "1:2"
+          ],
+          "apiValue": "16:9 (Widescreen)"
+        },
+        {
+          "id": "h3u3-size",
+          "name": "大小",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio.size",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "1344×768",
+          "options": [
+            "1344×768",
+            "1152×640",
+            "768×1344",
+            "640×1152",
+            "1024×1024",
+            "768×768",
+            "1216×832",
+            "832×1216",
+            "1536×640",
+            "640×1536",
+            "1152×896",
+            "896×1152"
+          ],
+          "apiValue": "1344×768"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-h3u4",
+      "name": "MiniMaxH3-全能视频4图",
+      "workflow_id": "2090106926330896386",
+      "fields": [
+        {
+          "id": "h3u4-img1",
+          "name": "参考图1",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u4-img2",
+          "name": "参考图2",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u4-img3",
+          "name": "参考图3",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u4-img4",
+          "name": "参考图4",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u4-prompt",
+          "name": "提示词",
+          "nodeId": "413",
+          "fieldName": "value",
+          "type": "textarea",
+          "dataType": "textarea",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u4-dur",
+          "name": "时长",
+          "nodeId": "417",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 15
+        },
+        {
+          "id": "h3u4-ratio",
+          "name": "比例",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "16:9 (Widescreen)",
+          "options": [
+            "16:9 (Widescreen)",
+            "9:16 (Portrait Widescreen)",
+            "1:1 (Square)",
+            "4:3 (Standard)",
+            "3:4 (Portrait)",
+            "21:9 (Ultra Widescreen)",
+            "2:1",
+            "1:2"
+          ],
+          "apiValue": "16:9 (Widescreen)"
+        },
+        {
+          "id": "h3u4-size",
+          "name": "大小",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio.size",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "1344×768",
+          "options": [
+            "1344×768",
+            "1152×640",
+            "768×1344",
+            "640×1152",
+            "1024×1024",
+            "768×768",
+            "1216×832",
+            "832×1216",
+            "1536×640",
+            "640×1536",
+            "1152×896",
+            "896×1152"
+          ],
+          "apiValue": "1344×768"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-h3u5",
+      "name": "MiniMaxH3-全能视频5图",
+      "workflow_id": "2090107013543063554",
+      "fields": [
+        {
+          "id": "h3u5-img1",
+          "name": "参考图1",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-img2",
+          "name": "参考图2",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-img3",
+          "name": "参考图3",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-img4",
+          "name": "参考图4",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-img5",
+          "name": "参考图5",
+          "nodeId": "374",
+          "fieldName": "media_state",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-prompt",
+          "name": "提示词",
+          "nodeId": "413",
+          "fieldName": "value",
+          "type": "textarea",
+          "dataType": "textarea",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "h3u5-dur",
+          "name": "时长",
+          "nodeId": "417",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 15
+        },
+        {
+          "id": "h3u5-ratio",
+          "name": "比例",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "16:9 (Widescreen)",
+          "options": [
+            "16:9 (Widescreen)",
+            "9:16 (Portrait Widescreen)",
+            "1:1 (Square)",
+            "4:3 (Standard)",
+            "3:4 (Portrait)",
+            "21:9 (Ultra Widescreen)",
+            "2:1",
+            "1:2"
+          ],
+          "apiValue": "16:9 (Widescreen)"
+        },
+        {
+          "id": "h3u5-size",
+          "name": "大小",
+          "nodeId": "384",
+          "fieldName": "aspect_ratio.size",
+          "type": "select",
+          "dataType": "text",
+          "inputMethod": "dropdown",
+          "default": "1344×768",
+          "options": [
+            "1344×768",
+            "1152×640",
+            "768×1344",
+            "640×1152",
+            "1024×1024",
+            "768×768",
+            "1216×832",
+            "832×1216",
+            "1536×640",
+            "640×1536",
+            "1152×896",
+            "896×1152"
+          ],
+          "apiValue": "1344×768"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-1452kf",
+      "name": "图片高清放大",
+      "workflow_id": "2079963651477430273",
+      "fields": [
+        {
+          "id": "f-saz3lf",
+          "name": "image",
+          "nodeId": "170",
+          "fieldName": "image",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": "71b725502b6060fc3692367a7a2a2568d60e3ca896c249d89c134f78492075a9.png"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-rg8z1r",
+      "name": "视频高清放大",
+      "workflow_id": "2049754667982266370",
+      "fields": [
+        {
+          "id": "f-ed1ypr",
+          "name": "video",
+          "nodeId": "11",
+          "fieldName": "video",
+          "type": "video",
+          "dataType": "video",
+          "inputMethod": "manual",
+          "default": "4c536d2cf0703e1a7ee0234bfcefd48e281b61ddeef9e3e4db1fc1613ceab8fe.mp4"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-6xy2ma",
+      "name": "klein单图编辑",
+      "workflow_id": "2049468077988909057",
+      "fields": [
+        {
+          "id": "f-j582mt",
+          "name": "image",
+          "nodeId": "43",
+          "fieldName": "image",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": "9dff2ec6c27fa5b910046c149baafb1de6de1a2ca2aaf1e6e287c3ae097ac0cf.png"
+        },
+        {
+          "id": "f-dntgvw",
+          "name": "text",
+          "nodeId": "47",
+          "fieldName": "text",
+          "type": "text",
+          "dataType": "text",
+          "inputMethod": "manual",
+          "default": "Remove watermark, clean the image"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-c5uwf4",
+      "name": "zimage文生图",
+      "workflow_id": "2049802598412197889",
+      "fields": [
+        {
+          "id": "f-hp0d4c",
+          "name": "prompt",
+          "nodeId": "39",
+          "fieldName": "text",
+          "type": "text",
+          "dataType": "text",
+          "inputMethod": "manual",
+          "default": ""
+        },
+        {
+          "id": "f-sv8rdp",
+          "name": "width",
+          "nodeId": "48",
+          "fieldName": "width",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 1024
+        },
+        {
+          "id": "f-2np5pz",
+          "name": "height",
+          "nodeId": "48",
+          "fieldName": "height",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 1024
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-2p7r59",
+      "name": "ltx图生视频",
+      "workflow_id": "2060962661160017922",
+      "fields": [
+        {
+          "id": "f-ixul1z",
+          "name": "宽",
+          "nodeId": "217",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 480
+        },
+        {
+          "id": "f-v5uln2",
+          "name": "高",
+          "nodeId": "218",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 832
+        },
+        {
+          "id": "f-dqt71s",
+          "name": "image",
+          "nodeId": "223",
+          "fieldName": "image",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": "bc24a4b1a4d927e24f3285085bac82dbfd1c78c8ce62545c2857095ff8db1f8b.jpg"
+        },
+        {
+          "id": "f-9u4s2r",
+          "name": "时长",
+          "nodeId": "209",
+          "fieldName": "value",
+          "type": "number",
+          "dataType": "number",
+          "inputMethod": "manual",
+          "default": 8
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-0ww8p7",
+      "name": "scail2动作迁移",
+      "workflow_id": "2065018768723632130",
+      "fields": [
+        {
+          "id": "f-yn6umn",
+          "name": "video",
+          "nodeId": "273",
+          "fieldName": "video",
+          "type": "video",
+          "dataType": "video",
+          "inputMethod": "manual",
+          "default": "42045bec6816fba6d81067ff6be89845bd5ddcd4cc8ba01cf3a89c369eeb8446.mp4"
+        },
+        {
+          "id": "f-rpxlgz",
+          "name": "image",
+          "nodeId": "30",
+          "fieldName": "image",
+          "type": "image",
+          "dataType": "image",
+          "inputMethod": "manual",
+          "default": "dc4ae9bc83892c4ec5b668fdafcd6da3b98eec6742cb2df0934fb46d0865d257.png"
+        }
+      ]
+    },
+    {
+      "id": "rh-wf-yt8w8n",
+      "name": "音色设计",
+      "workflow_id": "2086355855464816641",
+      "fields": [
+        {
+          "id": "f-yf7f2e",
+          "name": "台词",
+          "nodeId": "25",
+          "fieldName": "text",
+          "type": "text",
+          "dataType": "text",
+          "inputMethod": "manual",
+          "default": "吊点做在原吊顶的次龙骨上，超载三倍。花墙下面就是新娘站的位置——今天得拆一半。"
+        },
+        {
+          "id": "f-y5jdzi",
+          "name": "音色描述",
+          "nodeId": "24",
+          "fieldName": "text",
+          "type": "text",
+          "dataType": "text",
+          "inputMethod": "manual",
+          "default": "“柳青衣”：清越婉转，如山涧溪流，语速轻快流畅，带着江南女子的灵秀与机敏。说话时常带笑意，尾音微扬，似有余韵。偶尔故意放慢语速，制造反差，引人遐想。"
+        }
+      ]
+    }
+  ]
+}

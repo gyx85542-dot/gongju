@@ -15,7 +15,8 @@ __pycache__/
 history.json
 history.json.*
 *.bak
-data/
+data/*
+!data/runninghub.json
 output/
 assets/
 
